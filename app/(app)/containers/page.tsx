@@ -4,6 +4,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { formatDate } from '@/lib/utils/format'
+import { Info } from 'lucide-react'
 import Link from 'next/link'
 
 export default async function ContainersPage() {
@@ -21,6 +22,10 @@ export default async function ContainersPage() {
   return (
     <div className="space-y-4">
       <h2 className="text-2xl font-bold">컨테이너 현황</h2>
+      <div className="flex items-center gap-2 p-3 bg-muted rounded-md text-sm text-muted-foreground">
+        <Info className="h-4 w-4 shrink-0" />
+        컨테이너 등록/수정은 거래 상세 페이지에서 가능합니다.
+      </div>
 
       <div className="border rounded-lg overflow-hidden">
         <Table>

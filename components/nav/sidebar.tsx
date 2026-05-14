@@ -4,24 +4,13 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import {
-  LayoutDashboard,
-  FileText,
-  Container,
-  Building2,
-  TrendingUp,
-  Settings,
-  LogOut,
-} from 'lucide-react'
+import { FileText, Container, Building2, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const navItems = [
-  { href: '/', label: '대시보드', icon: LayoutDashboard },
   { href: '/transactions', label: '거래 목록', icon: FileText },
   { href: '/containers', label: '컨테이너', icon: Container },
   { href: '/manufacturers', label: '제조사', icon: Building2 },
-  { href: '/exchange-rates', label: '환율 관리', icon: TrendingUp },
-  { href: '/settings', label: '사용자 관리', icon: Settings },
 ]
 
 export function Sidebar() {
