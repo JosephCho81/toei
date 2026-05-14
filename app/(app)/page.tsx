@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { getBokExchangeRate } from '@/lib/api/bok'
 import { Badge } from '@/components/ui/badge'
-import { formatKrw } from '@/lib/utils/format'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { SummaryCards } from '@/components/dashboard/SummaryCards'
+import { DeadlineAlerts } from '@/components/dashboard/DeadlineAlerts'
 import Link from 'next/link'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -17,57 +19,69 @@ export default async function DashboardPage() {
 
   const { data: transactions } = await supabase
     .from('transactions')
-    .select('id, round_label, settlement_status, is_locked')
+    .select('id, round_label, settlement_status, import_amount_usd')
     .order('round_no', { ascending: false })
     .limit(100)
 
-  const statusCounts = (transactions ?? []).reduce<Record<string, number>>((acc, t) => {
-    acc[t.settlement_status] = (acc[t.settlement_status] ?? 0) + 1
-    return acc
-  }, {})
+  const all = transactions ?? []
+  const active = all.filter((t) => t.settlement_status !== 'closing_done')
+  const recent5 = all.slice(0, 5)
 
-  const inProgress = (transactions ?? []).filter(
-    (t) => !['closing_done'].includes(t.settlement_status)
+  const unsettledUsd = active.reduce(
+    (sum, t) => sum + (t.import_amount_usd ? Number(t.import_amount_usd) : 0),
+    0,
   )
+
+  const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  let todayRate: number | null = null
+  try {
+    todayRate = await getBokExchangeRate(todayStr)
+  } catch {
+    // BOK_API_KEY 미설정 시 무시
+  }
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">대시보드</h2>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {Object.entries(STATUS_LABELS).map(([key, label]) => (
-          <Card key={key}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">{label}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{statusCounts[key] ?? 0}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <SummaryCards
+        activeCount={active.length}
+        unsettledUsd={unsettledUsd}
+        todayRate={todayRate}
+      />
 
-      <div>
-        <h3 className="text-lg font-semibold mb-3">진행 중인 거래</h3>
-        {inProgress.length === 0 ? (
-          <p className="text-muted-foreground text-sm">진행 중인 거래가 없습니다.</p>
-        ) : (
-          <div className="space-y-2">
-            {inProgress.slice(0, 10).map((t) => (
+      <DeadlineAlerts />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">최근 5차 거래</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 p-3">
+          {recent5.length === 0 ? (
+            <p className="text-sm text-muted-foreground">거래 데이터가 없습니다.</p>
+          ) : (
+            recent5.map((t) => (
               <Link
                 key={t.id}
                 href={`/transactions/${t.id}`}
-                className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors"
+                className="flex items-center justify-between p-2 border rounded-md hover:bg-accent transition-colors"
               >
                 <span className="text-sm font-medium">{t.round_label}</span>
-                <Badge variant={t.settlement_status === 'pending' ? 'secondary' : 'default'}>
-                  {STATUS_LABELS[t.settlement_status]}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {t.import_amount_usd != null && (
+                    <span className="text-xs text-muted-foreground">
+                      ${Number(t.import_amount_usd).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                    </span>
+                  )}
+                  <Badge variant={t.settlement_status === 'closing_done' ? 'default' : 'secondary'}>
+                    {STATUS_LABELS[t.settlement_status] ?? t.settlement_status}
+                  </Badge>
+                </div>
               </Link>
-            ))}
-          </div>
-        )}
-      </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

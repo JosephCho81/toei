@@ -26,6 +26,7 @@ export default function ManufacturersPage() {
   const [editing, setEditing] = useState<Manufacturer | null>(null)
   const [form, setForm] = useState({ name: '', country: 'JP', notes: '', name_aliases: '' })
   const [saving, setSaving] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   async function load() {
     const { data } = await supabase.from('manufacturers').select('*').order('name')
@@ -62,7 +63,16 @@ export default function ManufacturersPage() {
   }
 
   async function handleDelete(id: string) {
+    setDeleteError(null)
     if (!confirm('정말 삭제하시겠습니까?')) return
+    const { count } = await supabase
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('manufacturer_id', id)
+    if ((count ?? 0) > 0) {
+      setDeleteError('이 제조사에 연결된 거래가 있어 삭제할 수 없습니다.')
+      return
+    }
     await supabase.from('manufacturers').delete().eq('id', id)
     load()
   }
@@ -73,6 +83,12 @@ export default function ManufacturersPage() {
         <h2 className="text-2xl font-bold">제조사 관리</h2>
         <Button size="sm" onClick={openNew}><Plus className="h-4 w-4 mr-1" />추가</Button>
       </div>
+
+      {deleteError && (
+        <div className="rounded-md border border-destructive bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          {deleteError}
+        </div>
+      )}
 
       {showForm && (
         <Card>
