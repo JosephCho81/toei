@@ -51,6 +51,14 @@ export default async function TransactionDetailPage({ params }: { params: Promis
         <div className="flex items-center gap-2">
           <Badge>{STATUS_LABELS[t.settlement_status] ?? t.settlement_status}</Badge>
           {t.is_locked && <Badge variant="outline">🔒 잠금</Badge>}
+          <Link
+            href={`/transactions/${id}/report`}
+            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), !closing?.is_locked && 'pointer-events-none opacity-50')}
+            title={!closing?.is_locked ? '클로징 완료 후 조회 가능' : '정산 리포트'}
+            aria-disabled={!closing?.is_locked}
+          >
+            정산 리포트
+          </Link>
           {!t.is_locked && (
             <Link href={`/transactions/${id}/edit`} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>수정</Link>
           )}
