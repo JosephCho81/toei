@@ -1,83 +1,98 @@
 'use client'
-
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ContainerForm } from './container-form'
+import { ContainerForm } from '@/components/containers/ContainerForm'
 import { formatDate } from '@/lib/utils/format'
-import { Plus } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 
 interface Container {
-  id: string
-  container_no: string
-  carrier: string | null
-  eta: string | null
-  etd: string | null
-  actual_arrival: string | null
-  vessel_name: string | null
+  id: string; container_no: string; bl_no: string | null; lc_number: string | null
+  container_size: string | null; carrier: string | null; eta: string | null; etd: string | null
+  actual_departure: string | null; actual_arrival: string | null; vessel_name: string | null
+  voyage_no: string | null; carton_count: number | null; manual_notes: string | null
   tracking_status: string | null
-  last_tracked_at: string | null
 }
 
 export function ContainerList({ transactionId, isLocked }: { transactionId: string; isLocked: boolean }) {
-  const [containers, setContainers] = useState<Container[]>([])
-  const [showForm, setShowForm] = useState(false)
   const supabase = createClient()
+  const [containers, setContainers] = useState<Container[]>([])
+  const [dialog, setDialog] = useState<{ open: boolean; editing: Container | null }>({ open: false, editing: null })
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   async function load() {
-    const { data } = await supabase
-      .from('containers')
-      .select('id,container_no,carrier,eta,etd,actual_arrival,vessel_name,tracking_status,last_tracked_at')
-      .eq('transaction_id', transactionId)
-      .order('created_at')
+    const { data } = await supabase.from('containers')
+      .select('id,container_no,bl_no,lc_number,container_size,carrier,eta,etd,actual_departure,actual_arrival,vessel_name,voyage_no,carton_count,manual_notes,tracking_status')
+      .eq('transaction_id', transactionId).order('created_at')
     setContainers(data ?? [])
   }
 
   useEffect(() => { load() }, [transactionId])
+
+  async function handleDelete(id: string) {
+    await supabase.from('containers').delete().eq('id', id)
+    setDeleteId(null); load()
+  }
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base">컨테이너 ({containers.length})</CardTitle>
         {!isLocked && (
-          <Button size="sm" variant="outline" onClick={() => setShowForm(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            추가
+          <Button size="sm" variant="outline" onClick={() => setDialog({ open: true, editing: null })}>
+            <Plus className="h-4 w-4 mr-1" />추가
           </Button>
         )}
       </CardHeader>
-      <CardContent>
-        {showForm && (
-          <ContainerForm
-            transactionId={transactionId}
-            onSaved={() => { setShowForm(false); load() }}
-            onCancel={() => setShowForm(false)}
-          />
-        )}
-        {containers.length === 0 && !showForm && (
+      <CardContent className="space-y-2">
+        {containers.length === 0 && (
           <p className="text-sm text-muted-foreground">등록된 컨테이너가 없습니다.</p>
         )}
-        <div className="space-y-2 mt-2">
-          {containers.map((c) => (
-            <div key={c.id} className="border rounded-lg p-3 text-sm">
-              <div className="flex items-center justify-between mb-1">
+        {containers.map((c) => (
+          <div key={c.id} className="border rounded-lg p-3 text-sm">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-mono font-semibold">{c.container_no}</span>
-                <div className="flex gap-2">
-                  {c.carrier && <Badge variant="outline" className="text-xs">{c.carrier}</Badge>}
-                  {c.tracking_status && <span className="text-xs text-muted-foreground">{c.tracking_status}</span>}
+                {c.container_size && <Badge variant="outline" className="text-xs">{c.container_size}</Badge>}
+                {c.carrier && <Badge variant="outline" className="text-xs">{c.carrier}</Badge>}
+                {c.tracking_status && <span className="text-xs text-muted-foreground">{c.tracking_status}</span>}
+              </div>
+              {!isLocked && (
+                <div className="flex gap-1 shrink-0 ml-2">
+                  {deleteId === c.id ? (
+                    <>
+                      <Button size="sm" variant="destructive" className="h-6 text-xs px-2" onClick={() => handleDelete(c.id)}>삭제 확인</Button>
+                      <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setDeleteId(null)}>취소</Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setDialog({ open: true, editing: c })}><Pencil className="h-3 w-3" /></Button>
+                      <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => setDeleteId(c.id)}><Trash2 className="h-3 w-3" /></Button>
+                    </>
+                  )}
                 </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-muted-foreground">
-                <span>ETD: {formatDate(c.etd)}</span>
-                <span>ETA: {formatDate(c.eta)}</span>
-                <span>실착: {formatDate(c.actual_arrival)}</span>
-              </div>
-              {c.vessel_name && <p className="mt-1 text-xs text-muted-foreground">선박: {c.vessel_name}</p>}
+              )}
             </div>
-          ))}
-        </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-0.5 text-xs text-muted-foreground mt-1">
+              <span>ETD: {formatDate(c.etd)}</span>
+              <span>ETA: {formatDate(c.eta)}</span>
+              {c.actual_arrival && <span>실착: {formatDate(c.actual_arrival)}</span>}
+              {c.bl_no && <span>B/L: {c.bl_no}</span>}
+              {c.vessel_name && <span>선박: {c.vessel_name}</span>}
+              {c.carton_count != null && <span>카톤: {c.carton_count.toLocaleString()}</span>}
+            </div>
+            {c.manual_notes && <p className="mt-1 text-xs text-muted-foreground">{c.manual_notes}</p>}
+          </div>
+        ))}
+        <ContainerForm
+          transactionId={transactionId}
+          open={dialog.open}
+          onOpenChange={(v) => setDialog(d => ({ ...d, open: v }))}
+          initialData={dialog.editing}
+          onSaved={() => { setDialog({ open: false, editing: null }); load() }}
+        />
       </CardContent>
     </Card>
   )
