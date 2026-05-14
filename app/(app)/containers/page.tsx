@@ -13,8 +13,7 @@ export default async function ContainersPage() {
   const { data: containers } = await supabase
     .from('containers')
     .select(`
-      id, container_no, carrier, eta, etd, actual_arrival,
-      vessel_name, tracking_status, last_tracked_at,
+      id, carrier, eta, etd, vessel_name, tracking_status, last_tracked_at,
       transactions(id, round_label)
     `)
     .order('created_at', { ascending: false })
@@ -31,50 +30,50 @@ export default async function ContainersPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>컨테이너 번호</TableHead>
+              <TableHead>차수</TableHead>
               <TableHead>선사</TableHead>
-              <TableHead>거래</TableHead>
               <TableHead>ETD</TableHead>
               <TableHead>ETA</TableHead>
-              <TableHead>실착일</TableHead>
-              <TableHead>선박</TableHead>
-              <TableHead>상태</TableHead>
+              <TableHead>현재위치</TableHead>
+              <TableHead>추적상태</TableHead>
+              <TableHead>마지막업데이트</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {(containers ?? []).map((c) => {
               const txRaw = c.transactions
-              const tx = Array.isArray(txRaw) ? txRaw[0] as { id: string; round_label: string } | undefined : txRaw as { id: string; round_label: string } | null
+              const tx = Array.isArray(txRaw)
+                ? txRaw[0] as { id: string; round_label: string } | undefined
+                : txRaw as { id: string; round_label: string } | null
               return (
                 <TableRow key={c.id}>
-                  <TableCell className="font-mono font-semibold">{c.container_no}</TableCell>
-                  <TableCell>
-                    {c.carrier ? (
-                      <Badge variant="outline" className="text-xs">{c.carrier}</Badge>
-                    ) : '-'}
-                  </TableCell>
                   <TableCell>
                     {tx ? (
-                      <Link href={`/transactions/${tx.id}`} className="text-sm hover:underline">
+                      <Link href={`/transactions/${tx.id}`} className="text-sm font-medium hover:underline">
                         {tx.round_label}
                       </Link>
                     ) : '-'}
                   </TableCell>
+                  <TableCell>
+                    {c.carrier ? <Badge variant="outline" className="text-xs">{c.carrier}</Badge> : '-'}
+                  </TableCell>
                   <TableCell className="text-sm">{formatDate(c.etd)}</TableCell>
                   <TableCell className="text-sm">{formatDate(c.eta)}</TableCell>
-                  <TableCell className="text-sm">{formatDate(c.actual_arrival)}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{c.vessel_name ?? '-'}</TableCell>
                   <TableCell>
-                    {c.tracking_status ? (
-                      <span className="text-xs text-muted-foreground">{c.tracking_status}</span>
-                    ) : '-'}
+                    {c.tracking_status
+                      ? <span className="text-xs text-muted-foreground">{c.tracking_status}</span>
+                      : '-'}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {c.last_tracked_at ? new Date(c.last_tracked_at).toLocaleDateString('ko-KR') : '-'}
                   </TableCell>
                 </TableRow>
               )
             })}
             {!containers?.length && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   등록된 컨테이너가 없습니다.
                 </TableCell>
               </TableRow>

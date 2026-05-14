@@ -7,35 +7,22 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ItemsInputSection, blankItem, type ItemRow } from '@/components/transactions/ItemsInputSection'
 
-interface Manufacturer {
-  id: string
-  name: string
-}
+interface Manufacturer { id: string; name: string }
 
 export default function NewTransactionPage() {
   const router = useRouter()
   const supabase = createClient()
-
   const [manufacturers, setManufacturers] = useState<Manufacturer[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
+  const [items, setItems] = useState<ItemRow[]>([blankItem()])
   const [form, setForm] = useState({
-    round_no: '',
-    round_label: '',
-    order_no: '',
-    manufacturer_id: '',
-    import_amount_usd: '',
-    lc_no: '',
-    lc_open_date: '',
-    customs_date: '',
-    customs_exchange_rate: '',
-    margin_rate_pct: '',
-    notes: '',
+    round_no: '', round_label: '', order_no: '', manufacturer_id: '',
+    import_amount_usd: '', lc_no: '', lc_open_date: '', customs_date: '',
+    customs_exchange_rate: '', notes: '',
   })
 
   useEffect(() => {
@@ -44,17 +31,12 @@ export default function NewTransactionPage() {
     })
   }, [])
 
-  function set(key: string, value: string) {
-    setForm((prev) => ({ ...prev, [key]: value }))
-  }
+  function set(key: string, value: string) { setForm((prev) => ({ ...prev, [key]: value })) }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!form.round_no || !form.round_label) {
-      setError('차수 번호와 라벨은 필수입니다.')
-      return
-    }
+    if (!form.round_no || !form.round_label) { setError('차수 번호와 라벨은 필수입니다.'); return }
     setSaving(true)
     const { data, error: err } = await supabase.from('transactions').insert({
       round_no: parseInt(form.round_no),
@@ -66,23 +48,34 @@ export default function NewTransactionPage() {
       lc_open_date: form.lc_open_date || null,
       customs_date: form.customs_date || null,
       customs_exchange_rate: form.customs_exchange_rate ? parseFloat(form.customs_exchange_rate) : null,
-      margin_rate_pct: form.margin_rate_pct ? parseFloat(form.margin_rate_pct) : null,
       notes: form.notes || null,
     }).select('id').single()
 
-    setSaving(false)
-    if (err) {
-      setError(err.message)
-      return
+    if (err) { setSaving(false); setError(err.message); return }
+
+    const validItems = items.filter((r) => r.spec || r.quantity || r.unit_price_usd)
+    if (validItems.length > 0) {
+      await supabase.from('transaction_items').insert(
+        validItems.map((r, i) => ({
+          transaction_id: data.id,
+          spec: r.spec || null, glove_type: r.glove_type || null,
+          color: r.color || null, size: r.size || null,
+          unit_price_usd: r.unit_price_usd ? parseFloat(r.unit_price_usd) : null,
+          quantity: r.quantity ? parseInt(r.quantity) : null,
+          unit: r.unit || 'DZ',
+          sort_order: i,
+        }))
+      )
     }
+
+    setSaving(false)
     router.push(`/transactions/${data.id}`)
   }
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="max-w-3xl space-y-4">
       <h2 className="text-2xl font-bold">새 거래 등록</h2>
-
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="space-y-4">
         <Card>
           <CardHeader><CardTitle className="text-base">기본 정보</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
@@ -99,17 +92,12 @@ export default function NewTransactionPage() {
               <Select value={form.manufacturer_id} onValueChange={(v) => set('manufacturer_id', v ?? '')}>
                 <SelectTrigger><SelectValue placeholder="선택" /></SelectTrigger>
                 <SelectContent>
-                  {manufacturers.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                  ))}
+                  {manufacturers.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </Field>
             <Field label="수입금액 (USD)">
               <Input type="number" step="0.0001" value={form.import_amount_usd} onChange={(e) => set('import_amount_usd', e.target.value)} />
-            </Field>
-            <Field label="마진율 (%)">
-              <Input type="number" step="0.01" value={form.margin_rate_pct} onChange={(e) => set('margin_rate_pct', e.target.value)} />
             </Field>
             <Field label="LC 번호">
               <Input value={form.lc_no} onChange={(e) => set('lc_no', e.target.value)} />
@@ -131,9 +119,15 @@ export default function NewTransactionPage() {
           </CardContent>
         </Card>
 
-        {error && <p className="text-sm text-destructive mt-2">{error}</p>}
+        <Card>
+          <CardHeader><CardTitle className="text-base">품목</CardTitle></CardHeader>
+          <CardContent>
+            <ItemsInputSection items={items} onChange={setItems} />
+          </CardContent>
+        </Card>
 
-        <div className="flex gap-2 mt-4">
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <div className="flex gap-2">
           <Button type="button" variant="outline" onClick={() => router.back()}>취소</Button>
           <Button type="submit" disabled={saving}>{saving ? '저장 중...' : '등록'}</Button>
         </div>
