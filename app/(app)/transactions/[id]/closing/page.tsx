@@ -38,6 +38,12 @@ export default function ClosingSettlementPage() {
     import_amount_usd: number | null
     customs_exchange_rate: number | null
   } | null>(null)
+  const [interimSummary, setInterimSummary] = useState<{
+    confirmed_amount_krw: number | null
+    customs_exchange_rate: number | null
+    is_locked: boolean
+    updated_at: string | null
+  } | null>(null)
   const [settlementId, setSettlementId] = useState<string | null>(null)
   const [isLocked, setIsLocked] = useState(false)
 
@@ -66,12 +72,12 @@ export default function ClosingSettlementPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: t } = await supabase
-        .from('transactions')
-        .select('import_amount_usd,customs_exchange_rate')
-        .eq('id', id)
-        .single()
+      const [{ data: t }, { data: interim }] = await Promise.all([
+        supabase.from('transactions').select('import_amount_usd,customs_exchange_rate').eq('id', id).single(),
+        supabase.from('interim_settlements').select('confirmed_amount_krw,customs_exchange_rate,is_locked,updated_at').eq('transaction_id', id).single(),
+      ])
       setTransaction(t)
+      if (interim) setInterimSummary(interim as typeof interimSummary)
 
       const { data: closing } = await supabase
         .from('closing_settlements')
@@ -205,6 +211,35 @@ export default function ClosingSettlementPage() {
         <h2 className="text-2xl font-bold">클로징정산</h2>
         {isLocked && <Badge variant="outline">🔒 확정</Badge>}
       </div>
+
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">중간정산 요약</CardTitle></CardHeader>
+        <CardContent className="text-sm">
+          {interimSummary?.is_locked ? (
+            <div className="flex items-center gap-6">
+              <div>
+                <span className="text-muted-foreground">확정금액</span>
+                <p className="font-bold text-lg font-mono">
+                  {interimSummary.confirmed_amount_krw?.toLocaleString('ko-KR')}원
+                </p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">통관환율</span>
+                <p className="font-mono">{interimSummary.customs_exchange_rate?.toLocaleString('ko-KR')}원/$</p>
+              </div>
+              {interimSummary.updated_at && (
+                <div>
+                  <span className="text-muted-foreground">정산일</span>
+                  <p>{new Date(interimSummary.updated_at).toLocaleDateString('ko-KR')}</p>
+                </div>
+              )}
+              <Badge variant="default" className="text-xs">완료</Badge>
+            </div>
+          ) : (
+            <Badge variant="destructive" className="text-xs">중간정산 미완료</Badge>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle className="text-base">클로징 기본 정보</CardTitle></CardHeader>

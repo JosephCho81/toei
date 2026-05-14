@@ -29,8 +29,8 @@ export default async function TransactionDetailPage({ params }: { params: Promis
     .select(`
       *,
       manufacturers(name),
-      interim_settlements(id, confirmed_amount_krw, is_locked, is_paid),
-      closing_settlements(id, confirmed_amount_krw, is_locked, is_paid)
+      interim_settlements(id, confirmed_amount_krw, is_locked, is_paid, updated_at),
+      closing_settlements(id, confirmed_amount_krw, is_locked, is_paid, closing_date)
     `)
     .eq('id', id)
     .single()
@@ -38,8 +38,8 @@ export default async function TransactionDetailPage({ params }: { params: Promis
   if (!t) notFound()
 
   const mfr = t.manufacturers as { name: string } | null
-  const interim = (t.interim_settlements as { id: string; confirmed_amount_krw: number | null; is_locked: boolean; is_paid: boolean }[] | null)?.[0]
-  const closing = (t.closing_settlements as { id: string; confirmed_amount_krw: number | null; is_locked: boolean; is_paid: boolean }[] | null)?.[0]
+  const interim = (t.interim_settlements as { id: string; confirmed_amount_krw: number | null; is_locked: boolean; is_paid: boolean; updated_at: string | null }[] | null)?.[0]
+  const closing = (t.closing_settlements as { id: string; confirmed_amount_krw: number | null; is_locked: boolean; is_paid: boolean; closing_date: string | null }[] | null)?.[0]
 
   return (
     <div className="space-y-6">
@@ -71,30 +71,28 @@ export default async function TransactionDetailPage({ params }: { params: Promis
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">정산 현황</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <SettlementRow
-              label="중간정산"
-              href={`/transactions/${id}/interim`}
-              amount={interim?.confirmed_amount_krw ?? null}
-              isLocked={interim?.is_locked ?? false}
-              isPaid={interim?.is_paid ?? false}
-              settlementId={interim?.id ?? null}
-              pdfType="interim"
-            />
-            <Separator />
-            <SettlementRow
-              label="클로징정산"
-              href={`/transactions/${id}/closing`}
-              amount={closing?.confirmed_amount_krw ?? null}
-              isLocked={closing?.is_locked ?? false}
-              isPaid={closing?.is_paid ?? false}
-              settlementId={closing?.id ?? null}
-              pdfType="closing"
-            />
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-2 gap-4">
+          <SettlementCard
+            label="중간정산"
+            href={`/transactions/${id}/interim`}
+            amount={interim?.confirmed_amount_krw ?? null}
+            date={interim?.updated_at ?? null}
+            isLocked={interim?.is_locked ?? false}
+            settlementId={interim?.id ?? null}
+            pdfType="interim"
+            txLocked={t.is_locked}
+          />
+          <SettlementCard
+            label="클로징정산"
+            href={`/transactions/${id}/closing`}
+            amount={closing?.confirmed_amount_krw ?? null}
+            date={closing?.closing_date ?? null}
+            isLocked={closing?.is_locked ?? false}
+            settlementId={closing?.id ?? null}
+            pdfType="closing"
+            txLocked={t.is_locked}
+          />
+        </div>
       </div>
 
       <ItemsEditTable transactionId={id} isLocked={t.is_locked} />
@@ -122,33 +120,34 @@ function Row({ label, value }: { label: string; value: string }) {
   )
 }
 
-function SettlementRow({
-  label, href, amount, isLocked, isPaid, settlementId, pdfType,
+function SettlementCard({
+  label, href, amount, date, isLocked, settlementId, pdfType, txLocked,
 }: {
-  label: string
-  href: string
-  amount: number | null
-  isLocked: boolean
-  isPaid: boolean
-  settlementId: string | null
-  pdfType: 'interim' | 'closing'
+  label: string; href: string; amount: number | null; date: string | null
+  isLocked: boolean; settlementId: string | null; pdfType: 'interim' | 'closing'; txLocked: boolean
 }) {
   return (
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium">{label}</p>
-        {amount != null && (
-          <p className="text-lg font-bold">{amount.toLocaleString('ko-KR')}원</p>
-        )}
-        <div className="flex gap-1 mt-1">
-          {isLocked && <Badge variant="outline" className="text-xs">확정</Badge>}
-          {isPaid && <Badge variant="default" className="text-xs">지불완료</Badge>}
+    <Card>
+      <CardContent className="pt-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold">{label}</p>
+          {isLocked
+            ? <Badge variant="default" className="text-xs">완료</Badge>
+            : <Badge variant="secondary" className="text-xs">미정산</Badge>}
         </div>
-      </div>
-      <div className="flex gap-2">
-        <SettlementPdfButton type={pdfType} settlementId={settlementId} isLocked={isLocked} />
-        <Link href={href} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>{amount == null ? '입력' : '보기/수정'}</Link>
-      </div>
-    </div>
+        {amount != null && (
+          <p className="text-xl font-bold font-mono">{amount.toLocaleString('ko-KR')}원</p>
+        )}
+        {date && <p className="text-xs text-muted-foreground">{formatDate(date)}</p>}
+        <div className="flex gap-2 pt-1">
+          <SettlementPdfButton type={pdfType} settlementId={settlementId} isLocked={isLocked} />
+          {!txLocked && (
+            <Link href={href} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
+              {amount == null ? '정산 시작' : '상세보기'}
+            </Link>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
