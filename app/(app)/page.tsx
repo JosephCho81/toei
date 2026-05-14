@@ -75,7 +75,8 @@ export default async function DashboardPage() {
             <p className="text-sm text-muted-foreground">거래 데이터가 없습니다.</p>
           ) : (
             recent5.map((t) => {
-              const mfr = t.manufacturers as { name: string } | null
+              const mfrArr = t.manufacturers as { name: string }[] | { name: string } | null
+              const mfrName = Array.isArray(mfrArr) ? mfrArr[0]?.name : mfrArr?.name
               return (
                 <Link
                   key={t.id}
@@ -84,8 +85,8 @@ export default async function DashboardPage() {
                 >
                   <div>
                     <span className="text-sm font-medium">{t.round_label}</span>
-                    {mfr?.name && (
-                      <span className="ml-2 text-xs text-muted-foreground">{mfr.name}</span>
+                    {mfrName && (
+                      <span className="ml-2 text-xs text-muted-foreground">{mfrName}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
