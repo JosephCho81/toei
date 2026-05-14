@@ -8,6 +8,7 @@ import { formatDate, formatUsd, formatExchangeRate } from '@/lib/utils/format'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { ContainerList } from './container-list'
+import { SettlementPdfButton } from '@/components/settlements/SettlementPdfButton'
 
 const STATUS_LABELS: Record<string, string> = {
   pending: '미진행',
@@ -26,8 +27,8 @@ export default async function TransactionDetailPage({ params }: { params: Promis
     .select(`
       *,
       manufacturers(name),
-      interim_settlements(confirmed_amount_krw, is_locked, is_paid),
-      closing_settlements(confirmed_amount_krw, is_locked, is_paid)
+      interim_settlements(id, confirmed_amount_krw, is_locked, is_paid),
+      closing_settlements(id, confirmed_amount_krw, is_locked, is_paid)
     `)
     .eq('id', id)
     .single()
@@ -35,8 +36,8 @@ export default async function TransactionDetailPage({ params }: { params: Promis
   if (!t) notFound()
 
   const mfr = t.manufacturers as { name: string } | null
-  const interim = (t.interim_settlements as { confirmed_amount_krw: number | null; is_locked: boolean; is_paid: boolean }[] | null)?.[0]
-  const closing = (t.closing_settlements as { confirmed_amount_krw: number | null; is_locked: boolean; is_paid: boolean }[] | null)?.[0]
+  const interim = (t.interim_settlements as { id: string; confirmed_amount_krw: number | null; is_locked: boolean; is_paid: boolean }[] | null)?.[0]
+  const closing = (t.closing_settlements as { id: string; confirmed_amount_krw: number | null; is_locked: boolean; is_paid: boolean }[] | null)?.[0]
 
   return (
     <div className="space-y-6">
@@ -77,6 +78,8 @@ export default async function TransactionDetailPage({ params }: { params: Promis
               amount={interim?.confirmed_amount_krw ?? null}
               isLocked={interim?.is_locked ?? false}
               isPaid={interim?.is_paid ?? false}
+              settlementId={interim?.id ?? null}
+              pdfType="interim"
             />
             <Separator />
             <SettlementRow
@@ -85,6 +88,8 @@ export default async function TransactionDetailPage({ params }: { params: Promis
               amount={closing?.confirmed_amount_krw ?? null}
               isLocked={closing?.is_locked ?? false}
               isPaid={closing?.is_paid ?? false}
+              settlementId={closing?.id ?? null}
+              pdfType="closing"
             />
           </CardContent>
         </Card>
@@ -112,13 +117,15 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function SettlementRow({
-  label, href, amount, isLocked, isPaid
+  label, href, amount, isLocked, isPaid, settlementId, pdfType,
 }: {
   label: string
   href: string
   amount: number | null
   isLocked: boolean
   isPaid: boolean
+  settlementId: string | null
+  pdfType: 'interim' | 'closing'
 }) {
   return (
     <div className="flex items-center justify-between">
@@ -132,7 +139,10 @@ function SettlementRow({
           {isPaid && <Badge variant="default" className="text-xs">지불완료</Badge>}
         </div>
       </div>
-      <Link href={href} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>{amount == null ? '입력' : '보기/수정'}</Link>
+      <div className="flex gap-2">
+        <SettlementPdfButton type={pdfType} settlementId={settlementId} isLocked={isLocked} />
+        <Link href={href} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>{amount == null ? '입력' : '보기/수정'}</Link>
+      </div>
     </div>
   )
 }
