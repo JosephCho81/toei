@@ -8,19 +8,15 @@ export default async function TransactionEditPage({ params }: { params: Promise<
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: t } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('id', id)
-    .single()
+  const [{ data: t }, { data: manufacturers }] = await Promise.all([
+    supabase.from('transactions').select('*').eq('id', id).single(),
+    supabase.from('manufacturers').select('id, name').order('name'),
+  ])
 
   if (!t) notFound()
   if (t.is_locked) redirect(`/transactions/${id}`)
 
-  const { data: manufacturers } = await supabase
-    .from('manufacturers')
-    .select('id, name')
-    .order('name')
+  const manufacturerName = manufacturers?.find((m) => m.id === t.manufacturer_id)?.name ?? null
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -30,8 +26,8 @@ export default async function TransactionEditPage({ params }: { params: Promise<
       </div>
       <TransactionEditForm
         transactionId={id}
+        manufacturerName={manufacturerName}
         initialData={t}
-        manufacturers={manufacturers ?? []}
       />
       <ShipmentsEditSection transactionId={id} />
     </div>

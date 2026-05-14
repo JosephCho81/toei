@@ -1,197 +1,136 @@
 'use client'
-
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
+import { StatusFields } from './StatusFields'
 
-interface TransactionData {
-  id: string
-  round_no: number
-  round_label: string
-  order_no: string | null
-  manufacturer_id: string | null
-  import_amount_usd: string | number | null
-  lc_no: string | null
-  lc_open_date: string | null
-  customs_date: string | null
-  customs_exchange_rate: string | number | null
-  margin_rate_pct: string | number | null
+const schema = z.object({
+  round_label: z.string().min(1, '필수'),
+  order_no: z.string(), import_amount_usd: z.string(),
+  lc_no: z.string(), lc_open_date: z.string(),
+  a1_payment_date: z.string(), lc_expiry_date: z.string(),
+  customs_date: z.string(), customs_exchange_rate: z.string(),
+  margin_rate_pct: z.string(),
+  lc_status: z.string(), logistics_status: z.string(), document_status: z.string(),
+  notes: z.string(),
+})
+type FV = z.infer<typeof schema>
+
+interface InitData {
+  round_label: string; order_no: string | null
+  import_amount_usd: string | number | null; lc_no: string | null
+  lc_open_date: string | null; a1_payment_date: string | null
+  lc_expiry_date: string | null; customs_date: string | null
+  customs_exchange_rate: string | number | null; margin_rate_pct: string | number | null
+  lc_status: string | null; logistics_status: string | null; document_status: string | null
   notes: string | null
 }
 
-interface Manufacturer {
-  id: string
-  name: string
-}
+function s(v: unknown): string { return v == null ? '' : String(v) }
 
-interface Props {
+export default function TransactionEditForm({
+  transactionId, manufacturerName, initialData,
+}: {
   transactionId: string
-  initialData: TransactionData
-  manufacturers: Manufacturer[]
-}
-
-function toStr(v: string | number | null | undefined): string {
-  return v == null ? '' : String(v)
-}
-
-export default function TransactionEditForm({ transactionId, initialData, manufacturers }: Props) {
+  manufacturerName: string | null
+  initialData: InitData
+}) {
   const router = useRouter()
   const supabase = createClient()
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const initial = {
+  const defaults: FV = {
     round_label: initialData.round_label,
     order_no: initialData.order_no ?? '',
-    manufacturer_id: initialData.manufacturer_id ?? '',
-    import_amount_usd: toStr(initialData.import_amount_usd),
+    import_amount_usd: s(initialData.import_amount_usd),
     lc_no: initialData.lc_no ?? '',
     lc_open_date: initialData.lc_open_date ?? '',
+    a1_payment_date: initialData.a1_payment_date ?? '',
+    lc_expiry_date: initialData.lc_expiry_date ?? '',
     customs_date: initialData.customs_date ?? '',
-    customs_exchange_rate: toStr(initialData.customs_exchange_rate),
-    margin_rate_pct: toStr(initialData.margin_rate_pct),
+    customs_exchange_rate: s(initialData.customs_exchange_rate),
+    margin_rate_pct: s(initialData.margin_rate_pct),
+    lc_status: initialData.lc_status ?? '',
+    logistics_status: initialData.logistics_status ?? '',
+    document_status: initialData.document_status ?? '',
     notes: initialData.notes ?? '',
   }
 
-  const [form, setForm] = useState(initial)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { register, handleSubmit, watch, setValue, formState: { isDirty, isSubmitting, errors } } =
+    useForm<FV>({ resolver: zodResolver(schema), defaultValues: defaults })
 
-  const isDirty = (Object.keys(initial) as (keyof typeof initial)[]).some(
-    (k) => form[k] !== initial[k]
-  )
+  const [ls, lgs, ds] = watch(['lc_status', 'logistics_status', 'document_status'])
 
-  function set(key: keyof typeof initial, value: string) {
-    setForm((prev) => ({ ...prev, [key]: value }))
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    if (!form.round_label) {
-      setError('차수 라벨은 필수입니다.')
-      return
-    }
-    setSaving(true)
-    const { error: err } = await supabase
-      .from('transactions')
-      .update({
-        round_label: form.round_label,
-        order_no: form.order_no || null,
-        manufacturer_id: form.manufacturer_id || null,
-        import_amount_usd: form.import_amount_usd ? parseFloat(form.import_amount_usd) : null,
-        lc_no: form.lc_no || null,
-        lc_open_date: form.lc_open_date || null,
-        customs_date: form.customs_date || null,
-        customs_exchange_rate: form.customs_exchange_rate ? parseFloat(form.customs_exchange_rate) : null,
-        margin_rate_pct: form.margin_rate_pct ? parseFloat(form.margin_rate_pct) : null,
-        notes: form.notes || null,
-      })
-      .eq('id', transactionId)
-
-    setSaving(false)
-    if (err) {
-      setError(err.message)
-      return
-    }
+  async function onSubmit(v: FV) {
+    setSubmitError(null)
+    const { error } = await supabase.from('transactions').update({
+      round_label: v.round_label,
+      order_no: v.order_no || null,
+      import_amount_usd: v.import_amount_usd ? parseFloat(v.import_amount_usd) : null,
+      lc_no: v.lc_no || null,
+      lc_open_date: v.lc_open_date || null,
+      a1_payment_date: v.a1_payment_date || null,
+      lc_expiry_date: v.lc_expiry_date || null,
+      customs_date: v.customs_date || null,
+      customs_exchange_rate: v.customs_exchange_rate ? parseFloat(v.customs_exchange_rate) : null,
+      margin_rate_pct: v.margin_rate_pct ? parseFloat(v.margin_rate_pct) : null,
+      lc_status: v.lc_status || null,
+      logistics_status: v.logistics_status || null,
+      document_status: v.document_status || null,
+      notes: v.notes || null,
+    }).eq('id', transactionId)
+    if (error) { setSubmitError(error.message); return }
     router.push(`/transactions/${transactionId}`)
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <Card>
         <CardHeader><CardTitle className="text-base">기본 정보</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-2 gap-4">
-          <Field label="차수 번호 (변경 불가)">
-            <Input value={initialData.round_no} disabled className="bg-muted" />
-          </Field>
-          <Field label="차수 라벨 *">
-            <Input
-              value={form.round_label}
-              onChange={(e) => set('round_label', e.target.value)}
-              required
-            />
-          </Field>
-          <Field label="발주번호">
-            <Input
-              value={form.order_no}
-              onChange={(e) => set('order_no', e.target.value)}
-              placeholder="TOSK01/27"
-            />
-          </Field>
-          <Field label="제조사">
-            <Select value={form.manufacturer_id} onValueChange={(v) => set('manufacturer_id', v ?? '')}>
-              <SelectTrigger><SelectValue placeholder="선택" /></SelectTrigger>
-              <SelectContent>
-                {manufacturers.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="수입금액 (USD)">
-            <Input
-              type="number"
-              step="0.0001"
-              value={form.import_amount_usd}
-              onChange={(e) => set('import_amount_usd', e.target.value)}
-            />
-          </Field>
-          <Field label="마진율 (%)">
-            <Input
-              type="number"
-              step="0.01"
-              value={form.margin_rate_pct}
-              onChange={(e) => set('margin_rate_pct', e.target.value)}
-            />
-          </Field>
-          <Field label="LC 번호">
-            <Input value={form.lc_no} onChange={(e) => set('lc_no', e.target.value)} />
-          </Field>
-          <Field label="LC 개설일">
-            <Input type="date" value={form.lc_open_date} onChange={(e) => set('lc_open_date', e.target.value)} />
-          </Field>
-          <Field label="통관일">
-            <Input type="date" value={form.customs_date} onChange={(e) => set('customs_date', e.target.value)} />
-          </Field>
-          <Field label="통관환율 (원/$)">
-            <Input
-              type="number"
-              step="0.0001"
-              value={form.customs_exchange_rate}
-              onChange={(e) => set('customs_exchange_rate', e.target.value)}
-            />
-          </Field>
+          <F label="제조사 (변경 불가)">
+            <div className="h-9 px-3 py-2 text-sm border rounded-md bg-muted">{manufacturerName ?? '-'}</div>
+          </F>
+          <F label="차수 라벨 *">
+            <Input {...register('round_label')} />
+            {errors.round_label && <p className="text-xs text-destructive">{errors.round_label.message}</p>}
+          </F>
+          <F label="발주번호"><Input {...register('order_no')} /></F>
+          <F label="수입금액 (USD)"><Input type="number" step="0.0001" {...register('import_amount_usd')} /></F>
+          <F label="LC 번호"><Input {...register('lc_no')} /></F>
+          <F label="LC 개설일"><Input type="date" {...register('lc_open_date')} /></F>
+          <F label="A1 지불일"><Input type="date" {...register('a1_payment_date')} /></F>
+          <F label="LC 만기일"><Input type="date" {...register('lc_expiry_date')} /></F>
+          <F label="통관일"><Input type="date" {...register('customs_date')} /></F>
+          <F label="통관환율 (원/$)"><Input type="number" step="0.0001" {...register('customs_exchange_rate')} /></F>
+          <F label="마진율 (%)"><Input type="number" step="0.01" {...register('margin_rate_pct')} /></F>
+          <StatusFields
+            values={{ lc_status: ls, logistics_status: lgs, document_status: ds }}
+            onChange={(k, v) => setValue(k, v, { shouldDirty: true })}
+          />
           <div className="col-span-2">
-            <Field label="메모">
-              <Input value={form.notes} onChange={(e) => set('notes', e.target.value)} />
-            </Field>
+            <F label="메모"><Input {...register('notes')} /></F>
           </div>
         </CardContent>
       </Card>
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
-
+      {submitError && <p className="text-sm text-destructive">{submitError}</p>}
       <div className="flex gap-2">
         <Button type="button" variant="outline" onClick={() => router.back()}>취소</Button>
-        <Button type="submit" disabled={saving || !isDirty}>
-          {saving ? '저장 중...' : '저장'}
+        <Button type="submit" disabled={isSubmitting || !isDirty}>
+          {isSubmitting ? '저장 중...' : '저장'}
         </Button>
       </div>
     </form>
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-sm">{label}</Label>
-      {children}
-    </div>
-  )
+function F({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div className="space-y-1"><Label className="text-sm">{label}</Label>{children}</div>
 }

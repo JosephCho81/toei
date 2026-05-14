@@ -7,7 +7,7 @@ import {
 import { formatDate, formatUsd } from '@/lib/utils/format'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Plus, Download } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, { label: string; variant: 'secondary' | 'default' | 'outline' | 'destructive' }> = {
   pending:       { label: '미진행', variant: 'secondary' },
@@ -33,10 +33,18 @@ export default async function TransactionsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">거래 목록</h2>
-        <Link href="/transactions/new" className={cn(buttonVariants({ size: 'sm' }))}>
-          <Plus className="h-4 w-4 mr-1" />
-          새 거래 등록
-        </Link>
+        <div className="flex gap-2">
+          <a
+            href="/api/export/transactions"
+            download
+            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+          >
+            <Download className="h-4 w-4 mr-1" />엑셀 다운로드
+          </a>
+          <Link href="/transactions/new" className={cn(buttonVariants({ size: 'sm' }))}>
+            <Plus className="h-4 w-4 mr-1" />새 거래 등록
+          </Link>
+        </div>
       </div>
 
       <div className="border rounded-lg overflow-hidden">
