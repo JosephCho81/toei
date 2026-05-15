@@ -44,6 +44,35 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: '정산 데이터를 찾을 수 없습니다.' }, { status: 404 })
   }
 
+  const transactionId = closing.transaction_id as string
+
+  const [
+    { data: txItems },
+    { data: interimSettlement },
+  ] = await Promise.all([
+    supabase.from('transaction_items')
+      .select('spec, color, size, unit_price_usd, quantity, unit, sort_order')
+      .eq('transaction_id', transactionId)
+      .order('sort_order'),
+    supabase.from('interim_settlements')
+      .select('id, customs_exchange_rate, confirmed_amount_krw')
+      .eq('transaction_id', transactionId)
+      .single(),
+  ])
+
+  let interimCostItems: { item_name: string; amount_krw: number; group_type: string }[] = []
+  if (interimSettlement?.id) {
+    const { data: costItems } = await supabase.from('interim_cost_items')
+      .select('item_name, amount_krw, group_type, sort_order')
+      .eq('interim_settlement_id', interimSettlement.id)
+      .order('sort_order')
+    interimCostItems = (costItems ?? []).map((c) => ({
+      item_name: String(c.item_name ?? ''),
+      amount_krw: Number(c.amount_krw) || 0,
+      group_type: String(c.group_type ?? ''),
+    }))
+  }
+
   const t = Array.isArray(closing.transactions) ? closing.transactions[0] : closing.transactions as {
     round_label: string
     import_amount_usd: number | null
@@ -85,6 +114,13 @@ export async function GET(req: NextRequest) {
   const now = new Date()
   const issuedAt = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
+  const confirmedKrw = Number(closing.confirmed_amount_krw) || 0
+  const directionLabel = confirmedKrw > 0
+    ? '한국에이원 → 토에이산교 지급'
+    : confirmedKrw < 0
+    ? '토에이산교 → 한국에이원 지급'
+    : '정산 없음 (상계)'
+
   const pdfData: ClosingPdfData = {
     roundLabel: t?.round_label ?? '-',
     manufacturerName: (mfr as { name: string } | null)?.name ?? '-',
@@ -106,14 +142,30 @@ export async function GET(req: NextRequest) {
       amountKrw: Number((c as { amount_krw: number }).amount_krw) || 0,
     })),
     closingCostsTotalKrw: calc.closingCostsTotalKrw,
-    confirmedAmountKrw: Number(closing.confirmed_amount_krw) || 0,
-    directionLabel: calc.finalSettlementKrw > 0
-      ? '한국에이원 → 토에이산교 지급'
-      : calc.finalSettlementKrw < 0
-      ? '토에이산교 → 한국에이원 지급'
-      : '정산 없음 (상계)',
+    confirmedAmountKrw: confirmedKrw,
+    directionLabel,
     isPaid: (closing.is_paid as boolean) ?? false,
     issuedAt,
+    items: (txItems ?? []).map((item) => ({
+      spec: String(item.spec ?? ''),
+      color: String(item.color ?? ''),
+      size: String(item.size ?? ''),
+      unitPriceUsd: Number(item.unit_price_usd) || 0,
+      quantity: Number(item.quantity) || 0,
+      unit: String(item.unit ?? ''),
+    })),
+    interimRate: interimSettlement?.customs_exchange_rate
+      ? Number(interimSettlement.customs_exchange_rate)
+      : null,
+    interimConfirmedKrw: interimSettlement?.confirmed_amount_krw
+      ? Number(interimSettlement.confirmed_amount_krw)
+      : null,
+    shippingItems: interimCostItems
+      .filter((c) => c.group_type === 'shipping')
+      .map((c) => ({ itemName: c.item_name, amountKrw: c.amount_krw })),
+    customsItems: interimCostItems
+      .filter((c) => c.group_type !== 'shipping')
+      .map((c) => ({ itemName: c.item_name, amountKrw: c.amount_krw })),
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

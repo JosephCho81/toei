@@ -33,6 +33,11 @@ export interface ClosingPdfData {
   directionLabel: string
   isPaid: boolean
   issuedAt: string
+  items: { spec: string; color: string; size: string; unitPriceUsd: number; quantity: number; unit: string }[]
+  interimRate: number | null
+  interimConfirmedKrw: number | null
+  shippingItems: { itemName: string; amountKrw: number }[]
+  customsItems: { itemName: string; amountKrw: number }[]
 }
 
 const NAVY = '#1e3a5f'
@@ -44,6 +49,8 @@ const MUTED = '#5a6778'
 const WHITE = '#ffffff'
 const GREEN = '#16a34a'
 const RED = '#dc2626'
+
+const BLUE_DARK = '#1e3a5f'
 
 const s = StyleSheet.create({
   page: {
@@ -201,6 +208,67 @@ const s = StyleSheet.create({
     fontSize: 8,
     color: '#9aa3b0',
   },
+  itemsTable: {
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  itemsHeaderRow: {
+    flexDirection: 'row',
+    backgroundColor: BLUE_DARK,
+    minHeight: 20,
+    alignItems: 'center',
+  },
+  itemsHeaderCell: {
+    color: WHITE,
+    fontSize: 7.5,
+    fontWeight: 700,
+    paddingLeft: 5,
+    paddingRight: 3,
+    paddingTop: 4,
+    paddingBottom: 4,
+  },
+  itemsDataRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+    minHeight: 20,
+    alignItems: 'center',
+  },
+  itemsDataRowEven: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+    minHeight: 20,
+    alignItems: 'center',
+    backgroundColor: GRAY_BG,
+  },
+  itemsDataRowLast: {
+    flexDirection: 'row',
+    minHeight: 20,
+    alignItems: 'center',
+  },
+  itemsDataRowLastEven: {
+    flexDirection: 'row',
+    minHeight: 20,
+    alignItems: 'center',
+    backgroundColor: GRAY_BG,
+  },
+  itemsCell: {
+    fontSize: 8.5,
+    paddingLeft: 5,
+    paddingRight: 3,
+    paddingTop: 4,
+    paddingBottom: 4,
+    borderRightWidth: 1,
+    borderRightColor: BORDER,
+  },
+  itemsCellLast: {
+    fontSize: 8.5,
+    paddingLeft: 5,
+    paddingRight: 3,
+    paddingTop: 4,
+    paddingBottom: 4,
+  },
 })
 
 function krw(n: number): string {
@@ -274,6 +342,76 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
           <Row label="회 차" value={data.roundLabel} />
           <Row label="제조사명" value={data.manufacturerName} even isLast />
         </View>
+
+        {data.items.length > 0 && (
+          <View>
+            <Text style={s.sectionLabel}>수입 품목 내역</Text>
+            <View style={s.itemsTable}>
+              <View style={s.itemsHeaderRow}>
+                <Text style={[s.itemsHeaderCell, { width: '26%' }]}>스펙</Text>
+                <Text style={[s.itemsHeaderCell, { width: '18%', borderLeftWidth: 1, borderLeftColor: BORDER }]}>색상</Text>
+                <Text style={[s.itemsHeaderCell, { width: '12%', borderLeftWidth: 1, borderLeftColor: BORDER }]}>사이즈</Text>
+                <Text style={[s.itemsHeaderCell, { width: '20%', borderLeftWidth: 1, borderLeftColor: BORDER }]}>단가(USD)</Text>
+                <Text style={[s.itemsHeaderCell, { width: '13%', borderLeftWidth: 1, borderLeftColor: BORDER }]}>수량</Text>
+                <Text style={[s.itemsHeaderCell, { width: '11%', borderLeftWidth: 1, borderLeftColor: BORDER }]}>단위</Text>
+              </View>
+              {data.items.map((item, i) => {
+                const isLast = i === data.items.length - 1
+                const isEven = i % 2 === 1
+                const rowStyle = isLast
+                  ? (isEven ? s.itemsDataRowLastEven : s.itemsDataRowLast)
+                  : (isEven ? s.itemsDataRowEven : s.itemsDataRow)
+                return (
+                  <View key={i} style={rowStyle}>
+                    <Text style={[s.itemsCell, { width: '26%' }]}>{item.spec}</Text>
+                    <Text style={[s.itemsCell, { width: '18%' }]}>{item.color}</Text>
+                    <Text style={[s.itemsCell, { width: '12%' }]}>{item.size}</Text>
+                    <Text style={[s.itemsCell, { width: '20%' }]}>{item.unitPriceUsd.toFixed(2)}</Text>
+                    <Text style={[s.itemsCell, { width: '13%' }]}>{item.quantity.toLocaleString('ko-KR')}</Text>
+                    <Text style={[s.itemsCellLast, { width: '11%' }]}>{item.unit}</Text>
+                  </View>
+                )
+              })}
+            </View>
+          </View>
+        )}
+
+        {data.interimRate != null && (
+          <View>
+            <Text style={s.sectionLabel}>중간정산 내역</Text>
+            <View style={s.table}>
+              <Row label="통관환율" value={`${data.interimRate.toLocaleString('ko-KR')}원/$`} />
+              {data.shippingItems.map((item, i) => (
+                <Row key={`sh-${i}`} label={item.itemName} value={krw(item.amountKrw)} even={(i + 1) % 2 === 1} indent />
+              ))}
+              {data.shippingItems.length > 0 && (
+                <Row
+                  label="해상운임 소계"
+                  value={krw(data.shippingItems.reduce((acc, r) => acc + r.amountKrw, 0))}
+                  even={(data.shippingItems.length + 1) % 2 === 1}
+                />
+              )}
+              {data.customsItems.map((item, i) => {
+                const offset = 1 + data.shippingItems.length + (data.shippingItems.length > 0 ? 1 : 0)
+                return (
+                  <Row key={`cu-${i}`} label={item.itemName} value={krw(item.amountKrw)} even={(offset + i) % 2 === 1} indent />
+                )
+              })}
+              {data.customsItems.length > 0 && (
+                <Row
+                  label="통관비용 소계"
+                  value={krw(data.customsItems.reduce((acc, r) => acc + r.amountKrw, 0))}
+                  even={(1 + data.shippingItems.length + (data.shippingItems.length > 0 ? 1 : 0) + data.customsItems.length) % 2 === 1}
+                />
+              )}
+              <Row
+                label="중간정산 확정금액"
+                value={data.interimConfirmedKrw != null ? krwSigned(data.interimConfirmedKrw) : '-'}
+                isLast
+              />
+            </View>
+          </View>
+        )}
 
         <Text style={s.sectionLabel}>LC 결제비용 및 환차손익</Text>
         <View style={s.table}>
