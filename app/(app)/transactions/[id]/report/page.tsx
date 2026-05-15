@@ -127,29 +127,43 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
       <ReportItemsSection items={items ?? []} importAmountUsd={t.import_amount_usd ? Number(t.import_amount_usd) : null} marginRatePct={marginPct} />
 
-      {interim && (
-        <ReportInterimSection data={{
-          customs_exchange_rate: interimRate,
-          confirmed_amount_krw: interim.confirmed_amount_krw ? Number(interim.confirmed_amount_krw) : null,
-          updated_at: interim.updated_at, shippingItems, customsItems, vatAmountKrw, importAmountKrw: interimImportKrw,
-        }} />
-      )}
+      {interim
+        ? (
+          <ReportInterimSection data={{
+            customs_exchange_rate: interimRate,
+            confirmed_amount_krw: interim.confirmed_amount_krw ? Number(interim.confirmed_amount_krw) : null,
+            updated_at: interim.updated_at, shippingItems, customsItems, vatAmountKrw, importAmountKrw: interimImportKrw,
+          }} />
+        )
+        : (
+          <ReportSection title="섹션 3 — 중간정산 내역">
+            <p className="text-sm text-muted-foreground">정산 데이터 없음</p>
+          </ReportSection>
+        )
+      }
 
-      {closing && closingCalc && (
-        <ReportClosingSection data={{
-          closing_date: closing.closing_date,
-          bok_exchange_rate: closing.bok_exchange_rate ? Number(closing.bok_exchange_rate) : null,
-          lc_payment_total_krw: lcPayment || null,
-          customs_exchange_rate: txCustomsRate || null,
-          importAmountKrw,
-          fxGainLossKrw: closingCalc.fxGainLossKrw,
-          lcFeeItems: lcFeesParsed, lcFeeTotalKrw: closingCalc.lcFeeTotalKrw,
-          fx_burden_a1_pct: fxBurdenA1Pct,
-          a1BurdenKrw: closingCalc.a1BurdenKrw, a1BurdenWithVatKrw: closingCalc.a1BurdenWithVatKrw,
-          closingCostItems: closingCostsParsed, closingCostsTotalKrw: closingCalc.closingCostsTotalKrw,
-          confirmed_amount_krw: closing.confirmed_amount_krw ? Number(closing.confirmed_amount_krw) : null,
-        }} />
-      )}
+      {closing && closingCalc
+        ? (
+          <ReportClosingSection data={{
+            closing_date: closing.closing_date,
+            bok_exchange_rate: closing.bok_exchange_rate ? Number(closing.bok_exchange_rate) : null,
+            lc_payment_total_krw: lcPayment || null,
+            customs_exchange_rate: txCustomsRate || null,
+            importAmountKrw,
+            fxGainLossKrw: closingCalc.fxGainLossKrw,
+            lcFeeItems: lcFeesParsed, lcFeeTotalKrw: closingCalc.lcFeeTotalKrw,
+            fx_burden_a1_pct: fxBurdenA1Pct,
+            a1BurdenKrw: closingCalc.a1BurdenKrw, a1BurdenWithVatKrw: closingCalc.a1BurdenWithVatKrw,
+            closingCostItems: closingCostsParsed, closingCostsTotalKrw: closingCalc.closingCostsTotalKrw,
+            confirmed_amount_krw: closing.confirmed_amount_krw ? Number(closing.confirmed_amount_krw) : null,
+          }} />
+        )
+        : (
+          <ReportSection title="섹션 4 — 클로징정산 내역">
+            <p className="text-sm text-muted-foreground">정산 데이터 없음</p>
+          </ReportSection>
+        )
+      }
 
       {interim && closing && (
         <ReportSection title="섹션 5 — 중간 vs 클로징 비교 요약">
