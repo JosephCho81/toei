@@ -269,6 +269,16 @@ ON CONFLICT (transaction_id) DO NOTHING;
 -- 4. 중간정산 비용 항목 (interim_cost_items)
 -- ─────────────────────────────────────────
 
+-- 재실행 시 중복 방지: 기존 cost_items 전체 삭제 후 재삽입
+DELETE FROM interim_cost_items
+WHERE interim_settlement_id IN (SELECT id FROM interim_settlements);
+
+DELETE FROM lc_fee_items
+WHERE closing_settlement_id IN (SELECT id FROM closing_settlements);
+
+DELETE FROM closing_cost_items
+WHERE closing_settlement_id IN (SELECT id FROM closing_settlements);
+
 -- 1차
 INSERT INTO interim_cost_items (interim_settlement_id, item_name, amount_krw, is_vat_taxable, vat_amount_krw, sort_order)
 VALUES
