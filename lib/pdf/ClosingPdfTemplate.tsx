@@ -30,6 +30,7 @@ export interface ClosingPdfData {
   closingCostItems: { itemName: string; amountKrw: number }[]
   closingCostsTotalKrw: number
   confirmedAmountKrw: number
+  directionLabel: string
   isPaid: boolean
   issuedAt: string
 }
@@ -350,13 +351,17 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
 
         <Text style={s.sectionLabel}>최종 정산액</Text>
         <View style={s.table}>
-          <Row label="최종 정산액" value={krwSigned(data.confirmedAmountKrw)} />
-          <PaidRow isPaid={data.isPaid} even isLast />
+          <Row label="정산 방향" value={data.directionLabel} />
+          <Row label="최종 정산액" value={krwSigned(data.confirmedAmountKrw)} even />
+          <PaidRow isPaid={data.isPaid} isLast />
         </View>
 
         <View style={s.summaryBox}>
-          <Text style={s.summaryLabel}>최종 정산액</Text>
-          <Text style={s.summaryValue}>{krwSigned(data.confirmedAmountKrw)}</Text>
+          <View>
+            <Text style={s.summaryLabel}>🏁 최종 정산</Text>
+            <Text style={{ fontSize: 10, color: NAVY_LIGHT, marginTop: 4 }}>{data.directionLabel}</Text>
+          </View>
+          <Text style={s.summaryValue}>₩ {Math.abs(data.confirmedAmountKrw).toLocaleString('ko-KR')}</Text>
         </View>
 
         <View style={s.footer}>

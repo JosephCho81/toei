@@ -107,6 +107,11 @@ export async function GET(req: NextRequest) {
     })),
     closingCostsTotalKrw: calc.closingCostsTotalKrw,
     confirmedAmountKrw: Number(closing.confirmed_amount_krw) || 0,
+    directionLabel: calc.finalSettlementKrw > 0
+      ? '한국에이원 → 토에이산교 지급'
+      : calc.finalSettlementKrw < 0
+      ? '토에이산교 → 한국에이원 지급'
+      : '정산 없음 (상계)',
     isPaid: (closing.is_paid as boolean) ?? false,
     issuedAt,
   }
