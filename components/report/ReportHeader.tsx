@@ -37,8 +37,8 @@ export function ReportHeader({
           <Printer className="h-4 w-4 mr-1" />
           인쇄
         </Button>
-        <SettlementPdfButton type="interim" settlementId={interimId} isLocked={interimLocked} />
-        <SettlementPdfButton type="closing" settlementId={closingId} isLocked={closingLocked} />
+        <SettlementPdfButton type="interim" settlementId={interimId} isLocked={interimLocked} label="중간정산 PDF" />
+        <SettlementPdfButton type="closing" settlementId={closingId} isLocked={closingLocked} label="클로징정산 PDF" />
       </div>
     </div>
   )

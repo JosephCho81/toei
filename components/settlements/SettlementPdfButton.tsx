@@ -7,10 +7,11 @@ interface SettlementPdfButtonProps {
   type: 'interim' | 'closing'
   settlementId: string | null
   isLocked: boolean
+  label?: string
   className?: string
 }
 
-export function SettlementPdfButton({ type, settlementId, isLocked, className }: SettlementPdfButtonProps) {
+export function SettlementPdfButton({ type, settlementId, isLocked, label, className }: SettlementPdfButtonProps) {
   function handleClick() {
     if (!settlementId) return
     window.open(`/api/pdf/${type}?settlementId=${settlementId}`, '_blank')
@@ -26,7 +27,7 @@ export function SettlementPdfButton({ type, settlementId, isLocked, className }:
       className={className}
     >
       <FileText className="h-4 w-4 mr-1" />
-      PDF 출력
+      {label ?? 'PDF 출력'}
     </Button>
   )
 }
