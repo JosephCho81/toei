@@ -96,10 +96,11 @@ export async function GET(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const buffer = await renderToBuffer(createElement(InterimPdfDocument, { data: pdfData }) as any)
 
+  const filename = `interim-${t?.round_label ?? 'settlement'}-${issuedAt}.pdf`
   return new Response(new Uint8Array(buffer), {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename="interim-${t?.round_label ?? 'settlement'}-${issuedAt}.pdf"`,
+      'Content-Disposition': `inline; filename="interim-settlement.pdf"; filename*=UTF-8''${encodeURIComponent(filename)}`,
     },
   })
 }
