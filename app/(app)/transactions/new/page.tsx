@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ItemsInputSection, blankItem, type ItemRow } from '@/components/transactions/ItemsInputSection'
 import { Plus, Trash2 } from 'lucide-react'
 
@@ -21,13 +22,25 @@ interface ContainerRow {
   eta: string
 }
 
+interface ForwardingDetailRow {
+  _key: string
+  item_name: string
+  quote_amount_krw: string
+  actual_amount_krw: string
+  is_vat_taxable: boolean
+}
+
 interface ForwardingRow {
   _key: string
   forwarder_name: string
   quote_date: string
-  quote_amount_krw: string
-  actual_amount_krw: string
-  notes: string
+  details: ForwardingDetailRow[]
+}
+
+const DEFAULT_FORWARDING_ITEMS = ['해상운임', '터미널 처리비(THC)', '서류발급비(D/O Fee)', '내륙운송비', '기타운임']
+
+function blankDetail(item_name = ''): ForwardingDetailRow {
+  return { _key: crypto.randomUUID(), item_name, quote_amount_krw: '', actual_amount_krw: '', is_vat_taxable: false }
 }
 
 function blankContainer(): ContainerRow {
@@ -35,7 +48,12 @@ function blankContainer(): ContainerRow {
 }
 
 function blankForwarding(): ForwardingRow {
-  return { _key: crypto.randomUUID(), forwarder_name: '오션마스터', quote_date: '', quote_amount_krw: '', actual_amount_krw: '', notes: '' }
+  return {
+    _key: crypto.randomUUID(),
+    forwarder_name: '오션마스터',
+    quote_date: '',
+    details: DEFAULT_FORWARDING_ITEMS.map((name) => blankDetail(name)),
+  }
 }
 
 export default function NewTransactionPage() {
@@ -65,8 +83,29 @@ export default function NewTransactionPage() {
     setContainers((prev) => prev.map((r) => r._key === key ? { ...r, [field]: value } : r))
   }
 
-  function setForwarding(key: string, field: keyof Omit<ForwardingRow, '_key'>, value: string) {
-    setForwardings((prev) => prev.map((r) => r._key === key ? { ...r, [field]: value } : r))
+  function setForwardingHeader(fKey: string, field: 'forwarder_name' | 'quote_date', value: string) {
+    setForwardings((prev) => prev.map((r) => r._key === fKey ? { ...r, [field]: value } : r))
+  }
+
+  function setForwardingDetail(fKey: string, dKey: string, field: keyof Omit<ForwardingDetailRow, '_key'>, value: string | boolean) {
+    setForwardings((prev) => prev.map((r) => r._key !== fKey ? r : {
+      ...r,
+      details: r.details.map((d) => d._key === dKey ? { ...d, [field]: value } : d),
+    }))
+  }
+
+  function addForwardingDetail(fKey: string) {
+    setForwardings((prev) => prev.map((r) => r._key !== fKey ? r : {
+      ...r,
+      details: [...r.details, blankDetail()],
+    }))
+  }
+
+  function removeForwardingDetail(fKey: string, dKey: string) {
+    setForwardings((prev) => prev.map((r) => r._key !== fKey ? r : {
+      ...r,
+      details: r.details.filter((d) => d._key !== dKey),
+    }))
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -121,15 +160,23 @@ export default function NewTransactionPage() {
     const validForwardings = forwardings.filter((r) => r.forwarder_name)
     if (validForwardings.length > 0) {
       await supabase.from('forwarding_quotes').insert(
-        validForwardings.map((r, i) => ({
-          transaction_id: data.id,
-          forwarder_name: r.forwarder_name,
-          quote_date: r.quote_date || null,
-          quote_amount_krw: r.quote_amount_krw ? parseInt(r.quote_amount_krw) : null,
-          actual_amount_krw: r.actual_amount_krw ? parseInt(r.actual_amount_krw) : null,
-          notes: r.notes || null,
-          sort_order: i,
-        }))
+        validForwardings.map((r, i) => {
+          const quoteTotal = r.details.reduce((s, d) => s + (parseInt(d.quote_amount_krw) || 0), 0)
+          const actualTotal = r.details.reduce((s, d) => s + (parseInt(d.actual_amount_krw) || 0), 0)
+          const notes = r.details
+            .filter((d) => d.item_name)
+            .map((d) => `${d.item_name}:${d.quote_amount_krw || 0}/${d.actual_amount_krw || 0}`)
+            .join('|')
+          return {
+            transaction_id: data.id,
+            forwarder_name: r.forwarder_name,
+            quote_date: r.quote_date || null,
+            quote_amount_krw: quoteTotal || null,
+            actual_amount_krw: actualTotal || null,
+            notes: notes || null,
+            sort_order: i,
+          }
+        })
       )
     }
 
@@ -185,6 +232,13 @@ export default function NewTransactionPage() {
         </Card>
 
         <Card>
+          <CardHeader><CardTitle className="text-base">품목</CardTitle></CardHeader>
+          <CardContent>
+            <ItemsInputSection items={items} onChange={setItems} />
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base">컨테이너</CardTitle>
             <Button type="button" size="sm" variant="outline" onClick={() => setContainers((p) => [...p, blankContainer()])}>
@@ -221,42 +275,100 @@ export default function NewTransactionPage() {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base">포워딩 견적</CardTitle>
             <Button type="button" size="sm" variant="outline" onClick={() => setForwardings((p) => [...p, blankForwarding()])}>
-              <Plus className="h-4 w-4 mr-1" />행 추가
+              <Plus className="h-4 w-4 mr-1" />견적 추가
             </Button>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-4">
             {forwardings.length === 0 && (
-              <p className="text-sm text-muted-foreground py-2">포워딩 견적이 없습니다. 행 추가 버튼을 눌러 추가하세요.</p>
+              <p className="text-sm text-muted-foreground py-2">포워딩 견적이 없습니다. 견적 추가 버튼을 눌러 추가하세요.</p>
             )}
-            {forwardings.map((r) => (
-              <div key={r._key} className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] gap-2 items-end">
-                <Field label="포워더명">
-                  <Input value={r.forwarder_name} onChange={(e) => setForwarding(r._key, 'forwarder_name', e.target.value)} />
-                </Field>
-                <Field label="견적일">
-                  <Input type="date" value={r.quote_date} onChange={(e) => setForwarding(r._key, 'quote_date', e.target.value)} />
-                </Field>
-                <Field label="견적금액 (KRW)">
-                  <Input type="number" value={r.quote_amount_krw} onChange={(e) => setForwarding(r._key, 'quote_amount_krw', e.target.value)} />
-                </Field>
-                <Field label="실청구금액 (KRW)">
-                  <Input type="number" value={r.actual_amount_krw} onChange={(e) => setForwarding(r._key, 'actual_amount_krw', e.target.value)} />
-                </Field>
-                <Field label="메모">
-                  <Input value={r.notes} onChange={(e) => setForwarding(r._key, 'notes', e.target.value)} />
-                </Field>
-                <Button type="button" variant="ghost" size="icon" className="text-destructive mb-0.5" onClick={() => setForwardings((p) => p.filter((x) => x._key !== r._key))}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+            {forwardings.map((r) => {
+              const quoteTotal = r.details.reduce((s, d) => s + (parseInt(d.quote_amount_krw) || 0), 0)
+              const actualTotal = r.details.reduce((s, d) => s + (parseInt(d.actual_amount_krw) || 0), 0)
+              return (
+                <div key={r._key} className="border rounded-md p-3 space-y-3">
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <Field label="포워더명">
+                        <Input value={r.forwarder_name} onChange={(e) => setForwardingHeader(r._key, 'forwarder_name', e.target.value)} />
+                      </Field>
+                    </div>
+                    <div className="w-36">
+                      <Field label="견적일">
+                        <Input type="date" value={r.quote_date} onChange={(e) => setForwardingHeader(r._key, 'quote_date', e.target.value)} />
+                      </Field>
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" className="text-destructive mb-0.5" onClick={() => setForwardings((p) => p.filter((x) => x._key !== r._key))}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">품목</CardTitle></CardHeader>
-          <CardContent>
-            <ItemsInputSection items={items} onChange={setItems} />
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left font-medium py-1 pr-2">항목명</th>
+                        <th className="text-right font-medium py-1 px-2">견적금액 (원)</th>
+                        <th className="text-right font-medium py-1 px-2">실청구금액 (원)</th>
+                        <th className="text-center font-medium py-1 px-2">부가세</th>
+                        <th className="w-8" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.details.map((d) => (
+                        <tr key={d._key} className="border-b border-dashed">
+                          <td className="py-1 pr-2">
+                            <Input
+                              value={d.item_name}
+                              onChange={(e) => setForwardingDetail(r._key, d._key, 'item_name', e.target.value)}
+                              className="h-7 text-sm"
+                            />
+                          </td>
+                          <td className="py-1 px-2">
+                            <Input
+                              type="number"
+                              value={d.quote_amount_krw}
+                              onChange={(e) => setForwardingDetail(r._key, d._key, 'quote_amount_krw', e.target.value)}
+                              className="h-7 text-sm text-right"
+                            />
+                          </td>
+                          <td className="py-1 px-2">
+                            <Input
+                              type="number"
+                              value={d.actual_amount_krw}
+                              onChange={(e) => setForwardingDetail(r._key, d._key, 'actual_amount_krw', e.target.value)}
+                              className="h-7 text-sm text-right"
+                            />
+                          </td>
+                          <td className="py-1 px-2 text-center">
+                            <Checkbox
+                              checked={d.is_vat_taxable}
+                              onCheckedChange={(v) => setForwardingDetail(r._key, d._key, 'is_vat_taxable', !!v)}
+                            />
+                          </td>
+                          <td className="py-1 pl-1">
+                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeForwardingDetail(r._key, d._key)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td className="pt-2 text-muted-foreground text-xs">소계</td>
+                        <td className="pt-2 px-2 text-right font-medium">{quoteTotal.toLocaleString()}</td>
+                        <td className="pt-2 px-2 text-right font-medium">{actualTotal.toLocaleString()}</td>
+                        <td colSpan={2} />
+                      </tr>
+                    </tfoot>
+                  </table>
+
+                  <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => addForwardingDetail(r._key)}>
+                    <Plus className="h-3 w-3 mr-1" />항목 추가
+                  </Button>
+                </div>
+              )
+            })}
           </CardContent>
         </Card>
 
