@@ -412,9 +412,9 @@ export default function ClosingSettlementPage() {
               <Select value={roundingPolicy} onValueChange={(v) => setRoundingPolicy(v as RoundingPolicy)} disabled={isLocked}>
                 <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="floor_100">100원 단위</SelectItem>
-                  <SelectItem value="floor_10">10원 단위</SelectItem>
-                  <SelectItem value="none">절사 없음</SelectItem>
+                  <SelectItem value="floor_100">100원 미만 버림</SelectItem>
+                  <SelectItem value="floor_10">10원 미만 버림</SelectItem>
+                  <SelectItem value="none">버림 없음</SelectItem>
                 </SelectContent>
               </Select>
             </div>
