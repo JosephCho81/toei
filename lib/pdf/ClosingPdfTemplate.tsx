@@ -496,7 +496,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
 
         <View style={s.summaryBox}>
           <View>
-            <Text style={s.summaryLabel}>🏁 최종 정산</Text>
+            <Text style={s.summaryLabel}>최종 정산</Text>
             <Text style={{ fontSize: 10, color: NAVY_LIGHT, marginTop: 4 }}>{data.directionLabel}</Text>
           </View>
           <Text style={s.summaryValue}>₩ {Math.abs(data.confirmedAmountKrw).toLocaleString('ko-KR')}</Text>
