@@ -106,11 +106,25 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
       )}
 
       <Separator className="my-3" />
-      <AmountRow
-        label="최종 정산 확정금액"
-        value={confirmed != null ? signed(confirmed) : '-'}
-        bold
-      />
+      {confirmed != null ? (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-xs font-semibold text-blue-500 mb-1">🏁 최종 정산</p>
+          {confirmed === 0 ? (
+            <p className="text-lg font-semibold text-blue-700">정산 없음 (상계)</p>
+          ) : (
+            <>
+              <p className="text-sm text-blue-600 mb-1">
+                {confirmed > 0 ? '한국에이원 → 토에이산교 지급' : '토에이산교 → 한국에이원 지급'}
+              </p>
+              <p className="text-2xl font-bold text-blue-700">
+                ₩ {Math.abs(confirmed).toLocaleString('ko-KR')}
+              </p>
+            </>
+          )}
+        </div>
+      ) : (
+        <AmountRow label="최종 정산 확정금액" value="-" bold />
+      )}
     </ReportSection>
   )
 }

@@ -2,7 +2,7 @@ import { Separator } from '@/components/ui/separator'
 
 export function ReportSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-8 break-inside-avoid">
+    <section className="mb-4 break-inside-avoid">
       <div className="flex items-center gap-3 mb-3">
         <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">{title}</h3>
         <Separator className="flex-1" />
