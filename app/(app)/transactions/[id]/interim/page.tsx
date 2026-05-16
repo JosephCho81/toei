@@ -36,6 +36,7 @@ export default function InterimSettlementPage() {
   const [roundingPolicy, setRoundingPolicy] = useState<RoundingPolicy>('floor_100')
   const [shippingRows, setShippingRows] = useState<CostRow[]>(DEFAULT_SHIPPING)
   const [customsRows, setCustomsRows] = useState<CostRow[]>(DEFAULT_CUSTOMS)
+  const [prefilled, setPrefilled] = useState(false)
   const [confirmed, setConfirmed] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -46,6 +47,7 @@ export default function InterimSettlementPage() {
       if (t?.customs_exchange_rate) setCustomsRate(String(t.customs_exchange_rate))
 
       const { data: interim } = await supabase.from('interim_settlements').select('*').eq('transaction_id', id).single()
+      let hasShippingItems = false
       if (interim) {
         setSid(interim.id); setIsLocked(interim.is_locked)
         setCustomsRate(String(interim.customs_exchange_rate))
@@ -56,8 +58,33 @@ export default function InterimSettlementPage() {
         if (items?.length) {
           const ship = items.filter((i) => (i as Record<string, unknown>).group_type === 'shipping').map(toRow)
           const cust = items.filter((i) => (i as Record<string, unknown>).group_type !== 'shipping').map(toRow)
-          if (ship.length) setShippingRows(ship)
+          if (ship.length) { setShippingRows(ship); hasShippingItems = true }
           if (cust.length) setCustomsRows(cust)
+        }
+      }
+
+      if (!hasShippingItems) {
+        const { data: fqList } = await supabase.from('forwarding_quotes').select('actual_amount_krw,notes').eq('transaction_id', id).order('sort_order')
+        const fq = (fqList ?? []).find((q: { actual_amount_krw: number | null; notes: string | null }) => q.actual_amount_krw)
+        if (fq?.actual_amount_krw) {
+          let rows: CostRow[] = []
+          if (fq.notes) {
+            try {
+              const parsed = fq.notes.split('|').map((entry: string) => {
+                const colonIdx = entry.indexOf(':')
+                const itemName = entry.slice(0, colonIdx)
+                const amounts = entry.slice(colonIdx + 1).split('/')
+                const actual = amounts[1] ?? amounts[0]
+                return { item_name: itemName, amount_krw: String(parseInt(actual) || 0), is_vat_taxable: false, vat_amount_krw: '0' } as CostRow
+              }).filter((r: CostRow) => r.item_name)
+              if (parsed.length) rows = parsed
+            } catch { /* notes 파싱 실패 시 단일 항목으로 폴백 */ }
+          }
+          if (!rows.length) {
+            rows = [{ item_name: '해상운임', amount_krw: String(fq.actual_amount_krw), is_vat_taxable: false, vat_amount_krw: '0' }]
+          }
+          setShippingRows(rows)
+          setPrefilled(true)
         }
       }
     }
@@ -133,7 +160,8 @@ export default function InterimSettlementPage() {
           </div>
         </CardContent>
       </Card>
-      <ShippingCostItems rows={shippingRows} onChange={setShippingRows} isLocked={isLocked} />
+      <ShippingCostItems rows={shippingRows} onChange={setShippingRows} isLocked={isLocked}
+        hint={prefilled ? '포워딩 견적 실청구액에서 자동 입력됐습니다. 수정 가능합니다.' : undefined} />
       <CustomsCostItems rows={customsRows} onChange={setCustomsRows} isLocked={isLocked} />
       <InterimResultsCard
         calc={calc} systemAmount={systemAmount} roundingPolicy={roundingPolicy}

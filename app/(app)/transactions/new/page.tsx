@@ -309,7 +309,7 @@ export default function NewTransactionPage() {
                         <th className="text-left font-medium py-1 pr-2">항목명</th>
                         <th className="text-right font-medium py-1 px-2">견적금액 (원)</th>
                         <th className="text-right font-medium py-1 px-2">실청구금액 (원)</th>
-                        <th className="text-center font-medium py-1 px-2">부가세</th>
+                        <th className="text-center font-medium py-1 px-2 whitespace-nowrap">부가세</th>
                         <th className="w-8" />
                       </tr>
                     </thead>

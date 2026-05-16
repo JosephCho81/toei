@@ -22,9 +22,9 @@ export const DEFAULT_SHIPPING: CostRow[] = [
   { item_name: '기타운임', amount_krw: '', is_vat_taxable: false, vat_amount_krw: '0' },
 ]
 
-interface Props { rows: CostRow[]; onChange: (rows: CostRow[]) => void; isLocked: boolean }
+interface Props { rows: CostRow[]; onChange: (rows: CostRow[]) => void; isLocked: boolean; hint?: string }
 
-export function CostItemsGroup({ title, rows, onChange, isLocked }: Props & { title: string }) {
+export function CostItemsGroup({ title, rows, onChange, isLocked, hint }: Props & { title: string }) {
   function upd(i: number, field: keyof CostRow, value: string | boolean) {
     onChange(rows.map((r, j) => {
       if (j !== i) return r
@@ -53,6 +53,7 @@ export function CostItemsGroup({ title, rows, onChange, isLocked }: Props & { ti
         )}
       </CardHeader>
       <CardContent>
+        {hint && <p className="text-xs text-blue-600 mb-2">{hint}</p>}
         <div className="grid grid-cols-12 gap-2 text-xs text-muted-foreground px-1 pb-1">
           <span className="col-span-4">항목명</span><span className="col-span-3">금액(원)</span>
           <span className="col-span-2 text-center">부가세</span><span className="col-span-2">부가세(원)</span>
