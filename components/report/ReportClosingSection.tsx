@@ -22,6 +22,8 @@ export interface ClosingData {
   closingCostItems: FeeItem[]
   closingCostsTotalKrw: number
   confirmed_amount_krw: number | null
+  interimConfirmedKrw: number | null
+  grandTotalKrw: number | null
 }
 
 function signed(n: number) {
@@ -58,6 +60,7 @@ function FeeTable({ title, items, footerLabel, footerValue }: {
 export function ReportClosingSection({ data }: { data: ClosingData }) {
   const fxIsGain = data.fxGainLossKrw >= 0
   const confirmed = data.confirmed_amount_krw
+  const hasGrandTotal = data.interimConfirmedKrw != null && data.grandTotalKrw != null
 
   return (
     <ReportSection title="섹션 4 — 클로징정산 내역">
@@ -124,6 +127,28 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
         </div>
       ) : (
         <AmountRow label="최종 정산 확정금액" value="-" bold />
+      )}
+
+      {hasGrandTotal && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-3 space-y-1.5">
+          <p className="text-xs font-bold text-blue-800">최종 종합 정산 (중간 + 클로징)</p>
+          <AmountRow
+            label="중간정산 확정금액"
+            value={`${formatKrw(data.interimConfirmedKrw!)}`}
+          />
+          <AmountRow
+            label="클로징 정산액"
+            value={`${confirmed != null && confirmed >= 0 ? '+' : ''}${formatKrw(confirmed ?? 0)}`}
+          />
+          <Separator className="border-blue-200" />
+          <div className="flex justify-between font-bold">
+            <span className="text-blue-900">최종 합계</span>
+            <span className="font-mono text-blue-900 text-base">{formatKrw(data.grandTotalKrw!)}</span>
+          </div>
+          <p className="text-xs text-blue-600">
+            {(data.grandTotalKrw ?? 0) >= 0 ? '한국에이원 → 토에이산교 지급' : '토에이산교 → 한국에이원 지급'}
+          </p>
+        </div>
       )}
     </ReportSection>
   )

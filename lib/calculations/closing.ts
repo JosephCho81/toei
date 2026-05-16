@@ -12,6 +12,8 @@ export interface ClosingCalculation {
   closingCostsTotalKrw: number
   finalSettlementKrw: number
   roundedFinalKrw: number
+  interimConfirmedKrw: number
+  grandTotalKrw: number
 }
 
 export function calculateClosing(params: {
@@ -22,6 +24,7 @@ export function calculateClosing(params: {
   fxBurdenA1Pct: number
   closingCostItems: { amountKrw: number; includesVat: boolean }[]
   roundingPolicy: RoundingPolicy
+  interimConfirmedKrw: number
 }): ClosingCalculation {
   const {
     lcPaymentTotalKrw,
@@ -31,6 +34,7 @@ export function calculateClosing(params: {
     fxBurdenA1Pct,
     closingCostItems,
     roundingPolicy,
+    interimConfirmedKrw,
   } = params
 
   const importAmountKrw = Math.round(importAmountUsd * customsExchangeRate)
@@ -54,6 +58,9 @@ export function calculateClosing(params: {
   // 최종 정산액 = 에이원 부담분(VAT포함) + 클로징 추가비용
   const finalSettlementKrw = a1BurdenWithVatKrw + closingCostsTotalKrw
 
+  const roundedFinalKrw = applyRounding(finalSettlementKrw, roundingPolicy)
+  const grandTotalKrw = interimConfirmedKrw + roundedFinalKrw
+
   return {
     importAmountKrw,
     fxGainLossKrw,
@@ -63,6 +70,8 @@ export function calculateClosing(params: {
     a1BurdenWithVatKrw,
     closingCostsTotalKrw,
     finalSettlementKrw,
-    roundedFinalKrw: applyRounding(finalSettlementKrw, roundingPolicy),
+    roundedFinalKrw,
+    interimConfirmedKrw,
+    grandTotalKrw,
   }
 }

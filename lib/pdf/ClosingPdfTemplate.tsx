@@ -36,6 +36,7 @@ export interface ClosingPdfData {
   items: { spec: string; color: string; size: string; unitPriceUsd: number; quantity: number; unit: string }[]
   interimRate: number | null
   interimConfirmedKrw: number | null
+  grandTotalKrw: number | null
   shippingItems: { itemName: string; amountKrw: number }[]
   customsItems: { itemName: string; amountKrw: number }[]
 }
@@ -163,6 +164,24 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  grandTotalBox: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#93c5fd',
+    padding: 12,
+    marginTop: 12,
+  },
+  grandTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  grandTotalDivider: {
+    borderTopWidth: 1,
+    borderTopColor: '#93c5fd',
+    marginTop: 6,
+    marginBottom: 6,
   },
   summaryLabel: {
     fontSize: 11,
@@ -501,6 +520,36 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
           </View>
           <Text style={s.summaryValue}>₩ {Math.abs(data.confirmedAmountKrw).toLocaleString('ko-KR')}</Text>
         </View>
+
+        {data.grandTotalKrw != null && data.interimConfirmedKrw != null && (
+          <View style={s.grandTotalBox}>
+            <Text style={{ fontSize: 9, fontWeight: 700, color: '#1e40af', marginBottom: 8 }}>
+              최종 종합 정산 (중간 + 클로징)
+            </Text>
+            <View style={s.grandTotalRow}>
+              <Text style={{ fontSize: 9, color: '#1d4ed8' }}>중간정산 확정금액</Text>
+              <Text style={{ fontSize: 9, color: '#1d4ed8', fontWeight: 700 }}>
+                {krw(data.interimConfirmedKrw)}
+              </Text>
+            </View>
+            <View style={s.grandTotalRow}>
+              <Text style={{ fontSize: 9, color: '#1d4ed8' }}>클로징 정산액</Text>
+              <Text style={{ fontSize: 9, color: '#1d4ed8', fontWeight: 700 }}>
+                {krwSigned(data.confirmedAmountKrw)}
+              </Text>
+            </View>
+            <View style={s.grandTotalDivider} />
+            <View style={s.grandTotalRow}>
+              <Text style={{ fontSize: 10, fontWeight: 700, color: '#1e3a8a' }}>최종 합계</Text>
+              <Text style={{ fontSize: 11, fontWeight: 700, color: '#1e3a8a' }}>
+                {krw(data.grandTotalKrw)}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 8, color: '#2563eb', marginTop: 4 }}>
+              {data.grandTotalKrw >= 0 ? '한국에이원 → 토에이산교 지급' : '토에이산교 → 한국에이원 지급'}
+            </Text>
+          </View>
+        )}
 
         <View style={s.footer}>
           <Text>발행일: {data.issuedAt}</Text>

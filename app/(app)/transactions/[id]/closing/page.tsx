@@ -139,6 +139,7 @@ export default function ClosingSettlementPage() {
           includesVat: r.includes_vat,
         })),
         roundingPolicy,
+        interimConfirmedKrw: interimSummary?.confirmed_amount_krw ?? 0,
       })
     : null
 
@@ -439,6 +440,28 @@ export default function ClosingSettlementPage() {
           </div>
         </CardContent>
       </Card>
+
+      {calc && interimSummary?.is_locked && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+          <p className="text-sm font-bold text-blue-800">최종 종합 정산 (중간 + 클로징)</p>
+          <div className="flex justify-between text-sm">
+            <span className="text-blue-700">중간정산 확정금액</span>
+            <span className="font-mono text-blue-700">{formatKrw(calc.interimConfirmedKrw)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-blue-700">클로징 정산액</span>
+            <span className="font-mono text-blue-700">{calc.roundedFinalKrw >= 0 ? '+' : ''}{formatKrw(calc.roundedFinalKrw)}</span>
+          </div>
+          <Separator className="border-blue-200" />
+          <div className="flex justify-between font-bold">
+            <span className="text-blue-900">최종 합계</span>
+            <span className="font-mono text-blue-900 text-lg">{formatKrw(calc.grandTotalKrw)}</span>
+          </div>
+          <p className="text-xs text-blue-600">
+            {calc.grandTotalKrw >= 0 ? '한국에이원 → 토에이산교 지급' : '토에이산교 → 한국에이원 지급'}
+          </p>
+        </div>
+      )}
 
       {!isLocked && (
         <div className="flex gap-2">

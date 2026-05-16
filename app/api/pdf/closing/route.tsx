@@ -109,6 +109,9 @@ export async function GET(req: NextRequest) {
     fxBurdenA1Pct: (closing.fx_burden_a1_pct as number) ?? 50,
     closingCostItems: closingCostItemsCalc,
     roundingPolicy: (closing.rounding_policy as 'floor_100' | 'floor_10' | 'none') ?? 'floor_100',
+    interimConfirmedKrw: interimSettlement?.confirmed_amount_krw
+      ? Number(interimSettlement.confirmed_amount_krw)
+      : 0,
   })
 
   const now = new Date()
@@ -159,6 +162,9 @@ export async function GET(req: NextRequest) {
       : null,
     interimConfirmedKrw: interimSettlement?.confirmed_amount_krw
       ? Number(interimSettlement.confirmed_amount_krw)
+      : null,
+    grandTotalKrw: interimSettlement?.confirmed_amount_krw != null
+      ? calc.grandTotalKrw
       : null,
     shippingItems: interimCostItems
       .filter((c) => c.group_type === 'shipping')

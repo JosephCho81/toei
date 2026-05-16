@@ -73,6 +73,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const lcPayment = closing?.lc_payment_total_krw ? Number(closing.lc_payment_total_krw) : 0
   const importAmountKrw = txCustomsRate > 0 ? Math.round(importUsd * txCustomsRate) : 0
 
+  const interimConfirmedKrwForCalc = interim?.confirmed_amount_krw ? Number(interim.confirmed_amount_krw) : 0
+
   const closingCalc = closing && txCustomsRate > 0
     ? calculateClosing({
         lcPaymentTotalKrw: lcPayment,
@@ -82,6 +84,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         fxBurdenA1Pct,
         closingCostItems: closingCostsParsed.map((c) => ({ amountKrw: c.amount_krw, includesVat: false })),
         roundingPolicy: 'none',
+        interimConfirmedKrw: interimConfirmedKrwForCalc,
       })
     : null
 
@@ -156,6 +159,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             a1BurdenKrw: closingCalc.a1BurdenKrw, a1BurdenWithVatKrw: closingCalc.a1BurdenWithVatKrw,
             closingCostItems: closingCostsParsed, closingCostsTotalKrw: closingCalc.closingCostsTotalKrw,
             confirmed_amount_krw: closing.confirmed_amount_krw ? Number(closing.confirmed_amount_krw) : null,
+            interimConfirmedKrw: interim?.confirmed_amount_krw ? Number(interim.confirmed_amount_krw) : null,
+            grandTotalKrw: interim?.confirmed_amount_krw != null ? closingCalc.grandTotalKrw : null,
           }} />
         )
         : (
