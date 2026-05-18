@@ -113,6 +113,20 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         closingLocked={closing?.is_locked ?? false}
       />
 
+      <div className="border border-green-200 rounded-lg px-6 py-5 mb-6 flex items-center justify-between bg-white">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/CI_a1korea.png" alt="한국에이원" style={{ height: '48px', objectFit: 'contain' }} />
+        <div className="text-center">
+          <h1 className="text-lg font-bold text-green-800">토에이산교 ↔ 한국에이원</h1>
+          <p className="text-base font-semibold text-green-700 mt-0.5">정산 리포트</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {t.round_label}{mfr?.name ? ` | ${mfr.name}` : ''}{t.order_no ? ` | ${t.order_no}` : ''}
+          </p>
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/CI_toei.png" alt="토에이산교" style={{ height: '48px', objectFit: 'contain' }} />
+      </div>
+
       <ReportSection title="섹션 1 — 거래 기본 정보">
         <div className="grid grid-cols-2 gap-x-8 gap-y-1">
           <InfoRow label="차수" value={t.round_label} />

@@ -110,16 +110,16 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
 
       <Separator className="my-3" />
       {confirmed != null ? (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-xs font-semibold text-blue-500 mb-1">🏁 최종 정산</p>
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <p className="text-xs font-semibold text-green-600 mb-1">🏁 최종 정산</p>
           {confirmed === 0 ? (
-            <p className="text-lg font-semibold text-blue-700">정산 없음 (상계)</p>
+            <p className="text-lg font-semibold text-green-700">정산 없음 (상계)</p>
           ) : (
             <>
-              <p className="text-sm text-blue-600 mb-1">
+              <p className="text-sm text-green-600 mb-1">
                 {confirmed > 0 ? '한국에이원 → 토에이산교 지급' : '토에이산교 → 한국에이원 지급'}
               </p>
-              <p className="text-2xl font-bold text-blue-700">
+              <p className="text-2xl font-bold text-green-700">
                 ₩ {Math.abs(confirmed).toLocaleString('ko-KR')}
               </p>
             </>
@@ -130,8 +130,8 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
       )}
 
       {hasGrandTotal && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-3 space-y-1.5">
-          <p className="text-xs font-bold text-blue-800">최종 종합 정산 (중간 + 클로징)</p>
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-3 space-y-1.5">
+          <p className="text-xs font-bold text-green-800">최종 종합 정산 (중간 + 클로징)</p>
           <AmountRow
             label="중간정산 확정금액"
             value={`${formatKrw(data.interimConfirmedKrw!)}`}
@@ -140,12 +140,12 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
             label="클로징 정산액"
             value={`${confirmed != null && confirmed >= 0 ? '+' : ''}${formatKrw(confirmed ?? 0)}`}
           />
-          <Separator className="border-blue-200" />
+          <Separator className="border-green-200" />
           <div className="flex justify-between font-bold">
-            <span className="text-blue-900">최종 합계</span>
-            <span className="font-mono text-blue-900 text-base">{formatKrw(data.grandTotalKrw!)}</span>
+            <span className="text-green-900">최종 합계</span>
+            <span className="font-mono text-green-900 text-base">{formatKrw(data.grandTotalKrw!)}</span>
           </div>
-          <p className="text-xs text-blue-600">
+          <p className="text-xs text-green-600">
             {(data.grandTotalKrw ?? 0) >= 0 ? '한국에이원 → 토에이산교 지급' : '토에이산교 → 한국에이원 지급'}
           </p>
         </div>
