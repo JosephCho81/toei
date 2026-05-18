@@ -29,7 +29,7 @@ export default function InterimSettlementPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  const [tx, setTx] = useState<{ import_amount_usd: number | null; customs_exchange_rate: number | null } | null>(null)
+  const [tx, setTx] = useState<{ import_amount_usd: number | null; customs_exchange_rate: number | null; margin_rate_pct: number | null } | null>(null)
   const [sid, setSid] = useState<string | null>(null)
   const [isLocked, setIsLocked] = useState(false)
   const [customsRate, setCustomsRate] = useState('')
@@ -42,7 +42,7 @@ export default function InterimSettlementPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: t } = await supabase.from('transactions').select('import_amount_usd,customs_exchange_rate').eq('id', id).single()
+      const { data: t } = await supabase.from('transactions').select('import_amount_usd,customs_exchange_rate,margin_rate_pct').eq('id', id).single()
       setTx(t)
       if (t?.customs_exchange_rate) setCustomsRate(String(t.customs_exchange_rate))
 
@@ -98,7 +98,7 @@ export default function InterimSettlementPage() {
   }))
 
   const calc = tx?.import_amount_usd && customsRate
-    ? calculateInterim({ importAmountUsd: Number(tx.import_amount_usd), customsExchangeRate: parseFloat(customsRate), costItems, roundingPolicy, vatIncludedInTotal: true })
+    ? calculateInterim({ importAmountUsd: Number(tx.import_amount_usd), customsExchangeRate: parseFloat(customsRate), marginRatePct: tx.margin_rate_pct ?? 0, costItems, roundingPolicy })
     : null
   const systemAmount = calc?.roundedTotalKrw ?? 0
 

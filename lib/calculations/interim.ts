@@ -7,9 +7,9 @@ export interface CostItem {
 }
 
 export interface InterimCalculation {
-  importAmountKrw: number
+  importAmountKrw: number   // import × rate × (1 + margin/100)
   totalCostKrw: number
-  vatAmountKrw: number
+  vatAmountKrw: number      // (importAmountKrw + totalCostKrw) × 10%
   totalWithVatKrw: number
   roundedTotalKrw: number
 }
@@ -23,16 +23,17 @@ export function applyRounding(amount: number, policy: RoundingPolicy): number {
 export function calculateInterim(params: {
   importAmountUsd: number
   customsExchangeRate: number
+  marginRatePct?: number
   costItems: CostItem[]
   roundingPolicy: RoundingPolicy
-  vatIncludedInTotal: boolean
+  vatIncludedInTotal?: boolean
 }): InterimCalculation {
-  const { importAmountUsd, customsExchangeRate, costItems, roundingPolicy } = params
+  const { importAmountUsd, customsExchangeRate, marginRatePct = 0, costItems, roundingPolicy } = params
 
-  const importAmountKrw = Math.round(importAmountUsd * customsExchangeRate)
+  const importAmountKrw = Math.round(importAmountUsd * customsExchangeRate * (1 + marginRatePct / 100))
 
   const totalCostKrw = costItems.reduce((sum, item) => sum + item.amountKrw, 0)
-  const vatAmountKrw = costItems.reduce((sum, item) => sum + item.vatAmountKrw, 0)
+  const vatAmountKrw = Math.round((importAmountKrw + totalCostKrw) * 0.1)
   const totalWithVatKrw = importAmountKrw + totalCostKrw + vatAmountKrw
 
   return {

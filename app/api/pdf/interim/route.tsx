@@ -79,9 +79,9 @@ export async function GET(req: NextRequest) {
   const calc = calculateInterim({
     importAmountUsd: Number(t?.import_amount_usd) || 0,
     customsExchangeRate: Number(interim.customs_exchange_rate) || 0,
+    marginRatePct: t?.margin_rate_pct ?? 0,
     costItems,
     roundingPolicy: (interim.rounding_policy as 'floor_100' | 'floor_10' | 'none') ?? 'floor_100',
-    vatIncludedInTotal: true,
   })
 
   const now = new Date()

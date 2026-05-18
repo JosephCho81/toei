@@ -37,7 +37,7 @@ export function InterimResultsCard({
             <Row label="통관 소계" value={formatKrw(customsSubtotal)} />
             <Row label="부가세 합계" value={formatKrw(calc.vatAmountKrw)} />
             <Separator />
-            <Row label="수입원가 (원화)" value={formatKrw(calc.importAmountKrw)} />
+            <Row label="수입원가 (마진포함)" value={formatKrw(calc.importAmountKrw)} />
             <Row label="총계 (부가세 포함)" value={formatKrw(calc.totalWithVatKrw)} bold />
           </div>
         )}
