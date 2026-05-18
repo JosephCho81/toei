@@ -8,7 +8,7 @@ import { LayoutDashboard, FileText, Building2, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const navItems = [
-  { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
+  { href: '/dashboard', label: '정산 현황', icon: LayoutDashboard },
   { href: '/transactions', label: '거래 목록', icon: FileText },
   { href: '/manufacturers', label: '제조사', icon: Building2 },
 ]

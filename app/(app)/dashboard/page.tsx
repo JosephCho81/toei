@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -8,6 +9,12 @@ import { formatDate } from '@/lib/utils/format'
 import {
   Package, TrendingUp, CheckCircle2, AlertTriangle, Ship, ArrowRight,
 } from 'lucide-react'
+import { VerificationIssueCard } from '@/components/dashboard/VerificationIssueCard'
+import type { VerRow } from '@/components/dashboard/VerificationIssueCard'
+
+export const metadata: Metadata = {
+  title: '정산 현황',
+}
 
 const STATUS_LABELS: Record<string, string> = {
   pending: '미진행',
@@ -50,8 +57,9 @@ export default async function DashboardPage() {
       .order('round_no', { ascending: false })
       .limit(5),
     supabase.from('interim_settlements')
-      .select('notes, confirmed_amount_krw, transactions(round_no, round_label, manufacturers(name))')
+      .select('id, notes, confirmed_amount_krw, transactions(round_no, round_label)')
       .like('notes', '%[검증]%')
+      .not('notes', 'like', '%[확인완료]%')
       .order('created_at'),
   ])
 
@@ -81,62 +89,64 @@ export default async function DashboardPage() {
     return Math.floor((eta.getTime() - today.getTime()) / 86400000) <= 7
   }).length
 
-  type VerificationRow = {
+  type RawVerRow = {
+    id: string
     notes: string | null
-    confirmed_amount_krw: unknown
-    transactions: { round_no: number; round_label: string; manufacturers: { name: string } | { name: string }[] | null } | { round_no: number; round_label: string; manufacturers: { name: string } | { name: string }[] | null }[] | null
+    confirmed_amount_krw: number | null
+    transactions: { round_no: number; round_label: string } | { round_no: number; round_label: string }[] | null
   }
-  const verRows = (verificationIssues ?? []) as unknown as VerificationRow[]
-
-  function extractVerNote(notes: string | null): string {
-    if (!notes) return ''
-    const idx = notes.indexOf('[검증]')
-    if (idx < 0) return ''
-    const after = notes.slice(idx + 4).trim()
-    return after.split(/[.\n]/)[0].trim()
-  }
+  const rawVerRows = (verificationIssues ?? []) as unknown as RawVerRow[]
+  const verRows: VerRow[] = rawVerRows.map((row) => {
+    const tx = Array.isArray(row.transactions) ? row.transactions[0] : row.transactions
+    return {
+      id: row.id,
+      notes: row.notes,
+      confirmed_amount_krw: row.confirmed_amount_krw,
+      round_label: tx?.round_label ?? '-',
+    }
+  })
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>대시보드</h2>
+      <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>정산 현황</h2>
 
       {/* 요약 통계 카드 4개 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* 전체 거래수 */}
         <Card className="border-green-200">
-          <CardContent className="pt-5 pb-4">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium" style={{ color: '#2E7D32' }}>전체 거래</p>
-              <Package className="h-4 w-4" style={{ color: '#4CAF50' }} />
+              <p className="text-base font-medium" style={{ color: '#2E7D32' }}>전체 거래</p>
+              <Package className="h-5 w-5" style={{ color: '#4CAF50' }} />
             </div>
             <p className="text-2xl font-bold font-mono" style={{ color: '#2E7D32' }}>{totalCount}건</p>
-            <p className="text-xs mt-1" style={{ color: '#4CAF50' }}>클로징 완료 {closingDone}건</p>
+            <p className="text-sm mt-1" style={{ color: '#4CAF50' }}>클로징 완료 {closingDone}건</p>
           </CardContent>
         </Card>
 
         {/* 총 수입금액 */}
         <Card style={{ backgroundColor: '#E8F5E9', borderColor: '#A5D6A7' }}>
-          <CardContent className="pt-5 pb-4">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium" style={{ color: '#2E7D32' }}>총 수입금액</p>
-              <TrendingUp className="h-4 w-4" style={{ color: '#2E7D32' }} />
+              <p className="text-base font-medium" style={{ color: '#2E7D32' }}>총 수입금액</p>
+              <TrendingUp className="h-5 w-5" style={{ color: '#2E7D32' }} />
             </div>
             <p className="text-2xl font-bold font-mono" style={{ color: '#2E7D32' }}>
               ${Math.round(totalUsd).toLocaleString('en-US')}
             </p>
-            <p className="text-xs mt-1" style={{ color: '#388E3C' }}>누적 수입 합계</p>
+            <p className="text-sm mt-1" style={{ color: '#388E3C' }}>누적 수입 합계</p>
           </CardContent>
         </Card>
 
         {/* 클로징 완료 */}
         <Card style={{ backgroundColor: '#2E7D32', borderColor: '#1B5E20' }}>
-          <CardContent className="pt-5 pb-4">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-white/80">클로징 완료</p>
-              <CheckCircle2 className="h-4 w-4 text-white/80" />
+              <p className="text-base font-medium text-white/80">클로징 완료</p>
+              <CheckCircle2 className="h-5 w-5 text-white/80" />
             </div>
             <p className="text-2xl font-bold font-mono text-white">{closingDone}건</p>
-            <p className="text-xs mt-1 text-white/70">
+            <p className="text-sm mt-1 text-white/70">
               완료율 {totalCount > 0 ? Math.round((closingDone / totalCount) * 100) : 0}%
             </p>
           </CardContent>
@@ -144,13 +154,13 @@ export default async function DashboardPage() {
 
         {/* 미정산 합계 */}
         <Card style={{ backgroundColor: '#FFF8E1', borderColor: '#FFE082' }}>
-          <CardContent className="pt-5 pb-4">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium" style={{ color: '#F57F17' }}>미정산 합계</p>
-              <AlertTriangle className="h-4 w-4" style={{ color: '#F57F17' }} />
+              <p className="text-base font-medium" style={{ color: '#F57F17' }}>미정산 합계</p>
+              <AlertTriangle className="h-5 w-5" style={{ color: '#F57F17' }} />
             </div>
             <p className="text-2xl font-bold font-mono" style={{ color: '#F57F17' }}>{pendingCount}건</p>
-            <p className="text-xs mt-1" style={{ color: '#FF8F00' }}>
+            <p className="text-sm mt-1" style={{ color: '#FF8F00' }}>
               ${Math.round(totalPendingUsd).toLocaleString('en-US')}
             </p>
           </CardContent>
@@ -290,45 +300,7 @@ export default async function DashboardPage() {
       </Card>
 
       {/* 검증 이슈 카드 */}
-      {verRows.length > 0 && (
-        <Card style={{ borderColor: '#FFB74D' }}>
-          <CardHeader className="pb-2" style={{ backgroundColor: '#FFF3E0', borderRadius: '0.5rem 0.5rem 0 0' }}>
-            <CardTitle className="text-base flex items-center gap-2" style={{ color: '#E65100' }}>
-              ⚠️ 검증 이슈 차수
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <table className="w-full text-sm">
-              <thead>
-                <tr style={{ backgroundColor: '#FFE0B2' }}>
-                  <th className="text-left px-4 py-2 text-xs font-medium" style={{ color: '#E65100' }}>차수</th>
-                  <th className="text-right px-4 py-2 text-xs font-medium" style={{ color: '#E65100' }}>확정금액</th>
-                  <th className="text-left px-4 py-2 text-xs font-medium" style={{ color: '#E65100' }}>이슈 내용</th>
-                </tr>
-              </thead>
-              <tbody>
-                {verRows.map((row, i) => {
-                  const tx = Array.isArray(row.transactions) ? row.transactions[0] : row.transactions
-                  const issueNote = extractVerNote(row.notes)
-                  return (
-                    <tr key={i} className="border-t" style={{ borderColor: '#FFE0B2' }}>
-                      <td className="px-4 py-2 font-semibold" style={{ color: '#BF360C' }}>
-                        {tx?.round_label ?? '-'}
-                      </td>
-                      <td className="px-4 py-2 text-right font-mono text-xs">
-                        {row.confirmed_amount_krw != null
-                          ? `${Number(row.confirmed_amount_krw as number).toLocaleString('ko-KR')}원`
-                          : '-'}
-                      </td>
-                      <td className="px-4 py-2 text-xs text-muted-foreground">{issueNote || '-'}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
-      )}
+      <VerificationIssueCard rows={verRows} />
 
       {/* 최근 5차 거래 */}
       <Card className="border-green-200">
