@@ -113,7 +113,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         closingLocked={closing?.is_locked ?? false}
       />
 
-      <div className="border border-green-200 rounded-lg px-6 py-5 mb-6 flex items-center justify-between bg-white">
+      <div className="border border-green-200 rounded-lg px-6 py-5 flex items-center justify-between bg-white">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/CI_a1korea.png" alt="한국에이원" style={{ height: '48px', objectFit: 'contain' }} />
         <div className="text-center">
@@ -126,6 +126,9 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/CI_toei.png" alt="토에이산교" style={{ height: '48px', objectFit: 'contain' }} />
       </div>
+      <p className="text-xs text-right mb-6 mt-1" style={{ color: '#666666' }}>
+        ※ 모든 금액은 부가세 별도 기준입니다.
+      </p>
 
       <ReportSection title="섹션 1 — 거래 기본 정보">
         <div className="grid grid-cols-2 gap-x-8 gap-y-1">

@@ -242,6 +242,12 @@ const s = StyleSheet.create({
     fontSize: 8,
     color: '#9aa3b0',
   },
+  disclaimer: {
+    fontSize: 8,
+    color: '#666666',
+    textAlign: 'right',
+    marginBottom: 10,
+  },
   itemsTable: {
     borderWidth: 1,
     borderColor: BORDER,
@@ -375,6 +381,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
           <Image src={CI_TOEI} style={s.headerLogo} />
         </View>
 
+        <Text style={s.disclaimer}>※ 모든 금액은 부가세 별도 기준입니다.</Text>
         <Text style={s.sectionLabel}>기본 정보</Text>
         <View style={s.table}>
           <Row label="회 차" value={data.roundLabel} />
@@ -491,14 +498,14 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
 
         <Text style={s.sectionLabel}>분담 비율 및 에이원 부담분</Text>
         <View style={s.table}>
-          <Row label="추가비용 합계" value={krwSigned(data.additionalCostKrw)} />
+          <Row label="추가비용 합계 (VAT 별도)" value={krwSigned(data.additionalCostKrw)} />
           <Row
             label={`에이원 부담 비율`}
             value={`${data.fxBurdenA1Pct}% (토에이 ${100 - data.fxBurdenA1Pct}%)`}
             even
           />
-          <Row label="에이원 부담분" value={krwSigned(data.a1BurdenKrw)} />
-          <Row label="에이원 부담분 + VAT" value={krwSigned(data.a1BurdenWithVatKrw)} even isLast />
+          <Row label="에이원 부담분 (VAT 별도)" value={krwSigned(data.a1BurdenKrw)} />
+          <Row label="에이원 부담분 + VAT (VAT 포함)" value={krwSigned(data.a1BurdenWithVatKrw)} even isLast />
         </View>
 
         <Text style={s.sectionLabel}>클로징 추가비용 (A+B+C)</Text>
@@ -518,7 +525,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
             )
           })}
           <Row
-            label="추가비용 소계"
+            label="추가비용 소계 (VAT 별도)"
             value={krw(data.closingCostsTotalKrw)}
             even={data.closingCostItems.length % 2 === 1}
             isLast

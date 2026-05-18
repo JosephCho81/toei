@@ -86,7 +86,7 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
       </div>
 
       {data.lcFeeItems.length > 0 && (
-        <FeeTable title="▸ LC 수수료" items={data.lcFeeItems} footerLabel="LC 수수료 합계" footerValue={data.lcFeeTotalKrw} />
+        <FeeTable title="▸ LC 수수료" items={data.lcFeeItems} footerLabel="LC 수수료 합계 (VAT 별도)" footerValue={data.lcFeeTotalKrw} />
       )}
 
       <Separator className="my-3" />
@@ -95,15 +95,15 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
           label={`환차손익 분담 비율 — 에이원 ${data.fx_burden_a1_pct}% / 토에이 ${100 - data.fx_burden_a1_pct}%`}
           value=""
         />
-        <AmountRow label="에이원 부담분" value={signed(data.a1BurdenKrw)} />
-        <AmountRow label="에이원 부담분 + VAT" value={signed(data.a1BurdenWithVatKrw)} bold />
+        <AmountRow label="에이원 부담분 (VAT 별도)" value={signed(data.a1BurdenKrw)} />
+        <AmountRow label="에이원 부담분 + VAT (VAT 포함)" value={signed(data.a1BurdenWithVatKrw)} bold />
       </div>
 
       {data.closingCostItems.length > 0 && (
         <FeeTable
           title="▸ 클로징 추가비용 (A+B+C)"
           items={data.closingCostItems.map((c, i) => ({ ...c, item_name: `${String.fromCharCode(65 + i)}) ${c.item_name}` }))}
-          footerLabel="추가비용 소계"
+          footerLabel="추가비용 소계 (VAT 별도)"
           footerValue={data.closingCostsTotalKrw}
         />
       )}

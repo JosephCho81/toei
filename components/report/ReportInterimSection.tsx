@@ -71,12 +71,12 @@ export function ReportInterimSection({ data }: { data: InterimData }) {
       <CostTable title="▸ 통관비용 세부 (그룹B)" items={data.customsItems} />
       <Separator className="my-3" />
       <div className="space-y-0.5">
-        <AmountRow label="해상운임 소계" value={formatKrw(shippingTotal)} />
-        <AmountRow label="통관비용 소계" value={formatKrw(customsTotal)} />
+        <AmountRow label="해상운임 소계 (VAT 별도)" value={formatKrw(shippingTotal)} />
+        <AmountRow label="통관비용 소계 (VAT 별도)" value={formatKrw(customsTotal)} />
         <AmountRow label="부가세 합계" value={formatKrw(data.vatAmountKrw)} />
         <Separator className="my-2" />
         <AmountRow
-          label="중간정산 확정금액"
+          label="중간정산 확정금액 (VAT 포함)"
           value={data.confirmed_amount_krw != null ? formatKrw(data.confirmed_amount_krw) : '-'}
           bold
         />

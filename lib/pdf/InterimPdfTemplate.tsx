@@ -193,6 +193,12 @@ const s = StyleSheet.create({
     fontSize: 8,
     color: '#9aa3b0',
   },
+  disclaimer: {
+    fontSize: 8,
+    color: '#666666',
+    textAlign: 'right',
+    marginBottom: 10,
+  },
 })
 
 function krw(n: number): string {
@@ -262,6 +268,7 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
           <Image src={CI_TOEI} style={s.headerLogo} />
         </View>
 
+        <Text style={s.disclaimer}>※ 모든 금액은 부가세 별도 기준입니다.</Text>
         <Text style={s.sectionLabel}>기본 정보</Text>
         <View style={s.table}>
           <Row label="회 차" value={data.roundLabel} />
@@ -279,14 +286,14 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
 
         <Text style={s.sectionLabel}>비용 내역</Text>
         <View style={s.table}>
-          <Row label="총 수입비용+관세" value={krw(data.totalCostKrw)} />
+          <Row label="총 수입비용+관세 (VAT 별도)" value={krw(data.totalCostKrw)} />
           <Row label="부가세" value={krw(data.vatAmountKrw)} even />
-          <Row label={marginLabel} value={krw(data.totalWithVatKrw)} isLast />
+          <Row label={`${marginLabel} (VAT 포함)`} value={krw(data.totalWithVatKrw)} isLast />
         </View>
 
         <Text style={s.sectionLabel}>지불 현황</Text>
         <View style={s.table}>
-          <Row label="최종 지급액" value={krw(data.confirmedAmountKrw)} />
+          <Row label="최종 지급액 (VAT 포함)" value={krw(data.confirmedAmountKrw)} />
           <PaidRow isPaid={data.isPaid} even isLast />
         </View>
 
