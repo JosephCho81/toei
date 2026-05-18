@@ -223,21 +223,21 @@ export default async function DashboardPage({
       {/* KPI 카드 4개 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="border-green-200">
-          <CardContent className="p-5">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-base font-medium" style={{ color: '#2E7D32' }}>전체 거래</p>
-              <Package className="h-5 w-5" style={{ color: '#4CAF50' }} />
+              <Package className="h-5 w-5" style={{ color: '#81C784' }} />
             </div>
             <p className="text-2xl font-bold font-mono" style={{ color: '#2E7D32' }}>{totalCount}건</p>
             <p className="text-sm mt-1" style={{ color: '#4CAF50' }}>클로징 완료 {closingDone}건</p>
           </CardContent>
         </Card>
 
-        <Card style={{ backgroundColor: '#E8F5E9', borderColor: '#A5D6A7' }}>
-          <CardContent className="p-5">
+        <Card style={{ backgroundColor: '#F1F8E9', borderColor: '#C8E6C9' }}>
+          <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-base font-medium" style={{ color: '#2E7D32' }}>총 수입금액</p>
-              <TrendingUp className="h-5 w-5" style={{ color: '#2E7D32' }} />
+              <TrendingUp className="h-5 w-5" style={{ color: '#4CAF50' }} />
             </div>
             <p className="text-2xl font-bold font-mono" style={{ color: '#2E7D32' }}>
               ${Math.round(totalUsd).toLocaleString('en-US')}
@@ -246,8 +246,8 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
 
-        <Card style={{ backgroundColor: '#2E7D32', borderColor: '#1B5E20' }}>
-          <CardContent className="p-5">
+        <Card style={{ backgroundColor: '#4CAF50', borderColor: '#388E3C' }}>
+          <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-base font-medium text-white/80">클로징 완료</p>
               <CheckCircle2 className="h-5 w-5 text-white/80" />
@@ -260,10 +260,10 @@ export default async function DashboardPage({
         </Card>
 
         <Card style={{ backgroundColor: '#FFF8E1', borderColor: '#FFE082' }}>
-          <CardContent className="p-5">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-base font-medium" style={{ color: '#F57F17' }}>미정산 합계</p>
-              <AlertTriangle className="h-5 w-5" style={{ color: '#F57F17' }} />
+              <AlertTriangle className="h-5 w-5" style={{ color: '#FFA000' }} />
             </div>
             <p className="text-2xl font-bold font-mono" style={{ color: '#F57F17' }}>{pendingCount}건</p>
             <p className="text-sm mt-1" style={{ color: '#FF8F00' }}>
@@ -275,10 +275,10 @@ export default async function DashboardPage({
 
       {/* D-Day 알림 */}
       <Card className="border-green-200">
-        <CardHeader className="pb-2" style={{ backgroundColor: '#2E7D32', borderRadius: '0.5rem 0.5rem 0 0' }}>
-          <CardTitle className="text-base flex items-center gap-2 text-white">
+        <CardHeader className="pb-2 border-l-4 pl-3" style={{ borderColor: '#4CAF50' }}>
+          <CardTitle className="text-base flex items-center gap-2" style={{ color: '#2E7D32' }}>
             ⏰ D-Day 알림
-            <span className="text-xs font-normal text-white/70">(입금일 기준 55일 마감)</span>
+            <span className="text-xs font-normal text-muted-foreground">(입금일 기준 55일 마감)</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-1.5 pt-3">
@@ -316,7 +316,7 @@ export default async function DashboardPage({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* 중간정산 미완료 */}
         <Card className="border-green-200">
-          <CardHeader className="pb-2" style={{ backgroundColor: '#E8F5E9', borderRadius: '0.5rem 0.5rem 0 0' }}>
+          <CardHeader className="pb-2 border-l-4 pl-3" style={{ borderColor: '#4CAF50' }}>
             <CardTitle className="text-base" style={{ color: '#2E7D32' }}>중간정산 미완료</CardTitle>
           </CardHeader>
           <CardContent className="pt-3">
@@ -347,7 +347,7 @@ export default async function DashboardPage({
 
         {/* 클로징 미완료 */}
         <Card className="border-green-200">
-          <CardHeader className="pb-2" style={{ backgroundColor: '#E8F5E9', borderRadius: '0.5rem 0.5rem 0 0' }}>
+          <CardHeader className="pb-2 border-l-4 pl-3" style={{ borderColor: '#4CAF50' }}>
             <CardTitle className="text-base" style={{ color: '#2E7D32' }}>클로징 미완료</CardTitle>
           </CardHeader>
           <CardContent className="pt-3">
@@ -379,11 +379,11 @@ export default async function DashboardPage({
 
       {/* 컨테이너 추적 현황 */}
       <Card className="border-green-200">
-        <CardHeader className="pb-2" style={{ backgroundColor: '#2E7D32', borderRadius: '0.5rem 0.5rem 0 0' }}>
-          <CardTitle className="text-base flex items-center gap-2 text-white">
+        <CardHeader className="pb-2 border-l-4 pl-3" style={{ borderColor: '#4CAF50' }}>
+          <CardTitle className="text-base flex items-center gap-2" style={{ color: '#2E7D32' }}>
             <Ship className="h-4 w-4" />
             컨테이너 추적 현황
-            <span className="text-xs font-normal text-white/70 ml-1">
+            <span className="text-xs font-normal text-muted-foreground ml-1">
               운송중 {inTransit}건 · ETA 7일 이내 {arrivingSoon}건
             </span>
           </CardTitle>
@@ -394,14 +394,14 @@ export default async function DashboardPage({
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr style={{ backgroundColor: '#388E3C' }}>
-                  <th className="text-center px-4 py-2 font-medium text-white text-xs">차수</th>
-                  <th className="text-center px-4 py-2 font-medium text-white text-xs">제조사</th>
-                  <th className="text-center px-4 py-2 font-medium text-white text-xs">제품</th>
-                  <th className="text-center px-4 py-2 font-medium text-white text-xs">컨테이너</th>
-                  <th className="text-center px-4 py-2 font-medium text-white text-xs">ETD</th>
-                  <th className="text-center px-4 py-2 font-medium text-white text-xs">ETA</th>
-                  <th className="text-center px-4 py-2 font-medium text-white text-xs">상태</th>
+                <tr style={{ backgroundColor: '#E8F5E9' }}>
+                  <th className="text-center px-4 py-2 font-medium text-xs" style={{ color: '#2E7D32' }}>차수</th>
+                  <th className="text-center px-4 py-2 font-medium text-xs" style={{ color: '#2E7D32' }}>제조사</th>
+                  <th className="text-center px-4 py-2 font-medium text-xs" style={{ color: '#2E7D32' }}>제품</th>
+                  <th className="text-center px-4 py-2 font-medium text-xs" style={{ color: '#2E7D32' }}>컨테이너</th>
+                  <th className="text-center px-4 py-2 font-medium text-xs" style={{ color: '#2E7D32' }}>ETD</th>
+                  <th className="text-center px-4 py-2 font-medium text-xs" style={{ color: '#2E7D32' }}>ETA</th>
+                  <th className="text-center px-4 py-2 font-medium text-xs" style={{ color: '#2E7D32' }}>상태</th>
                 </tr>
               </thead>
               <tbody>
@@ -441,7 +441,7 @@ export default async function DashboardPage({
                         {c.etd ? formatDate(c.etd) : '-'}
                       </td>
                       <td className="px-4 py-2 text-center text-xs">
-                        <span className={isArrivingSoon ? 'text-orange-600 font-semibold' : 'text-gray-400'}>
+                        <span className={isArrivingSoon ? 'text-orange-400 font-semibold' : 'text-gray-400'}>
                           {c.eta ? formatDate(c.eta) : '-'}
                         </span>
                       </td>
@@ -460,24 +460,24 @@ export default async function DashboardPage({
       {/* 최근 거래 현황 */}
       <Card className="border-green-200">
         <CardHeader
-          className="pb-2 flex flex-row items-center justify-between"
-          style={{ backgroundColor: '#1B5E20', borderRadius: '0.5rem 0.5rem 0 0' }}
+          className="pb-2 flex flex-row items-center justify-between border-l-4 pl-3"
+          style={{ borderColor: '#4CAF50' }}
         >
-          <CardTitle className="text-base text-white">최근 거래 현황</CardTitle>
-          <Link href="/transactions" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'text-white/80 hover:text-white hover:bg-white/10')}>
+          <CardTitle className="text-base" style={{ color: '#2E7D32' }}>최근 거래 현황</CardTitle>
+          <Link href="/transactions" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'hover:bg-green-50')} style={{ color: '#4CAF50' }}>
             전체 보기 <ArrowRight className="h-3.5 w-3.5 ml-1" />
           </Link>
         </CardHeader>
         <CardContent className="p-0">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ backgroundColor: '#2E7D32' }}>
-                <th className="text-center px-4 py-2 font-medium text-white text-xs">회차</th>
-                <th className="text-center px-4 py-2 font-medium text-white text-xs">제조사</th>
-                <th className="text-center px-4 py-2 font-medium text-white text-xs">수입금액</th>
-                <th className="text-center px-4 py-2 font-medium text-white text-xs">ETD</th>
-                <th className="text-center px-4 py-2 font-medium text-white text-xs">ETA</th>
-                <th className="text-center px-4 py-2 font-medium text-white text-xs">정산상태</th>
+              <tr style={{ backgroundColor: '#E8F5E9' }}>
+                <th className="text-center px-4 py-2 font-medium text-xs" style={{ color: '#2E7D32' }}>회차</th>
+                <th className="text-center px-4 py-2 font-medium text-xs" style={{ color: '#2E7D32' }}>제조사</th>
+                <th className="text-center px-4 py-2 font-medium text-xs" style={{ color: '#2E7D32' }}>수입금액</th>
+                <th className="text-center px-4 py-2 font-medium text-xs" style={{ color: '#2E7D32' }}>ETD</th>
+                <th className="text-center px-4 py-2 font-medium text-xs" style={{ color: '#2E7D32' }}>ETA</th>
+                <th className="text-center px-4 py-2 font-medium text-xs" style={{ color: '#2E7D32' }}>정산상태</th>
               </tr>
             </thead>
             <tbody>

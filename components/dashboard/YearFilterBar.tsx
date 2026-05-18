@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation'
 
-const YEARS = ['2021', '2022', '2023', '2024', '2025']
+const currentYear = new Date().getFullYear()
+const YEARS = Array.from({ length: currentYear - 2020 }, (_, i) => String(2021 + i))
 
 export function YearFilterBar({ currentYear }: { currentYear?: string }) {
   const router = useRouter()
