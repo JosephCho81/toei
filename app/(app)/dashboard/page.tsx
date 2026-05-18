@@ -56,6 +56,10 @@ export default async function DashboardPage({
     return q
   }
 
+  const containerCutoffDate = new Date()
+  containerCutoffDate.setDate(containerCutoffDate.getDate() - 7)
+  const containerCutoffStr = containerCutoffDate.toISOString().slice(0, 10)
+
   const [
     { data: allTx },
     { data: ddayTx },
@@ -76,6 +80,7 @@ export default async function DashboardPage({
     supabase.from('containers')
       .select('id, container_no, etd, eta, actual_arrival, tracking_status, transactions(id, round_label, manufacturers(name), transaction_items(spec))')
       .is('actual_arrival', null)
+      .gte('eta', containerCutoffStr)
       .order('eta', { ascending: true, nullsFirst: false })
       .limit(10),
     supabase.from('transactions')
@@ -294,7 +299,7 @@ export default async function DashboardPage({
                 style={{ backgroundColor: isOverdue ? '#FFEBEE' : isUrgent ? '#FFF3E0' : '#E8F5E9' }}
               >
                 <span className="font-semibold">{t.round_label}</span>
-                <span className="text-xs text-muted-foreground">입금일: {formatDate(t.a1_payment_date)}</span>
+                <span className="text-xs text-gray-400">입금일: {formatDate(t.a1_payment_date)}</span>
                 <span className={cn(
                   'font-bold text-sm',
                   isOverdue ? 'text-red-600' : isUrgent ? 'text-orange-600' : 'text-green-600',
@@ -306,72 +311,6 @@ export default async function DashboardPage({
           })}
         </CardContent>
       </Card>
-
-      {/* 최근 5차 거래 */}
-      <Card className="border-green-200">
-        <CardHeader
-          className="pb-2 flex flex-row items-center justify-between"
-          style={{ backgroundColor: '#1B5E20', borderRadius: '0.5rem 0.5rem 0 0' }}
-        >
-          <CardTitle className="text-base text-white">최근 거래 현황</CardTitle>
-          <Link href="/transactions" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'text-white/80 hover:text-white hover:bg-white/10')}>
-            전체 보기 <ArrowRight className="h-3.5 w-3.5 ml-1" />
-          </Link>
-        </CardHeader>
-        <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ backgroundColor: '#2E7D32' }}>
-                <th className="text-center px-4 py-2 font-medium text-white text-xs">회차</th>
-                <th className="text-center px-4 py-2 font-medium text-white text-xs">제조사</th>
-                <th className="text-center px-4 py-2 font-medium text-white text-xs">수입금액</th>
-                <th className="text-center px-4 py-2 font-medium text-white text-xs">ETD</th>
-                <th className="text-center px-4 py-2 font-medium text-white text-xs">ETA</th>
-                <th className="text-center px-4 py-2 font-medium text-white text-xs">정산상태</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(recentTx ?? []).map((t, i) => {
-                const mfr = Array.isArray(t.manufacturers) ? t.manufacturers[0] : t.manufacturers
-                const ctrs = (Array.isArray(t.containers) ? t.containers : []) as { etd: string | null; eta: string | null }[]
-                const etd = ctrs.map((c) => c.etd).filter(Boolean).sort()[0] ?? null
-                const eta = ctrs.map((c) => c.eta).filter(Boolean).sort().at(-1) ?? null
-                return (
-                  <tr
-                    key={t.id}
-                    className="border-b last:border-0 hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: i % 2 === 1 ? '#F1F8E9' : '#ffffff' }}
-                  >
-                    <td className="px-4 py-2.5 font-semibold text-center">
-                      <Link href={`/transactions/${t.id}`} className="hover:underline" style={{ color: '#2E7D32' }}>
-                        {t.round_label}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-2.5 text-center text-muted-foreground">
-                      {(mfr as { name: string } | null)?.name ?? '-'}
-                    </td>
-                    <td className="px-4 py-2.5 text-center font-mono">
-                      ${Number(t.import_amount_usd ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                    </td>
-                    <td className="px-4 py-2.5 text-center text-muted-foreground">
-                      {etd ? formatDate(etd) : '-'}
-                    </td>
-                    <td className="px-4 py-2.5 text-center text-muted-foreground">
-                      {eta ? formatDate(eta) : '-'}
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      <StatusBadge status={t.settlement_status} />
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
-
-      {/* 검증 이슈 */}
-      <VerificationIssueCard rows={verRows} />
 
       {/* 미완료 현황 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -498,11 +437,11 @@ export default async function DashboardPage({
                       <td className="px-4 py-2 text-center font-mono text-xs">
                         {c.container_no ?? '-'}
                       </td>
-                      <td className="px-4 py-2 text-center text-muted-foreground text-xs">
+                      <td className="px-4 py-2 text-center text-gray-400 text-xs">
                         {c.etd ? formatDate(c.etd) : '-'}
                       </td>
                       <td className="px-4 py-2 text-center text-xs">
-                        <span className={isArrivingSoon ? 'text-orange-600 font-semibold' : 'text-muted-foreground'}>
+                        <span className={isArrivingSoon ? 'text-orange-600 font-semibold' : 'text-gray-400'}>
                           {c.eta ? formatDate(c.eta) : '-'}
                         </span>
                       </td>
@@ -517,6 +456,72 @@ export default async function DashboardPage({
           )}
         </CardContent>
       </Card>
+
+      {/* 최근 거래 현황 */}
+      <Card className="border-green-200">
+        <CardHeader
+          className="pb-2 flex flex-row items-center justify-between"
+          style={{ backgroundColor: '#1B5E20', borderRadius: '0.5rem 0.5rem 0 0' }}
+        >
+          <CardTitle className="text-base text-white">최근 거래 현황</CardTitle>
+          <Link href="/transactions" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'text-white/80 hover:text-white hover:bg-white/10')}>
+            전체 보기 <ArrowRight className="h-3.5 w-3.5 ml-1" />
+          </Link>
+        </CardHeader>
+        <CardContent className="p-0">
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ backgroundColor: '#2E7D32' }}>
+                <th className="text-center px-4 py-2 font-medium text-white text-xs">회차</th>
+                <th className="text-center px-4 py-2 font-medium text-white text-xs">제조사</th>
+                <th className="text-center px-4 py-2 font-medium text-white text-xs">수입금액</th>
+                <th className="text-center px-4 py-2 font-medium text-white text-xs">ETD</th>
+                <th className="text-center px-4 py-2 font-medium text-white text-xs">ETA</th>
+                <th className="text-center px-4 py-2 font-medium text-white text-xs">정산상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(recentTx ?? []).map((t, i) => {
+                const mfr = Array.isArray(t.manufacturers) ? t.manufacturers[0] : t.manufacturers
+                const ctrs = (Array.isArray(t.containers) ? t.containers : []) as { etd: string | null; eta: string | null }[]
+                const etd = ctrs.map((c) => c.etd).filter(Boolean).sort()[0] ?? null
+                const eta = ctrs.map((c) => c.eta).filter(Boolean).sort().at(-1) ?? null
+                return (
+                  <tr
+                    key={t.id}
+                    className="border-b last:border-0 hover:opacity-90 transition-opacity"
+                    style={{ backgroundColor: i % 2 === 1 ? '#F1F8E9' : '#ffffff' }}
+                  >
+                    <td className="px-4 py-2.5 font-semibold text-center">
+                      <Link href={`/transactions/${t.id}`} className="hover:underline" style={{ color: '#2E7D32' }}>
+                        {t.round_label}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-2.5 text-center text-muted-foreground">
+                      {(mfr as { name: string } | null)?.name ?? '-'}
+                    </td>
+                    <td className="px-4 py-2.5 text-center font-mono">
+                      ${Number(t.import_amount_usd ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                    </td>
+                    <td className="px-4 py-2.5 text-center text-gray-400">
+                      {etd ? formatDate(etd) : '-'}
+                    </td>
+                    <td className="px-4 py-2.5 text-center text-gray-400">
+                      {eta ? formatDate(eta) : '-'}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <StatusBadge status={t.settlement_status} />
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
+      {/* 검증 이슈 */}
+      <VerificationIssueCard rows={verRows} />
     </div>
   )
 }

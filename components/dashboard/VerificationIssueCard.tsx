@@ -62,6 +62,14 @@ export function VerificationIssueCard({ rows }: { rows: VerRow[] }) {
             <span className="font-semibold">중간정산 계산 기준</span>
             <br />
             확정금액 = &#123; (수입금액<sub>USD</sub> × 통관환율 × (1 + 마진율)) + 통관비용 합계 &#125; × 1.10
+            <br />
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ 해상운임 (부가세 별도 실비 청구)
+            <br />
+            <span className="text-xs" style={{ color: '#4CAF50' }}>
+              · 통관환율: 입고시 세관 신고 환율 기준<br />
+              · 해상운임은 부가세 별도 실비 청구 → 부가세(×1.10) 적용 제외<br />
+              · 클로징환율(BOK)은 클로징정산 환차손익 계산에 별도 적용
+            </span>
           </div>
         </div>
         <table className="w-full text-sm">
