@@ -26,6 +26,8 @@ export interface ClosingPdfData {
   closingDate: string | null
   lcPaymentTotalKrw: number
   importAmountKrw: number
+  importAmountUsd?: number
+  vatAmountKrw?: number
   fxGainLossKrw: number
   lcFeeItems: { itemName: string; amountKrw: number }[]
   lcFeeTotalKrw: number
@@ -367,11 +369,29 @@ function PaidRow({ isPaid, even, isLast }: { isPaid: boolean; even?: boolean; is
   )
 }
 
+const SENS_DELTAS = [-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50]
+
+function buildSensScenarios(bokRate: number, importAmountUsd: number, importAmountKrw: number, lcFeeTotal: number, burdenPct: number, extraCosts: number) {
+  return SENS_DELTAS.map(delta => {
+    const simRate = bokRate + delta
+    const simLc = Math.round(importAmountUsd * simRate)
+    const simFx = simLc - importAmountKrw
+    const simA1 = Math.round((simFx + lcFeeTotal) * (burdenPct / 100))
+    const simFinal = Math.round(simA1 * 1.1) + extraCosts
+    return { delta, simRate, simFx, simFinal, isActual: delta === 0 }
+  })
+}
+
 export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
   const fxIsGain = data.fxGainLossKrw >= 0
   const fxLabel = fxIsGain
     ? `환차익 (A1 유리, ${data.fxBurdenA1Pct}% 수령)`
     : `환차손 (A1 불리, ${data.fxBurdenA1Pct}% 부담)`
+  const additionalCost = data.fxGainLossKrw + data.lcFeeTotalKrw
+  const nonVatCostsTotal = [...data.shippingItems, ...data.customsItems].reduce((s, r) => s + r.amountKrw, 0)
+  const sensScenarios = data.bokExchangeRate != null && data.importAmountUsd
+    ? buildSensScenarios(data.bokExchangeRate, data.importAmountUsd, data.importAmountKrw, data.lcFeeTotalKrw, data.fxBurdenA1Pct, data.closingCostsTotalKrw)
+    : null
 
   return (
     <Document>
@@ -650,6 +670,163 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
           </View>
         )}
 
+        {/* 계산 플로우 (중간정산 → 클로징 → 종합) */}
+        {data.interimConfirmedKrw != null && data.grandTotalKrw != null && (
+          <View>
+            <Text style={s.sectionLabel}>계산 플로우 요약</Text>
+            <View style={[s.table, { backgroundColor: '#f9fafb' }]}>
+              <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center' }}>
+                <View style={{ flex: 1, paddingLeft: 10, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 8.5, color: MUTED }}>수입원가 (USD×통관환율)</Text>
+                </View>
+                <View style={{ width: '40%', paddingRight: 10, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 8.5, textAlign: 'right' }}>{krw(data.importAmountKrw)}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center', backgroundColor: GRAY_BG }}>
+                <View style={{ flex: 1, paddingLeft: 20, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 8, color: MUTED }}>+ 통관/운송비</Text>
+                </View>
+                <View style={{ width: '40%', paddingRight: 10, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 8, textAlign: 'right', color: MUTED }}>+{nonVatCostsTotal.toLocaleString('ko-KR')}원</Text>
+                </View>
+              </View>
+              {data.vatAmountKrw != null && (
+                <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center' }}>
+                  <View style={{ flex: 1, paddingLeft: 20, paddingTop: 4, paddingBottom: 4 }}>
+                    <Text style={{ fontSize: 8, color: MUTED }}>+ 부가세</Text>
+                  </View>
+                  <View style={{ width: '40%', paddingRight: 10, paddingTop: 4, paddingBottom: 4 }}>
+                    <Text style={{ fontSize: 8, textAlign: 'right', color: MUTED }}>+{data.vatAmountKrw.toLocaleString('ko-KR')}원</Text>
+                  </View>
+                </View>
+              )}
+              <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 24, alignItems: 'center', backgroundColor: GREEN }}>
+                <View style={{ flex: 1, paddingLeft: 10, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 9, color: WHITE, fontWeight: 700 }}>= 중간정산 확정금액</Text>
+                </View>
+                <View style={{ width: '40%', paddingRight: 10, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 9, textAlign: 'right', color: WHITE, fontWeight: 700 }}>{krw(data.interimConfirmedKrw!)}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center', backgroundColor: GRAY_BG }}>
+                <View style={{ flex: 1, paddingLeft: 20, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 8, color: fxIsGain ? GREEN_GAIN : RED }}>{fxIsGain ? '+ 환차익' : '- 환차손'}</Text>
+                </View>
+                <View style={{ width: '40%', paddingRight: 10, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 8, textAlign: 'right', color: fxIsGain ? GREEN_GAIN : RED }}>{krwSigned(data.fxGainLossKrw)}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center' }}>
+                <View style={{ flex: 1, paddingLeft: 20, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 8, color: MUTED }}>+ LC수수료</Text>
+                </View>
+                <View style={{ width: '40%', paddingRight: 10, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 8, textAlign: 'right', color: MUTED }}>{krwSigned(data.lcFeeTotalKrw)}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center', backgroundColor: GRAY_BG }}>
+                <View style={{ flex: 1, paddingLeft: 20, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 8, color: MUTED }}>× 에이원 분담 ({data.fxBurdenA1Pct}%) + VAT</Text>
+                </View>
+                <View style={{ width: '40%', paddingRight: 10, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 8, textAlign: 'right', color: MUTED }}>{krwSigned(data.a1BurdenWithVatKrw)}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 24, alignItems: 'center', backgroundColor: additionalCost < 0 ? '#FEE2E2' : '#FEF9C3' }}>
+                <View style={{ flex: 1, paddingLeft: 10, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 9, fontWeight: 700, color: additionalCost < 0 ? RED : '#92400E' }}>= 클로징 정산금액</Text>
+                </View>
+                <View style={{ width: '40%', paddingRight: 10, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 9, textAlign: 'right', fontWeight: 700, color: additionalCost < 0 ? RED : '#92400E' }}>{krwSigned(data.confirmedAmountKrw)}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', minHeight: 26, alignItems: 'center', backgroundColor: '#1B5E20' }}>
+                <View style={{ flex: 1, paddingLeft: 10, paddingTop: 5, paddingBottom: 5 }}>
+                  <Text style={{ fontSize: 10, fontWeight: 700, color: WHITE }}>= 종합정산액</Text>
+                </View>
+                <View style={{ width: '40%', paddingRight: 10, paddingTop: 5, paddingBottom: 5 }}>
+                  <Text style={{ fontSize: 10, textAlign: 'right', fontWeight: 700, color: WHITE }}>{krw(data.grandTotalKrw!)}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* 환율 민감도 분석 */}
+        {sensScenarios && (
+          <View break>
+            <Text style={s.sectionLabel}>환율 민감도 분석 (BOK 고시환율 시나리오)</Text>
+            <View style={{ borderWidth: 1, borderColor: BORDER }}>
+              <View style={{ flexDirection: 'row', backgroundColor: GREEN, minHeight: 18, alignItems: 'center' }}>
+                <Text style={{ width: '20%', paddingLeft: 6, fontSize: 7.5, color: WHITE, fontWeight: 700 }}>환율 변동</Text>
+                <Text style={{ width: '30%', textAlign: 'right', paddingRight: 8, fontSize: 7.5, color: WHITE, fontWeight: 700 }}>시뮬레이션 환율</Text>
+                <Text style={{ width: '25%', textAlign: 'right', paddingRight: 8, fontSize: 7.5, color: WHITE, fontWeight: 700 }}>환차손익</Text>
+                <Text style={{ flex: 1, textAlign: 'right', paddingRight: 8, fontSize: 7.5, color: WHITE, fontWeight: 700 }}>클로징 정산</Text>
+              </View>
+              {sensScenarios.map((sc, i) => (
+                <View
+                  key={i}
+                  style={{
+                    flexDirection: 'row',
+                    borderBottomWidth: i < sensScenarios.length - 1 ? 1 : 0,
+                    borderBottomColor: BORDER,
+                    minHeight: 18,
+                    alignItems: 'center',
+                    backgroundColor: sc.isActual ? '#E8F5E9' : i % 2 === 1 ? GRAY_BG : WHITE,
+                  }}
+                >
+                  <Text style={{ width: '20%', paddingLeft: 6, fontSize: 7.5, color: sc.delta === 0 ? GREEN : sc.delta < 0 ? RED : '#1565C0', fontWeight: sc.isActual ? 700 : 400 }}>
+                    {sc.delta === 0 ? '← 실제' : sc.delta > 0 ? `+${sc.delta}원` : `${sc.delta}원`}
+                  </Text>
+                  <Text style={{ width: '30%', textAlign: 'right', paddingRight: 8, fontSize: 7.5 }}>
+                    {sc.simRate.toLocaleString('ko-KR')}원/$
+                  </Text>
+                  <Text style={{ width: '25%', textAlign: 'right', paddingRight: 8, fontSize: 7.5, color: sc.simFx >= 0 ? '#1565C0' : RED }}>
+                    {sc.simFx >= 0 ? '+' : ''}{sc.simFx.toLocaleString('ko-KR')}원
+                  </Text>
+                  <Text style={{ flex: 1, textAlign: 'right', paddingRight: 8, fontSize: 7.5, color: sc.simFinal < 0 ? RED : sc.isActual ? GREEN : TEXT, fontWeight: sc.isActual ? 700 : 400 }}>
+                    {sc.simFinal >= 0 ? '+' : ''}{sc.simFinal.toLocaleString('ko-KR')}원
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        <View style={s.footer}>
+          <Text>발행일: {data.issuedAt}</Text>
+          <Text>발행자: ㈜한국에이원</Text>
+        </View>
+      </Page>
+
+      {/* 결재 도장 페이지 */}
+      <Page size="A4" style={s.page}>
+        <View style={s.header}>
+          <Image src={CI_A1} style={s.headerLogo} />
+          <View style={s.headerCenter}>
+            <Text style={s.companyName}>㈜한국에이원 ↔ 토에이산교</Text>
+            <Text style={s.docTitle}>{data.roundLabel} — 결재 확인</Text>
+          </View>
+          <Image src={CI_TOEI} style={s.headerLogo} />
+        </View>
+        <View style={{ marginTop: 40 }}>
+          <Text style={{ fontSize: 9, color: MUTED, textAlign: 'center', marginBottom: 10 }}>결재</Text>
+          <View style={{ flexDirection: 'row', borderWidth: 1, borderColor: '#9ca3af' }}>
+            <View style={{ flex: 1, borderRightWidth: 1, borderRightColor: '#9ca3af' }}>
+              <Text style={{ fontSize: 9, textAlign: 'center', paddingTop: 6, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#9ca3af', color: MUTED }}>담당자</Text>
+              <View style={{ height: 80 }} />
+            </View>
+            <View style={{ flex: 1, borderRightWidth: 1, borderRightColor: '#9ca3af' }}>
+              <Text style={{ fontSize: 9, textAlign: 'center', paddingTop: 6, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#9ca3af', color: MUTED }}>확인자</Text>
+              <View style={{ height: 80 }} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 9, textAlign: 'center', paddingTop: 6, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#9ca3af', color: MUTED }}>승인자</Text>
+              <View style={{ height: 80 }} />
+            </View>
+          </View>
+        </View>
         <View style={s.footer}>
           <Text>발행일: {data.issuedAt}</Text>
           <Text>발행자: ㈜한국에이원</Text>

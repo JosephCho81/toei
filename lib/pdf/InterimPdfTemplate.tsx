@@ -373,6 +373,71 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
           <Text style={s.summaryValue}>{krw(Math.abs(data.confirmedAmountKrw))}</Text>
         </View>
 
+        {/* 원가 구성 비율 */}
+        <View>
+          <Text style={s.sectionLabel}>원가 구성 비율</Text>
+          <View style={{ borderWidth: 1, borderColor: BORDER, padding: 8, backgroundColor: GRAY_BG }}>
+            {(() => {
+              const total = data.importAmountKrw + itemsTotal + data.vatAmountKrw
+              if (total <= 0) return null
+              const segs = [
+                { label: '수입원가', amount: data.importAmountKrw, color: GREEN },
+                { label: '통관/운송비', amount: itemsTotal, color: '#f97316' },
+                { label: '부가세', amount: data.vatAmountKrw, color: '#eab308' },
+              ].filter(s => s.amount > 0)
+              return (
+                <View>
+                  {segs.map((seg, i) => (
+                    <View key={i} style={{ flexDirection: 'row', marginBottom: 3, alignItems: 'center' }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: seg.color, marginRight: 6 }} />
+                      <Text style={{ fontSize: 8, color: MUTED, width: 80 }}>{seg.label}</Text>
+                      <Text style={{ fontSize: 8, color: seg.color, fontWeight: 700, width: 40, textAlign: 'right' }}>
+                        {Math.round(seg.amount / total * 100)}%
+                      </Text>
+                      <Text style={{ fontSize: 8, color: MUTED, marginLeft: 8 }}>
+                        ({seg.amount.toLocaleString('ko-KR')}원)
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )
+            })()}
+          </View>
+        </View>
+
+        <View style={s.footer}>
+          <Text>발행일: {data.issuedAt}</Text>
+          <Text>발행자: ㈜한국에이원</Text>
+        </View>
+      </Page>
+
+      {/* 결재 도장 페이지 */}
+      <Page size="A4" style={s.page}>
+        <View style={{ backgroundColor: GREEN, padding: 14, marginBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Image src={CI_A1} style={{ height: 40, width: 80, objectFit: 'contain' }} />
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={{ color: WHITE, fontSize: 9, fontWeight: 700, textAlign: 'center' }}>㈜한국에이원 ↔ 토에이산교</Text>
+            <Text style={{ color: WHITE, fontSize: 14, fontWeight: 700, textAlign: 'center', marginTop: 5 }}>{data.roundLabel} — 결재 확인</Text>
+          </View>
+          <Image src={CI_TOEI} style={{ height: 40, width: 80, objectFit: 'contain' }} />
+        </View>
+        <View style={{ marginTop: 40 }}>
+          <Text style={{ fontSize: 9, color: MUTED, textAlign: 'center', marginBottom: 10 }}>결재</Text>
+          <View style={{ flexDirection: 'row', borderWidth: 1, borderColor: '#9ca3af' }}>
+            <View style={{ flex: 1, borderRightWidth: 1, borderRightColor: '#9ca3af' }}>
+              <Text style={{ fontSize: 9, textAlign: 'center', paddingTop: 6, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#9ca3af', color: MUTED }}>담당자</Text>
+              <View style={{ height: 80 }} />
+            </View>
+            <View style={{ flex: 1, borderRightWidth: 1, borderRightColor: '#9ca3af' }}>
+              <Text style={{ fontSize: 9, textAlign: 'center', paddingTop: 6, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#9ca3af', color: MUTED }}>확인자</Text>
+              <View style={{ height: 80 }} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 9, textAlign: 'center', paddingTop: 6, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#9ca3af', color: MUTED }}>승인자</Text>
+              <View style={{ height: 80 }} />
+            </View>
+          </View>
+        </View>
         <View style={s.footer}>
           <Text>발행일: {data.issuedAt}</Text>
           <Text>발행자: ㈜한국에이원</Text>

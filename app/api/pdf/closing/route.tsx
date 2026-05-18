@@ -68,12 +68,13 @@ export async function GET(req: NextRequest) {
   let interimCostItems: { item_name: string; amount_krw: number; group_type: string }[] = []
   if (interimSettlement?.id) {
     const { data: costItems } = await supabase.from('interim_cost_items')
-      .select('item_name, amount_krw, group_type, sort_order')
+      .select('item_name, amount_krw, vat_amount_krw, group_type, sort_order')
       .eq('interim_settlement_id', interimSettlement.id)
       .order('sort_order')
     interimCostItems = (costItems ?? []).map((c) => ({
       item_name: String(c.item_name ?? ''),
       amount_krw: Number(c.amount_krw) || 0,
+      vat_amount_krw: Number((c as { vat_amount_krw?: unknown }).vat_amount_krw) || 0,
       group_type: String(c.group_type ?? ''),
     }))
   }
@@ -129,11 +130,18 @@ export async function GET(req: NextRequest) {
     ? '토에이산교 → 한국에이원 지급'
     : '정산 없음 (상계)'
 
+  const vatAmountKrw = interimCostItems.reduce((sum, c) => {
+    const item = c as { vat_amount_krw?: unknown }
+    return sum + (item.vat_amount_krw ? Number(item.vat_amount_krw) : 0)
+  }, 0)
+
   const pdfData: ClosingPdfData = {
     roundLabel: t?.round_label ?? '-',
     manufacturerName: (mfr as { name: string } | null)?.name ?? '-',
     customsExchangeRate: Number(t?.customs_exchange_rate) || 0,
     bokExchangeRate: closing.bok_exchange_rate != null ? Number(closing.bok_exchange_rate) : null,
+    importAmountUsd: Number(t?.import_amount_usd) || 0,
+    vatAmountKrw,
     closingDate: (closing.closing_date as string | null) ?? null,
     lcPaymentTotalKrw: Number(closing.lc_payment_total_krw) || 0,
     importAmountKrw: calc.importAmountKrw,

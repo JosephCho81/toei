@@ -1,7 +1,6 @@
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { Separator } from '@/components/ui/separator'
 import { ReportSection } from './ReportSection'
 import { formatKrw, formatDate } from '@/lib/utils/format'
 
@@ -96,8 +95,8 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
 
   return (
     <>
-      {/* 섹션 2: 환율 정보 */}
-      <ReportSection title="섹션 2 — 환율 정보">
+      {/* V-1: 환율 정보 */}
+      <ReportSection title="V-1. 환율 정보">
         <div className="border border-green-200 rounded-lg overflow-hidden">
           <InfoRow
             label="통관환율 (입고시)"
@@ -106,7 +105,7 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
               : '-'}
           />
           <InfoRow
-            label="클로징환율 (L/C 결제)"
+            label="클로징환율 (BOK고시)"
             value={data.bok_exchange_rate != null
               ? `${data.bok_exchange_rate.toLocaleString('ko-KR')}원/$`
               : '-'}
@@ -118,43 +117,41 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
         </div>
       </ReportSection>
 
-      {/* 섹션 3: LC 결제 내역 */}
-      <ReportSection title="섹션 3 — LC 결제 내역">
-        <div className="space-y-1">
+      {/* V-2: LC 결제 내역 (LC 결제 + 수수료 + 추가비용 분담 통합) */}
+      <ReportSection title="V-2. LC 결제 내역">
+        <div className="space-y-1 mb-3">
+          <AmountRow
+            label="LC 결제비용 (토에이 지불)"
+            value={data.lc_payment_total_krw != null ? formatKrw(data.lc_payment_total_krw) : '-'}
+          />
           <AmountRow
             label={`원금 × 통관환율 (${data.customs_exchange_rate?.toLocaleString('ko-KR')}원/$)`}
             value={formatKrw(data.importAmountKrw)}
           />
-          <AmountRow
-            label="LC 결제비용 (원화)"
-            value={data.lc_payment_total_krw != null ? formatKrw(data.lc_payment_total_krw) : '-'}
-          />
-          <Separator className="my-2" />
-          <AmountRow
-            label={`환차${fxIsGain ? '익' : '손'} (${fxIsGain ? 'A1 유리' : 'A1 불리'})`}
-            value={signed(data.fxGainLossKrw)}
-            color={fxIsGain ? 'text-green-600' : 'text-red-600'}
-            bold
-          />
+          <div
+            className="flex justify-between text-sm py-0.5 cursor-help"
+            title={`LC결제비용(${data.lc_payment_total_krw?.toLocaleString('ko-KR')}원) - 원금×통관환율(${data.importAmountKrw.toLocaleString('ko-KR')}원) = ${data.fxGainLossKrw >= 0 ? '+' : ''}${data.fxGainLossKrw.toLocaleString('ko-KR')}원`}
+          >
+            <span className="text-muted-foreground">{`환율차액 (환차${fxIsGain ? '익' : '손'})`}</span>
+            <span className={`font-mono font-semibold ${fxIsGain ? 'text-blue-600' : 'text-red-600'}`}>
+              {signed(data.fxGainLossKrw)}
+            </span>
+          </div>
         </div>
         {data.lcFeeItems.length > 0 && (
-          <div className="mt-3">
+          <div className="mb-3">
             <FeeTable
-              title="▸ LC 수수료"
+              title="▸ LC 제비용"
               items={data.lcFeeItems}
-              footerLabel="LC 수수료 합계"
+              footerLabel="LC 제비용 합계"
               footerValue={data.lcFeeTotalKrw}
             />
           </div>
         )}
-      </ReportSection>
-
-      {/* 섹션 4: 추가비용 및 분담 */}
-      <ReportSection title="섹션 4 — 추가비용 및 분담">
         <div className="border border-border rounded-lg overflow-hidden">
           <div className="flex text-sm py-1.5 px-3 border-b bg-muted/20">
             <span className="w-56 text-muted-foreground shrink-0">추가비용 합계 (VAT 별도)</span>
-            <span className={`font-mono font-medium ${data.a1BurdenKrw !== 0 ? (data.a1BurdenKrw < 0 ? 'text-red-600' : '') : ''}`}>
+            <span className={`font-mono font-medium ${(data.fxGainLossKrw + data.lcFeeTotalKrw) < 0 ? 'text-red-600' : ''}`}>
               {signed(data.fxGainLossKrw + data.lcFeeTotalKrw)}
             </span>
           </div>
@@ -166,16 +163,19 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
             <span className="w-56 text-muted-foreground shrink-0">에이원 부담 (VAT 별도)</span>
             <span className="font-mono font-medium">{signed(data.a1BurdenKrw)}</span>
           </div>
-          <div className="flex text-sm py-1.5 px-3">
+          <div
+            className="flex text-sm py-1.5 px-3 cursor-help"
+            title={`에이원 부담 VAT별도(${data.a1BurdenKrw >= 0 ? '+' : ''}${data.a1BurdenKrw.toLocaleString('ko-KR')}원) × 1.1 = ${data.a1BurdenWithVatKrw >= 0 ? '+' : ''}${data.a1BurdenWithVatKrw.toLocaleString('ko-KR')}원`}
+          >
             <span className="w-56 text-muted-foreground shrink-0">에이원 부담 (VAT 포함)</span>
             <span className="font-mono font-semibold">{signed(data.a1BurdenWithVatKrw)}</span>
           </div>
         </div>
       </ReportSection>
 
-      {/* 섹션 5: 기타 미정산 비용 (A+B+C) */}
+      {/* V-3: 기타 미정산 비용 */}
       {data.closingCostItems.length > 0 && (
-        <ReportSection title="섹션 5 — 기타 미정산 비용 (A+B+C)">
+        <ReportSection title="V-3. 기타 미정산 비용 (A+B+C)">
           <FeeTable
             title=""
             items={data.closingCostItems.map((c, i) => ({
@@ -188,53 +188,53 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
         </ReportSection>
       )}
 
-      {/* 섹션 6: 종합 정산 */}
-      <ReportSection title="섹션 6 — 종합 정산">
-        {/* 클로징 정산 */}
-        {confirmed != null && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-3">
-            <p className="text-xs font-semibold text-amber-700 mb-1">클로징 정산액</p>
-            <p className={`text-xl font-bold font-mono ${confirmed < 0 ? 'text-red-700' : 'text-amber-800'}`}>
+      {/* V-4: 클로징 정산금액 */}
+      {confirmed != null && (
+        <ReportSection title="V-4. 클로징 정산금액">
+          <div className={`border-2 rounded-lg p-4 ${confirmed < 0 ? 'border-red-400 bg-red-50' : 'border-amber-400 bg-amber-50'}`}>
+            <p className={`text-2xl font-bold font-mono mb-2 ${confirmed < 0 ? 'text-red-700' : 'text-amber-800'}`}>
               {signed(confirmed)}
             </p>
             {closingDirection && (
-              <p className="text-xs text-amber-700 mt-1">{closingDirection}</p>
+              <div className={`inline-flex items-center rounded px-3 py-1 ${confirmed < 0 ? 'bg-red-600' : 'bg-amber-600'} text-white`}>
+                <span className="text-sm font-semibold">{closingDirection}</span>
+              </div>
             )}
           </div>
-        )}
+        </ReportSection>
+      )}
 
-        {/* 종합 정산 (중간 + 클로징) */}
-        {hasGrandTotal && (
-          <div className="bg-green-50 border-2 border-green-600 rounded-lg p-5">
-            <p className="text-xs font-bold text-green-700 mb-3">최종 종합 정산 (중간정산 + 클로징)</p>
-            <div className="space-y-1.5 mb-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-green-700">중간정산 확정금액</span>
-                <span className="font-mono text-green-700">+{formatKrw(data.interimConfirmedKrw!)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-green-700">클로징 정산액</span>
-                <span className={`font-mono ${(confirmed ?? 0) < 0 ? 'text-red-600' : 'text-green-700'}`}>
-                  {signed(confirmed ?? 0)}
-                </span>
-              </div>
-              <Separator className="border-green-200 my-1" />
-              <div className="flex justify-between font-bold text-base">
-                <span className="text-green-900">종합정산액</span>
-                <span className="font-mono text-green-900">{signed(data.grandTotalKrw!)}</span>
-              </div>
+      {/* VI: 종합 정산 */}
+      {hasGrandTotal && (
+        <ReportSection title="VI. 종합 정산">
+          <div className="border border-green-300 rounded-lg overflow-hidden mb-3">
+            <div className="flex justify-between text-sm py-2 px-4 border-b bg-muted/10">
+              <span className="text-muted-foreground">중간정산 확정금액</span>
+              <span className="font-mono text-green-700">+{formatKrw(data.interimConfirmedKrw!)}</span>
             </div>
-            {grandDirection && (
-              <div className="bg-green-700 text-white rounded px-4 py-2 text-center">
-                <p className="text-xs text-green-200 mb-0.5">최종 정산 방향</p>
-                <p className="text-sm font-bold">{grandDirection}</p>
-                <p className="text-lg font-bold font-mono mt-1">{formatKrw(Math.abs(data.grandTotalKrw!))}</p>
-              </div>
-            )}
+            <div className="flex justify-between text-sm py-2 px-4 border-b">
+              <span className="text-muted-foreground">클로징 정산금액</span>
+              <span className={`font-mono ${(confirmed ?? 0) < 0 ? 'text-red-600' : 'text-green-700'}`}>
+                {signed(confirmed ?? 0)}
+              </span>
+            </div>
+            <div className="flex justify-between font-bold text-base py-2 px-4 bg-green-50">
+              <span className="text-green-900">종합정산액</span>
+              <span className="font-mono text-green-900">{formatKrw(data.grandTotalKrw!)}</span>
+            </div>
           </div>
-        )}
+          {grandDirection && (
+            <div className="bg-green-700 text-white rounded-lg px-4 py-4 text-center">
+              <p className="text-xs text-green-200 mb-1">최종 정산</p>
+              <p className="text-sm font-bold mb-1">{grandDirection}</p>
+              <p className="text-2xl font-bold font-mono">₩ {Math.abs(data.grandTotalKrw!).toLocaleString('ko-KR')}</p>
+            </div>
+          )}
+        </ReportSection>
+      )}
 
-        {!hasGrandTotal && confirmed != null && (
+      {!hasGrandTotal && confirmed != null && (
+        <ReportSection title="VI. 종합 정산">
           <div className="bg-green-50 border-2 border-green-600 rounded-lg p-4">
             <p className="text-xs text-muted-foreground mb-1">클로징 최종 정산</p>
             <p className="text-2xl font-bold font-mono text-green-800">
@@ -246,8 +246,8 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
               </div>
             )}
           </div>
-        )}
-      </ReportSection>
+        </ReportSection>
+      )}
     </>
   )
 }

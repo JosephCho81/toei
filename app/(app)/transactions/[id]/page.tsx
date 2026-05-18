@@ -30,13 +30,17 @@ export default async function TransactionDetailPage({ params }: { params: Promis
     { data: closing },
   ] = await Promise.all([
     supabase.from('transactions').select('*, manufacturers(name)').eq('id', id).single(),
-    supabase.from('interim_settlements').select('id, confirmed_amount_krw, is_locked, is_paid, updated_at').eq('transaction_id', id).maybeSingle(),
-    supabase.from('closing_settlements').select('id, confirmed_amount_krw, is_locked, is_paid, closing_date').eq('transaction_id', id).maybeSingle(),
+    supabase.from('interim_settlements').select('id, confirmed_amount_krw, customs_exchange_rate, is_locked, is_paid, updated_at').eq('transaction_id', id).maybeSingle(),
+    supabase.from('closing_settlements').select('id, confirmed_amount_krw, bok_exchange_rate, is_locked, is_paid, closing_date').eq('transaction_id', id).maybeSingle(),
   ])
 
   if (!t) notFound()
 
   const mfr = t.manufacturers as { name: string } | null
+  const displayCustomsRate = interim?.customs_exchange_rate
+    ? Number(interim.customs_exchange_rate)
+    : (t.customs_exchange_rate ? Number(t.customs_exchange_rate) : null)
+  const bokRate = closing?.bok_exchange_rate ? Number(closing.bok_exchange_rate) : null
 
   return (
     <div className="space-y-6">
@@ -69,7 +73,10 @@ export default async function TransactionDetailPage({ params }: { params: Promis
             <Row label="LC번호" value={t.lc_no ?? '-'} />
             <Row label="LC개설일" value={formatDate(t.lc_open_date)} />
             <Row label="통관일" value={formatDate(t.customs_date)} />
-            <Row label="통관환율" value={formatExchangeRate(t.customs_exchange_rate ? Number(t.customs_exchange_rate) : null)} />
+            <Row label="통관환율" value={displayCustomsRate != null ? `${formatExchangeRate(displayCustomsRate)} (입고시)` : '-'} />
+            {bokRate != null && (
+              <Row label="클로징환율" value={`${formatExchangeRate(bokRate)} (BOK고시)`} />
+            )}
             <Row label="마진율" value={t.margin_rate_pct ? `${t.margin_rate_pct}%` : '-'} />
           </CardContent>
         </Card>
@@ -94,6 +101,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
             settlementId={closing?.id ?? null}
             pdfType="closing"
             txLocked={t.is_locked}
+            interimConfirmedKrw={interim?.confirmed_amount_krw ?? null}
           />
         </div>
       </div>
@@ -124,11 +132,20 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function SettlementCard({
-  label, href, amount, date, isLocked, settlementId, pdfType, txLocked,
+  label, href, amount, date, isLocked, settlementId, pdfType, txLocked, interimConfirmedKrw,
 }: {
   label: string; href: string; amount: number | null; date: string | null
   isLocked: boolean; settlementId: string | null; pdfType: 'interim' | 'closing'; txLocked: boolean
+  interimConfirmedKrw?: number | null
 }) {
+  const grandTotal = (interimConfirmedKrw != null && amount != null)
+    ? interimConfirmedKrw + amount
+    : null
+
+  const closingDirection = amount != null && amount !== 0
+    ? amount >= 0 ? '한국에이원 → 토에이산교 지급' : '토에이산교 → 한국에이원 지급'
+    : null
+
   return (
     <Card>
       <CardContent className="pt-4 space-y-3">
@@ -138,9 +155,31 @@ function SettlementCard({
             ? <Badge variant="default" className="text-xs">완료</Badge>
             : <Badge variant="secondary" className="text-xs">미정산</Badge>}
         </div>
-        {amount != null && (
+
+        {grandTotal != null ? (
+          <>
+            <div>
+              <p className="text-xs text-muted-foreground">종합정산액</p>
+              <p className="text-xl font-bold font-mono">{grandTotal.toLocaleString('ko-KR')}원</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                (중간 {interimConfirmedKrw!.toLocaleString('ko-KR')} + 클로징 {amount!.toLocaleString('ko-KR')})
+              </p>
+            </div>
+            <Separator />
+            <div>
+              <p className="text-xs text-muted-foreground">클로징 정산금액</p>
+              <p className={`text-base font-bold font-mono ${amount! < 0 ? 'text-red-600' : ''}`}>
+                {amount!.toLocaleString('ko-KR')}원
+              </p>
+              {closingDirection && (
+                <p className="text-xs text-muted-foreground mt-0.5">{closingDirection}</p>
+              )}
+            </div>
+          </>
+        ) : amount != null ? (
           <p className="text-xl font-bold font-mono">{amount.toLocaleString('ko-KR')}원</p>
-        )}
+        ) : null}
+
         {date && <p className="text-xs text-muted-foreground">{formatDate(date)}</p>}
         <div className="flex gap-2 pt-1">
           <SettlementPdfButton type={pdfType} settlementId={settlementId} isLocked={isLocked} />

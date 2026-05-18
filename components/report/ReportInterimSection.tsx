@@ -18,14 +18,17 @@ export interface InterimCostData {
   shippingItems: CostItem[]
   customsItems: CostItem[]
   vatAmountKrw: number
+  confirmedAmountKrw?: number | null
+  interimDirection?: string | null
 }
 
 export function ReportInterimSection({ data }: { data: InterimCostData }) {
   const itemsTotal = [...data.shippingItems, ...data.customsItems].reduce((s, r) => s + r.amount_krw, 0)
   const subTotal = data.importAmountKrw + itemsTotal + data.vatAmountKrw
+  const showConfirmed = data.confirmedAmountKrw != null
 
   return (
-    <ReportSection title="섹션 2 — 수입 원가 계산">
+    <ReportSection title="III. 중간정산 내역">
       <Table>
         <TableHeader>
           <TableRow className="bg-green-50">
@@ -42,7 +45,14 @@ export function ReportInterimSection({ data }: { data: InterimCostData }) {
                 ? `$${data.importAmountUsd.toLocaleString('en-US')} × ${data.customs_exchange_rate.toLocaleString('ko-KR')}원`
                 : ''}
             </TableCell>
-            <TableCell className="text-right font-mono">{data.importAmountKrw.toLocaleString('ko-KR')}원</TableCell>
+            <TableCell
+              className="text-right font-mono cursor-help"
+              title={data.importAmountUsd > 0 && data.customs_exchange_rate
+                ? `$${data.importAmountUsd.toLocaleString('en-US')} × ${data.customs_exchange_rate.toLocaleString('ko-KR')}원/$ = ${data.importAmountKrw.toLocaleString('ko-KR')}원`
+                : undefined}
+            >
+              {data.importAmountKrw.toLocaleString('ko-KR')}원
+            </TableCell>
           </TableRow>
           {data.shippingItems.map((item, i) => (
             <TableRow key={`sh-${i}`} className="bg-muted/20">
@@ -63,13 +73,31 @@ export function ReportInterimSection({ data }: { data: InterimCostData }) {
             <TableCell className="text-muted-foreground text-xs">(원가합계) × 10%</TableCell>
             <TableCell className="text-right font-mono">{data.vatAmountKrw.toLocaleString('ko-KR')}원</TableCell>
           </TableRow>
-          <TableRow className="bg-green-50 font-semibold border-t-2 border-green-200">
-            <TableCell className="text-green-800">소계</TableCell>
-            <TableCell />
-            <TableCell className="text-right font-mono text-green-800">{subTotal.toLocaleString('ko-KR')}원</TableCell>
-          </TableRow>
+          {showConfirmed ? (
+            <TableRow className="bg-green-700 font-bold border-t-2 border-green-800">
+              <TableCell className="text-white text-base">중간정산 확정금액</TableCell>
+              <TableCell />
+              <TableCell
+                className="text-right font-mono text-white text-base cursor-help"
+                title={`수입원가 + 통관비 + 운송비 + 부가세 = ${data.confirmedAmountKrw!.toLocaleString('ko-KR')}원`}
+              >
+                {data.confirmedAmountKrw!.toLocaleString('ko-KR')}원
+              </TableCell>
+            </TableRow>
+          ) : (
+            <TableRow className="bg-green-50 font-semibold border-t-2 border-green-200">
+              <TableCell className="text-green-800">소계</TableCell>
+              <TableCell />
+              <TableCell className="text-right font-mono text-green-800">{subTotal.toLocaleString('ko-KR')}원</TableCell>
+            </TableRow>
+          )}
         </TableBody>
       </Table>
+      {data.interimDirection && (
+        <div className="mt-2 inline-flex items-center bg-green-700 text-white rounded px-3 py-1">
+          <span className="text-sm font-semibold">{data.interimDirection}</span>
+        </div>
+      )}
     </ReportSection>
   )
 }

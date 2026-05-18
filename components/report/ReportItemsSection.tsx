@@ -33,7 +33,7 @@ export function ReportItemsSection({ items, importAmountUsd, marginRatePct }: Pr
     ? importAmountUsd * (1 + marginRatePct / 100) : null
 
   return (
-    <ReportSection title="섹션 2 — 수입 제품 내역">
+    <ReportSection title="II. 수입 품목 내역">
       <div className="overflow-x-auto mb-3">
         <Table>
           <TableHeader>
