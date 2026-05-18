@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { formatDate } from '@/lib/utils/format'
 import {
   Package, TrendingUp, CheckCircle2, AlertTriangle, Ship, ArrowRight,
@@ -33,7 +32,6 @@ export default async function DashboardPage({
   const { year } = await searchParams
   const supabase = await createClient()
 
-  // 연도 필터 조건 (lc_open_date 기준)
   const yearFrom = year ? `${year}-01-01` : null
   const yearTo = year ? `${year}-12-31` : null
 
@@ -43,9 +41,10 @@ export default async function DashboardPage({
     return q
   }
   const buildInterimPendingQ = () => {
+    // LEFT JOIN 방식: interim_settlements가 없거나, confirmed_amount_krw가 NULL이거나, is_locked=false인 거래
     let q = supabase.from('transactions')
-      .select('id, round_label, import_amount_usd')
-      .in('settlement_status', ['pending', 'interim_saved'])
+      .select('id, round_label, import_amount_usd, interim_settlements(id, confirmed_amount_krw, is_locked)')
+      .not('settlement_status', 'eq', 'closing_done')
     if (yearFrom && yearTo) q = q.gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
     return q
   }
@@ -60,9 +59,9 @@ export default async function DashboardPage({
   const [
     { data: allTx },
     { data: ddayTx },
-    { data: interimPending },
+    { data: rawInterimData },
     { data: closingPending },
-    { data: inTransitContainers },
+    { data: containerData },
     { data: recentTx },
     { data: verificationIssues },
   ] = await Promise.all([
@@ -75,9 +74,10 @@ export default async function DashboardPage({
     buildInterimPendingQ(),
     buildClosingPendingQ(),
     supabase.from('containers')
-      .select('id, eta, actual_arrival')
+      .select('id, container_no, etd, eta, actual_arrival, tracking_status, transactions(id, round_label, manufacturers(name), transaction_items(spec))')
       .is('actual_arrival', null)
-      .not('eta', 'is', null),
+      .order('eta', { ascending: true, nullsFirst: false })
+      .limit(10),
     supabase.from('transactions')
       .select('id, round_label, round_no, import_amount_usd, settlement_status, manufacturers(name), containers(etd, eta)')
       .order('round_no', { ascending: false })
@@ -89,14 +89,26 @@ export default async function DashboardPage({
       .order('created_at'),
   ])
 
+  // interimPending: LEFT JOIN 필터 적용
+  type RawInterimTx = {
+    id: string; round_label: string; import_amount_usd: number | null
+    interim_settlements: { id: string; confirmed_amount_krw: number | null; is_locked: boolean | null }[] | null
+  }
+  const rawInterimAll = (rawInterimData ?? []) as unknown as RawInterimTx[]
+  const interimPending = rawInterimAll.filter((t) => {
+    const settlements = t.interim_settlements ?? []
+    if (settlements.length === 0) return true
+    return settlements.some((s) => s.confirmed_amount_krw == null || s.is_locked === false)
+  })
+
   const totalCount = allTx?.length ?? 0
   const totalUsd = allTx?.reduce((s, t) => s + Number(t.import_amount_usd ?? 0), 0) ?? 0
   const closingDone = allTx?.filter((t) => t.settlement_status === 'closing_done').length ?? 0
 
-  const interimPendingUsd = (interimPending ?? []).reduce((s, t) => s + Number(t.import_amount_usd ?? 0), 0)
+  const interimPendingUsd = interimPending.reduce((s, t) => s + Number(t.import_amount_usd ?? 0), 0)
   const closingPendingUsd = (closingPending ?? []).reduce((s, t) => s + Number(t.import_amount_usd ?? 0), 0)
   const totalPendingUsd = interimPendingUsd + closingPendingUsd
-  const pendingCount = (interimPending?.length ?? 0) + (closingPending?.length ?? 0)
+  const pendingCount = interimPending.length + (closingPending?.length ?? 0)
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -108,30 +120,45 @@ export default async function DashboardPage({
     return { ...t, dday: 55 - elapsed }
   }).sort((a, b) => a.dday - b.dday)
 
-  const inTransit = inTransitContainers?.length ?? 0
-  const arrivingSoon = (inTransitContainers ?? []).filter((c) => {
-    const eta = new Date(c.eta!)
+  // 컨테이너 데이터 처리
+  type ContainerRow = {
+    id: string
+    container_no: string | null
+    etd: string | null
+    eta: string | null
+    actual_arrival: string | null
+    tracking_status: string | null
+    transactions: {
+      id: string; round_label: string
+      manufacturers: { name: string } | { name: string }[] | null
+      transaction_items: { spec: string | null }[] | null
+    } | {
+      id: string; round_label: string
+      manufacturers: { name: string } | { name: string }[] | null
+      transaction_items: { spec: string | null }[] | null
+    }[] | null
+  }
+  const containers = (containerData ?? []) as unknown as ContainerRow[]
+  const inTransit = containers.length
+  const arrivingSoon = containers.filter((c) => {
+    if (!c.eta) return false
+    const eta = new Date(c.eta)
     eta.setHours(0, 0, 0, 0)
     return Math.floor((eta.getTime() - today.getTime()) / 86400000) <= 7
   }).length
 
+  // 검증 이슈 처리
   type RawVerRow = {
     id: string
     notes: string | null
     confirmed_amount_krw: number | null
     customs_exchange_rate: number | null
     transactions: {
-      id: string
-      round_no: number
-      round_label: string
-      import_amount_usd: number | null
-      margin_rate_pct: number | null
+      id: string; round_no: number; round_label: string
+      import_amount_usd: number | null; margin_rate_pct: number | null
     } | {
-      id: string
-      round_no: number
-      round_label: string
-      import_amount_usd: number | null
-      margin_rate_pct: number | null
+      id: string; round_no: number; round_label: string
+      import_amount_usd: number | null; margin_rate_pct: number | null
     }[] | null
     interim_cost_items: { amount_krw: number | null }[] | null
   }
@@ -185,9 +212,8 @@ export default async function DashboardPage({
         )}
       </div>
 
-      {/* 요약 통계 카드 4개 */}
+      {/* KPI 카드 4개 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* 전체 거래수 */}
         <Card className="border-green-200">
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
@@ -199,7 +225,6 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
 
-        {/* 총 수입금액 */}
         <Card style={{ backgroundColor: '#E8F5E9', borderColor: '#A5D6A7' }}>
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
@@ -213,7 +238,6 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
 
-        {/* 클로징 완료 */}
         <Card style={{ backgroundColor: '#2E7D32', borderColor: '#1B5E20' }}>
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
@@ -227,7 +251,6 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
 
-        {/* 미정산 합계 */}
         <Card style={{ backgroundColor: '#FFF8E1', borderColor: '#FFE082' }}>
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
@@ -263,15 +286,9 @@ export default async function DashboardPage({
                 href={`/transactions/${t.id}`}
                 className={cn(
                   'flex items-center justify-between px-3 py-2 rounded-md text-sm hover:opacity-80 transition-opacity',
-                  isOverdue
-                    ? 'border border-red-200'
-                    : isUrgent
-                    ? 'border border-orange-200'
-                    : 'border border-green-200',
+                  isOverdue ? 'border border-red-200' : isUrgent ? 'border border-orange-200' : 'border border-green-200',
                 )}
-                style={{
-                  backgroundColor: isOverdue ? '#FFEBEE' : isUrgent ? '#FFF3E0' : '#E8F5E9',
-                }}
+                style={{ backgroundColor: isOverdue ? '#FFEBEE' : isUrgent ? '#FFF3E0' : '#E8F5E9' }}
               >
                 <span className="font-semibold">{t.round_label}</span>
                 <span className="text-xs text-muted-foreground">입금일: {formatDate(t.a1_payment_date)}</span>
@@ -287,27 +304,94 @@ export default async function DashboardPage({
         </CardContent>
       </Card>
 
+      {/* 최근 5차 거래 */}
+      <Card className="border-green-200">
+        <CardHeader
+          className="pb-2 flex flex-row items-center justify-between"
+          style={{ backgroundColor: '#1B5E20', borderRadius: '0.5rem 0.5rem 0 0' }}
+        >
+          <CardTitle className="text-base text-white">최근 거래 현황</CardTitle>
+          <Link href="/transactions" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'text-white/80 hover:text-white hover:bg-white/10')}>
+            전체 보기 <ArrowRight className="h-3.5 w-3.5 ml-1" />
+          </Link>
+        </CardHeader>
+        <CardContent className="p-0">
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ backgroundColor: '#2E7D32' }}>
+                <th className="text-center px-4 py-2 font-medium text-white text-xs">회차</th>
+                <th className="text-center px-4 py-2 font-medium text-white text-xs">제조사</th>
+                <th className="text-center px-4 py-2 font-medium text-white text-xs">수입금액</th>
+                <th className="text-center px-4 py-2 font-medium text-white text-xs">ETD</th>
+                <th className="text-center px-4 py-2 font-medium text-white text-xs">ETA</th>
+                <th className="text-center px-4 py-2 font-medium text-white text-xs">정산상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(recentTx ?? []).map((t, i) => {
+                const mfr = Array.isArray(t.manufacturers) ? t.manufacturers[0] : t.manufacturers
+                const ctrs = (Array.isArray(t.containers) ? t.containers : []) as { etd: string | null; eta: string | null }[]
+                const etd = ctrs.map((c) => c.etd).filter(Boolean).sort()[0] ?? null
+                const eta = ctrs.map((c) => c.eta).filter(Boolean).sort().at(-1) ?? null
+                return (
+                  <tr
+                    key={t.id}
+                    className="border-b last:border-0 hover:opacity-90 transition-opacity"
+                    style={{ backgroundColor: i % 2 === 1 ? '#F1F8E9' : '#ffffff' }}
+                  >
+                    <td className="px-4 py-2.5 font-semibold text-center">
+                      <Link href={`/transactions/${t.id}`} className="hover:underline" style={{ color: '#2E7D32' }}>
+                        {t.round_label}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-2.5 text-center text-muted-foreground">
+                      {(mfr as { name: string } | null)?.name ?? '-'}
+                    </td>
+                    <td className="px-4 py-2.5 text-center font-mono">
+                      ${Number(t.import_amount_usd ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                    </td>
+                    <td className="px-4 py-2.5 text-center text-muted-foreground">
+                      {etd ? formatDate(etd) : '-'}
+                    </td>
+                    <td className="px-4 py-2.5 text-center text-muted-foreground">
+                      {eta ? formatDate(eta) : '-'}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <StatusBadge status={t.settlement_status} />
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
+      {/* 검증 이슈 */}
+      <VerificationIssueCard rows={verRows} />
+
+      {/* 미완료 현황 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* 미정산 현황 — 중간 */}
+        {/* 중간정산 미완료 */}
         <Card className="border-green-200">
           <CardHeader className="pb-2" style={{ backgroundColor: '#E8F5E9', borderRadius: '0.5rem 0.5rem 0 0' }}>
             <CardTitle className="text-base" style={{ color: '#2E7D32' }}>중간정산 미완료</CardTitle>
           </CardHeader>
           <CardContent className="pt-3">
-            <p className="text-3xl font-bold font-mono" style={{ color: '#2E7D32' }}>{interimPending?.length ?? 0}건</p>
+            <p className="text-3xl font-bold font-mono" style={{ color: '#2E7D32' }}>{interimPending.length}건</p>
             <p className="text-sm text-muted-foreground mt-1">
               ${Math.round(interimPendingUsd).toLocaleString('en-US')}
             </p>
             <div className="mt-3 space-y-1">
-              {(interimPending ?? []).slice(0, 4).map((t) => (
+              {interimPending.slice(0, 4).map((t) => (
                 <Link key={t.id} href={`/transactions/${t.id}/interim`}
-                  className="text-xs text-muted-foreground hover:text-foreground flex justify-between">
+                  className="text-sm font-medium hover:text-foreground flex justify-between py-2 text-muted-foreground">
                   <span>{t.round_label}</span>
-                  <span>${Number(t.import_amount_usd ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+                  <span className="font-semibold">${Number(t.import_amount_usd ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
                 </Link>
               ))}
-              {(interimPending?.length ?? 0) > 4 && (
-                <p className="text-xs text-muted-foreground">외 {(interimPending?.length ?? 0) - 4}건</p>
+              {interimPending.length > 4 && (
+                <p className="text-sm text-muted-foreground">외 {interimPending.length - 4}건</p>
               )}
             </div>
             <Link
@@ -319,7 +403,7 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
 
-        {/* 미정산 현황 — 클로징 */}
+        {/* 클로징 미완료 */}
         <Card className="border-green-200">
           <CardHeader className="pb-2" style={{ backgroundColor: '#E8F5E9', borderRadius: '0.5rem 0.5rem 0 0' }}>
             <CardTitle className="text-base" style={{ color: '#2E7D32' }}>클로징 미완료</CardTitle>
@@ -332,13 +416,13 @@ export default async function DashboardPage({
             <div className="mt-3 space-y-1">
               {(closingPending ?? []).slice(0, 4).map((t) => (
                 <Link key={t.id} href={`/transactions/${t.id}/closing`}
-                  className="text-xs text-muted-foreground hover:text-foreground flex justify-between">
+                  className="text-sm font-medium hover:text-foreground flex justify-between py-2 text-muted-foreground">
                   <span>{t.round_label}</span>
-                  <span>${Number(t.import_amount_usd ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+                  <span className="font-semibold">${Number(t.import_amount_usd ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
                 </Link>
               ))}
               {(closingPending?.length ?? 0) > 4 && (
-                <p className="text-xs text-muted-foreground">외 {(closingPending?.length ?? 0) - 4}건</p>
+                <p className="text-sm text-muted-foreground">외 {(closingPending?.length ?? 0) - 4}건</p>
               )}
             </div>
             <Link
@@ -357,86 +441,75 @@ export default async function DashboardPage({
           <CardTitle className="text-base flex items-center gap-2 text-white">
             <Ship className="h-4 w-4" />
             컨테이너 추적 현황
+            <span className="text-xs font-normal text-white/70 ml-1">
+              운송중 {inTransit}건 · ETA 7일 이내 {arrivingSoon}건
+            </span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center gap-10 pt-4">
-          <div>
-            <p className="text-3xl font-bold font-mono" style={{ color: '#2E7D32' }}>{inTransit}</p>
-            <p className="text-sm text-muted-foreground">운송 중</p>
-          </div>
-          <div>
-            <p className={cn('text-3xl font-bold font-mono', arrivingSoon > 0 ? 'text-orange-600' : '')}
-              style={arrivingSoon === 0 ? { color: '#2E7D32' } : {}}>
-              {arrivingSoon}
-            </p>
-            <p className="text-sm text-muted-foreground">ETA 7일 이내</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 검증 이슈 카드 */}
-      <VerificationIssueCard rows={verRows} />
-
-      {/* 최근 5차 거래 */}
-      <Card className="border-green-200">
-        <CardHeader
-          className="pb-2 flex flex-row items-center justify-between"
-          style={{ backgroundColor: '#1B5E20', borderRadius: '0.5rem 0.5rem 0 0' }}
-        >
-          <CardTitle className="text-base text-white">최근 거래 현황</CardTitle>
-          <Link href="/transactions" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'text-white/80 hover:text-white hover:bg-white/10')}>
-            전체 보기 <ArrowRight className="h-3.5 w-3.5 ml-1" />
-          </Link>
-        </CardHeader>
         <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ backgroundColor: '#2E7D32' }}>
-                <th className="text-left px-4 py-2 font-medium text-white text-xs">회차</th>
-                <th className="text-left px-4 py-2 font-medium text-white text-xs">제조사</th>
-                <th className="text-right px-4 py-2 font-medium text-white text-xs">수입금액</th>
-                <th className="text-center px-4 py-2 font-medium text-white text-xs">ETD</th>
-                <th className="text-center px-4 py-2 font-medium text-white text-xs">ETA</th>
-                <th className="text-center px-4 py-2 font-medium text-white text-xs">정산상태</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(recentTx ?? []).map((t, i) => {
-                const mfr = Array.isArray(t.manufacturers) ? t.manufacturers[0] : t.manufacturers
-                const ctrs = (Array.isArray(t.containers) ? t.containers : []) as { etd: string | null; eta: string | null }[]
-                const etd = ctrs.map((c) => c.etd).filter(Boolean).sort()[0] ?? null
-                const eta = ctrs.map((c) => c.eta).filter(Boolean).sort().at(-1) ?? null
-                return (
-                  <tr
-                    key={t.id}
-                    className="border-b last:border-0 hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: i % 2 === 1 ? '#F1F8E9' : '#ffffff' }}
-                  >
-                    <td className="px-4 py-2.5 font-semibold">
-                      <Link href={`/transactions/${t.id}`} className="hover:underline" style={{ color: '#2E7D32' }}>
-                        {t.round_label}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground">
-                      {(mfr as { name: string } | null)?.name ?? '-'}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-mono">
-                      ${Number(t.import_amount_usd ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                    </td>
-                    <td className="px-4 py-2.5 text-center text-muted-foreground">
-                      {etd ? formatDate(etd) : '-'}
-                    </td>
-                    <td className="px-4 py-2.5 text-center text-muted-foreground">
-                      {eta ? formatDate(eta) : '-'}
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      <StatusBadge status={t.settlement_status} />
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          {containers.length === 0 ? (
+            <p className="text-sm text-muted-foreground px-4 py-3">운송 중인 컨테이너 없음</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ backgroundColor: '#388E3C' }}>
+                  <th className="text-center px-4 py-2 font-medium text-white text-xs">차수</th>
+                  <th className="text-center px-4 py-2 font-medium text-white text-xs">제조사</th>
+                  <th className="text-center px-4 py-2 font-medium text-white text-xs">제품</th>
+                  <th className="text-center px-4 py-2 font-medium text-white text-xs">컨테이너</th>
+                  <th className="text-center px-4 py-2 font-medium text-white text-xs">ETD</th>
+                  <th className="text-center px-4 py-2 font-medium text-white text-xs">ETA</th>
+                  <th className="text-center px-4 py-2 font-medium text-white text-xs">상태</th>
+                </tr>
+              </thead>
+              <tbody>
+                {containers.map((c, i) => {
+                  const tx = Array.isArray(c.transactions) ? c.transactions[0] : c.transactions
+                  const mfr = tx ? (Array.isArray(tx.manufacturers) ? tx.manufacturers[0] : tx.manufacturers) : null
+                  const items = tx?.transaction_items ?? []
+                  const productSummary = [...new Set(items.map((it) => it.spec).filter(Boolean))].join(', ') || '-'
+                  const isArrivingSoon = c.eta
+                    ? Math.floor((new Date(c.eta).getTime() - today.getTime()) / 86400000) <= 7
+                    : false
+                  return (
+                    <tr
+                      key={c.id}
+                      className="border-b last:border-0"
+                      style={{ backgroundColor: i % 2 === 1 ? '#F1F8E9' : '#ffffff' }}
+                    >
+                      <td className="px-4 py-2 text-center font-semibold">
+                        {tx ? (
+                          <Link href={`/transactions/${tx.id}`} className="hover:underline" style={{ color: '#2E7D32' }}>
+                            {tx.round_label}
+                          </Link>
+                        ) : '-'}
+                      </td>
+                      <td className="px-4 py-2 text-center text-muted-foreground text-xs">
+                        {(mfr as { name: string } | null)?.name ?? '-'}
+                      </td>
+                      <td className="px-4 py-2 text-center text-muted-foreground text-xs">
+                        {productSummary}
+                      </td>
+                      <td className="px-4 py-2 text-center font-mono text-xs">
+                        {c.container_no ?? '-'}
+                      </td>
+                      <td className="px-4 py-2 text-center text-muted-foreground text-xs">
+                        {c.etd ? formatDate(c.etd) : '-'}
+                      </td>
+                      <td className="px-4 py-2 text-center text-xs">
+                        <span className={isArrivingSoon ? 'text-orange-600 font-semibold' : 'text-muted-foreground'}>
+                          {c.eta ? formatDate(c.eta) : '-'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-center text-xs text-muted-foreground">
+                        {c.tracking_status ?? '-'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
         </CardContent>
       </Card>
     </div>

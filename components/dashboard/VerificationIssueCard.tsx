@@ -13,15 +13,21 @@ export type VerRow = {
   diff: number | null
 }
 
-function formatDiff(diff: number | null): string {
+function formatDiff(diff: number | null, roundLabel: string): string {
   if (diff == null) return '-'
   const abs = Math.round(Math.abs(diff))
   const formatted = abs.toLocaleString('ko-KR')
+
+  // 27차 특수 케이스
+  if (roundLabel === '27차') {
+    return `계산값 대비 +${formatted}원 차이. 엑셀 기준 누락 비용 항목 추정 (원인 미확정). 실지불 확정액 유지.`
+  }
+
   if (diff < -100) {
-    return `계산값 대비 ${formatted}원 초과 지급. 수입금액 또는 통관환율 소수점 불일치. 실지불 확정액 유지.`
+    return `계산값 대비 ${formatted}원 초과 지급 (한국에이원 → 토에이산교). 수입금액 또는 통관환율 소수점 불일치. 실지불 확정액 유지.`
   }
   if (diff > 100) {
-    return `계산값 대비 ${formatted}원 미달. 원인 미확정. 실지불 확정액 유지.`
+    return `계산값 대비 ${formatted}원 미달 (한국에이원 → 토에이산교 기준). 원인 미확정. 실지불 확정액 유지.`
   }
   return '계산값과 일치 (소수점 반올림 차이 이내)'
 }
@@ -44,7 +50,7 @@ export function VerificationIssueCard({ rows }: { rows: VerRow[] }) {
     <Card style={{ borderColor: '#FFB74D' }}>
       <CardHeader className="pb-2" style={{ backgroundColor: '#FFF3E0', borderRadius: '0.5rem 0.5rem 0 0' }}>
         <CardTitle className="text-base flex items-center gap-2" style={{ color: '#E65100' }}>
-          ⚠️ 검증 이슈 차수
+          ⚠️ 검증 이슈
           <span className="text-xs font-normal text-orange-500">행 클릭 시 거래 상세로 이동</span>
         </CardTitle>
       </CardHeader>
@@ -52,9 +58,9 @@ export function VerificationIssueCard({ rows }: { rows: VerRow[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr style={{ backgroundColor: '#FFE0B2' }}>
-              <th className="text-left px-4 py-2 text-xs font-medium" style={{ color: '#E65100' }}>차수</th>
-              <th className="text-right px-4 py-2 text-xs font-medium" style={{ color: '#E65100' }}>확정금액</th>
-              <th className="text-left px-4 py-2 text-xs font-medium" style={{ color: '#E65100' }}>이슈 내용</th>
+              <th className="text-center px-4 py-2 text-xs font-medium" style={{ color: '#E65100' }}>차수</th>
+              <th className="text-center px-4 py-2 text-xs font-medium" style={{ color: '#E65100' }}>확정금액</th>
+              <th className="text-center px-4 py-2 text-xs font-medium" style={{ color: '#E65100' }}>이슈 내용</th>
               <th className="px-4 py-2"></th>
             </tr>
           </thead>
@@ -66,7 +72,7 @@ export function VerificationIssueCard({ rows }: { rows: VerRow[] }) {
                 style={{ borderColor: '#FFE0B2' }}
                 onClick={() => router.push(`/transactions/${row.transaction_id}`)}
               >
-                <td className="px-4 py-2 font-semibold" style={{ color: '#BF360C' }}>
+                <td className="px-4 py-2 font-semibold text-center" style={{ color: '#BF360C' }}>
                   {row.round_label}
                 </td>
                 <td className="px-4 py-2 text-right font-mono text-xs">
@@ -75,7 +81,7 @@ export function VerificationIssueCard({ rows }: { rows: VerRow[] }) {
                     : '-'}
                 </td>
                 <td className="px-4 py-2 text-xs" style={{ color: '#6B7280' }}>
-                  {formatDiff(row.diff)}
+                  {formatDiff(row.diff, row.round_label)}
                 </td>
                 <td className="px-4 py-2 text-right">
                   <button

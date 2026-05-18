@@ -1,36 +1,27 @@
 'use client'
 
-import Link from 'next/link'
-import { cn } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
 
 const YEARS = ['2021', '2022', '2023', '2024', '2025']
 
 export function YearFilterBar({ currentYear }: { currentYear?: string }) {
+  const router = useRouter()
+
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <Link
-        href="/dashboard"
-        className={cn(
-          'px-3 py-1.5 rounded text-sm font-medium transition-colors',
-          !currentYear ? 'text-white' : 'border border-green-300 hover:bg-green-50',
-        )}
-        style={!currentYear ? { backgroundColor: '#2E7D32' } : { color: '#2E7D32' }}
-      >
-        전체
-      </Link>
-      {YEARS.map((year) => (
-        <Link
-          key={year}
-          href={`/dashboard?year=${year}`}
-          className={cn(
-            'px-3 py-1.5 rounded text-sm font-medium transition-colors',
-            currentYear === year ? 'text-white' : 'border border-green-300 hover:bg-green-50',
-          )}
-          style={currentYear === year ? { backgroundColor: '#2E7D32' } : { color: '#2E7D32' }}
-        >
-          {year}
-        </Link>
+    <select
+      value={currentYear ?? ''}
+      onChange={(e) => router.push(e.target.value ? `/dashboard?year=${e.target.value}` : '/dashboard')}
+      className="px-3 py-2 text-sm rounded focus:outline-none focus:ring-2"
+      style={{
+        border: '1.5px solid #4CAF50',
+        color: '#2E7D32',
+        backgroundColor: '#fff',
+      }}
+    >
+      <option value="">전체 연도</option>
+      {YEARS.map((y) => (
+        <option key={y} value={y}>{y}년</option>
       ))}
-    </div>
+    </select>
   )
 }
