@@ -1,4 +1,5 @@
-import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer'
+import path from 'path'
 
 Font.register({
   family: 'NotoSansKR',
@@ -13,6 +14,9 @@ Font.register({
     },
   ],
 })
+
+const CI_A1 = path.join(process.cwd(), 'public', 'CI_a1korea.png')
+const CI_TOEI = path.join(process.cwd(), 'public', 'CI_toei.png')
 
 export interface ClosingPdfData {
   roundLabel: string
@@ -41,17 +45,15 @@ export interface ClosingPdfData {
   customsItems: { itemName: string; amountKrw: number }[]
 }
 
-const NAVY = '#1e3a5f'
-const NAVY_LIGHT = '#2a4f7a'
+const GREEN = '#2E7D32'
+const GREEN_LIGHT = '#388E3C'
 const GRAY_BG = '#f7f9fc'
-const BORDER = '#d0d7e3'
+const BORDER = '#A5D6A7'
 const TEXT = '#333333'
 const MUTED = '#5a6778'
 const WHITE = '#ffffff'
-const GREEN = '#16a34a'
+const GREEN_GAIN = '#16a34a'
 const RED = '#dc2626'
-
-const BLUE_DARK = '#1e3a5f'
 
 const s = StyleSheet.create({
   page: {
@@ -64,25 +66,38 @@ const s = StyleSheet.create({
     paddingRight: 40,
   },
   header: {
-    backgroundColor: NAVY,
-    padding: 18,
+    backgroundColor: GREEN,
+    padding: 14,
     marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerLogo: {
+    height: 40,
+    width: 80,
+    objectFit: 'contain',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
   },
   companyName: {
     color: WHITE,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 700,
-    marginBottom: 8,
+    marginBottom: 5,
+    textAlign: 'center',
   },
   docTitle: {
     color: WHITE,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 700,
     textAlign: 'center',
   },
   sectionLabel: {
     fontSize: 8.5,
-    color: NAVY_LIGHT,
+    color: GREEN_LIGHT,
     fontWeight: 700,
     marginTop: 12,
     marginBottom: 3,
@@ -148,7 +163,7 @@ const s = StyleSheet.create({
     paddingBottom: 6,
   },
   fxGainText: {
-    color: GREEN,
+    color: GREEN_GAIN,
     fontWeight: 700,
   },
   fxLossText: {
@@ -156,9 +171,9 @@ const s = StyleSheet.create({
     fontWeight: 700,
   },
   summaryBox: {
-    backgroundColor: '#e8eef7',
+    backgroundColor: '#E8F5E9',
     borderWidth: 1.5,
-    borderColor: NAVY,
+    borderColor: GREEN,
     padding: 14,
     marginTop: 16,
     flexDirection: 'row',
@@ -166,9 +181,9 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   grandTotalBox: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#E8F5E9',
     borderWidth: 1,
-    borderColor: '#93c5fd',
+    borderColor: '#A5D6A7',
     padding: 12,
     marginTop: 12,
   },
@@ -179,22 +194,22 @@ const s = StyleSheet.create({
   },
   grandTotalDivider: {
     borderTopWidth: 1,
-    borderTopColor: '#93c5fd',
+    borderTopColor: '#A5D6A7',
     marginTop: 6,
     marginBottom: 6,
   },
   summaryLabel: {
     fontSize: 11,
     fontWeight: 700,
-    color: NAVY,
+    color: GREEN,
   },
   summaryValue: {
     fontSize: 14,
     fontWeight: 700,
-    color: NAVY,
+    color: GREEN,
   },
   paidView: {
-    backgroundColor: GREEN,
+    backgroundColor: GREEN_GAIN,
     paddingLeft: 8,
     paddingRight: 8,
     paddingTop: 3,
@@ -233,7 +248,7 @@ const s = StyleSheet.create({
   },
   itemsHeaderRow: {
     flexDirection: 'row',
-    backgroundColor: BLUE_DARK,
+    backgroundColor: GREEN,
     minHeight: 20,
     alignItems: 'center',
   },
@@ -352,8 +367,12 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
     <Document>
       <Page size="A4" style={s.page}>
         <View style={s.header}>
-          <Text style={s.companyName}>㈜한국에이원</Text>
-          <Text style={s.docTitle}>A1 KOREA, LC 거래 최종정산 내역</Text>
+          <Image src={CI_A1} style={s.headerLogo} />
+          <View style={s.headerCenter}>
+            <Text style={s.companyName}>㈜한국에이원 ↔ 토에이산교</Text>
+            <Text style={s.docTitle}>LC 거래 최종정산 내역</Text>
+          </View>
+          <Image src={CI_TOEI} style={s.headerLogo} />
         </View>
 
         <Text style={s.sectionLabel}>기본 정보</Text>
@@ -516,36 +535,36 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
         <View style={s.summaryBox}>
           <View>
             <Text style={s.summaryLabel}>최종 정산</Text>
-            <Text style={{ fontSize: 10, color: NAVY_LIGHT, marginTop: 4 }}>{data.directionLabel}</Text>
+            <Text style={{ fontSize: 10, color: GREEN_LIGHT, marginTop: 4 }}>{data.directionLabel}</Text>
           </View>
           <Text style={s.summaryValue}>₩ {Math.abs(data.confirmedAmountKrw).toLocaleString('ko-KR')}</Text>
         </View>
 
         {data.grandTotalKrw != null && data.interimConfirmedKrw != null && (
           <View style={s.grandTotalBox}>
-            <Text style={{ fontSize: 9, fontWeight: 700, color: '#1e40af', marginBottom: 8 }}>
+            <Text style={{ fontSize: 9, fontWeight: 700, color: '#1B5E20', marginBottom: 8 }}>
               최종 종합 정산 (중간 + 클로징)
             </Text>
             <View style={s.grandTotalRow}>
-              <Text style={{ fontSize: 9, color: '#1d4ed8' }}>중간정산 확정금액</Text>
-              <Text style={{ fontSize: 9, color: '#1d4ed8', fontWeight: 700 }}>
+              <Text style={{ fontSize: 9, color: '#2E7D32' }}>중간정산 확정금액</Text>
+              <Text style={{ fontSize: 9, color: '#2E7D32', fontWeight: 700 }}>
                 {krw(data.interimConfirmedKrw)}
               </Text>
             </View>
             <View style={s.grandTotalRow}>
-              <Text style={{ fontSize: 9, color: '#1d4ed8' }}>클로징 정산액</Text>
-              <Text style={{ fontSize: 9, color: '#1d4ed8', fontWeight: 700 }}>
+              <Text style={{ fontSize: 9, color: '#2E7D32' }}>클로징 정산액</Text>
+              <Text style={{ fontSize: 9, color: '#2E7D32', fontWeight: 700 }}>
                 {krwSigned(data.confirmedAmountKrw)}
               </Text>
             </View>
             <View style={s.grandTotalDivider} />
             <View style={s.grandTotalRow}>
-              <Text style={{ fontSize: 10, fontWeight: 700, color: '#1e3a8a' }}>최종 합계</Text>
-              <Text style={{ fontSize: 11, fontWeight: 700, color: '#1e3a8a' }}>
+              <Text style={{ fontSize: 10, fontWeight: 700, color: '#1B5E20' }}>최종 합계</Text>
+              <Text style={{ fontSize: 11, fontWeight: 700, color: '#1B5E20' }}>
                 {krw(data.grandTotalKrw)}
               </Text>
             </View>
-            <Text style={{ fontSize: 8, color: '#2563eb', marginTop: 4 }}>
+            <Text style={{ fontSize: 8, color: '#388E3C', marginTop: 4 }}>
               {data.grandTotalKrw >= 0 ? '한국에이원 → 토에이산교 지급' : '토에이산교 → 한국에이원 지급'}
             </Text>
           </View>

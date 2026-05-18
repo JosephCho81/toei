@@ -1,4 +1,5 @@
-import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer'
+import path from 'path'
 
 Font.register({
   family: 'NotoSansKR',
@@ -13,6 +14,9 @@ Font.register({
     },
   ],
 })
+
+const CI_A1 = path.join(process.cwd(), 'public', 'CI_a1korea.png')
+const CI_TOEI = path.join(process.cwd(), 'public', 'CI_toei.png')
 
 export interface InterimPdfData {
   roundLabel: string
@@ -31,10 +35,10 @@ export interface InterimPdfData {
   issuedAt: string
 }
 
-const NAVY = '#1e3a5f'
-const NAVY_LIGHT = '#2a4f7a'
+const GREEN = '#2E7D32'
+const GREEN_LIGHT = '#388E3C'
 const GRAY_BG = '#f7f9fc'
-const BORDER = '#d0d7e3'
+const BORDER = '#A5D6A7'
 const TEXT = '#333333'
 const MUTED = '#5a6778'
 const WHITE = '#ffffff'
@@ -50,25 +54,38 @@ const s = StyleSheet.create({
     paddingRight: 40,
   },
   header: {
-    backgroundColor: NAVY,
-    padding: 18,
+    backgroundColor: GREEN,
+    padding: 14,
     marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerLogo: {
+    height: 40,
+    width: 80,
+    objectFit: 'contain',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
   },
   companyName: {
     color: WHITE,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 700,
-    marginBottom: 8,
+    marginBottom: 5,
+    textAlign: 'center',
   },
   docTitle: {
     color: WHITE,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 700,
     textAlign: 'center',
   },
   sectionLabel: {
     fontSize: 8.5,
-    color: NAVY_LIGHT,
+    color: GREEN_LIGHT,
     fontWeight: 700,
     marginTop: 12,
     marginBottom: 3,
@@ -123,9 +140,9 @@ const s = StyleSheet.create({
     paddingBottom: 6,
   },
   summaryBox: {
-    backgroundColor: '#e8eef7',
+    backgroundColor: '#E8F5E9',
     borderWidth: 1.5,
-    borderColor: NAVY,
+    borderColor: GREEN,
     padding: 14,
     marginTop: 16,
     flexDirection: 'row',
@@ -135,12 +152,12 @@ const s = StyleSheet.create({
   summaryLabel: {
     fontSize: 11,
     fontWeight: 700,
-    color: NAVY,
+    color: GREEN,
   },
   summaryValue: {
     fontSize: 14,
     fontWeight: 700,
-    color: NAVY,
+    color: GREEN,
   },
   paidView: {
     backgroundColor: '#16a34a',
@@ -237,8 +254,12 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
     <Document>
       <Page size="A4" style={s.page}>
         <View style={s.header}>
-          <Text style={s.companyName}>㈜한국에이원</Text>
-          <Text style={s.docTitle}>A1 KOREA, LC 거래 중간정산 내역</Text>
+          <Image src={CI_A1} style={s.headerLogo} />
+          <View style={s.headerCenter}>
+            <Text style={s.companyName}>㈜한국에이원 ↔ 토에이산교</Text>
+            <Text style={s.docTitle}>LC 거래 중간정산 내역</Text>
+          </View>
+          <Image src={CI_TOEI} style={s.headerLogo} />
         </View>
 
         <Text style={s.sectionLabel}>기본 정보</Text>
