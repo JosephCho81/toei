@@ -4,11 +4,11 @@ import { calculateClosing } from '@/lib/calculations/closing'
 import { formatDate, formatUsd } from '@/lib/utils/format'
 import { ReportHeader } from '@/components/report/ReportHeader'
 import { ReportSection, InfoRow } from '@/components/report/ReportSection'
-import { ComparisonTable } from '@/components/report/ComparisonTable'
-import { ReportItemsSection } from '@/components/report/ReportItemsSection'
 import { ReportInterimSection } from '@/components/report/ReportInterimSection'
+import { ReportInterimConfirmedSection } from '@/components/report/ReportInterimConfirmedSection'
 import { ReportClosingSection } from '@/components/report/ReportClosingSection'
 import { ReportForwardingSection } from '@/components/report/ReportForwardingSection'
+import { Separator } from '@/components/ui/separator'
 
 export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -16,15 +16,11 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
   const [
     { data: t },
-    { data: items },
     { data: interim },
     { data: closing },
     { data: fwdRows },
   ] = await Promise.all([
     supabase.from('transactions').select('*, manufacturers(name)').eq('id', id).single(),
-    supabase.from('transaction_items')
-      .select('id,spec,glove_type,color,size,unit_price_usd,quantity,unit,sort_order')
-      .eq('transaction_id', id).order('sort_order'),
     supabase.from('interim_settlements')
       .select('id,customs_exchange_rate,confirmed_amount_krw,is_locked,updated_at')
       .eq('transaction_id', id).single(),
@@ -40,7 +36,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
   const [{ data: interimCosts }, { data: lcFees }, { data: closingCosts }] = await Promise.all([
     interim?.id
-      ? supabase.from('interim_cost_items').select('item_name,amount_krw,is_vat_taxable,vat_amount_krw,group_type')
+      ? supabase.from('interim_cost_items')
+          .select('item_name,amount_krw,is_vat_taxable,vat_amount_krw,group_type')
           .eq('interim_settlement_id', interim.id).order('sort_order')
       : Promise.resolve({ data: [] }),
     closing?.id
@@ -57,7 +54,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const importUsd = Number(t.import_amount_usd ?? 0)
   const txCustomsRate = Number(t.customs_exchange_rate ?? 0)
   const interimRate = interim?.customs_exchange_rate ? Number(interim.customs_exchange_rate) : null
-  const marginPct = t.margin_rate_pct ? Number(t.margin_rate_pct) : null
+  const customsRate = interimRate ?? txCustomsRate
 
   type IC = { item_name: string; amount_krw: unknown; is_vat_taxable: boolean; vat_amount_krw: unknown; group_type: string }
   const allCosts = (interimCosts ?? []) as IC[]
@@ -65,15 +62,13 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const shippingItems = allCosts.filter((i) => i.group_type === 'shipping').map(toRow)
   const customsItems = allCosts.filter((i) => i.group_type !== 'shipping').map(toRow)
   const vatAmountKrw = allCosts.reduce((s, i) => s + Number(i.vat_amount_krw ?? 0), 0)
-  const interimImportKrw = interimRate ? Math.round(importUsd * interimRate) : 0
+  const interimImportKrw = customsRate ? Math.round(importUsd * customsRate) : 0
 
   const lcFeesParsed = (lcFees ?? []).map((f) => ({ item_name: String(f.item_name), amount_krw: Number(f.amount_krw) }))
   const closingCostsParsed = (closingCosts ?? []).map((c) => ({ item_name: String(c.item_name), amount_krw: Number(c.amount_krw) }))
   const fxBurdenA1Pct = closing?.fx_burden_a1_pct ?? 50
   const lcPayment = closing?.lc_payment_total_krw ? Number(closing.lc_payment_total_krw) : 0
   const importAmountKrw = txCustomsRate > 0 ? Math.round(importUsd * txCustomsRate) : 0
-
-  const interimConfirmedKrwForCalc = interim?.confirmed_amount_krw ? Number(interim.confirmed_amount_krw) : 0
 
   const closingCalc = closing && txCustomsRate > 0
     ? calculateClosing({
@@ -84,22 +79,11 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         fxBurdenA1Pct,
         closingCostItems: closingCostsParsed.map((c) => ({ amountKrw: c.amount_krw, includesVat: false })),
         roundingPolicy: 'none',
-        interimConfirmedKrw: interimConfirmedKrwForCalc,
+        interimConfirmedKrw: interim?.confirmed_amount_krw ? Number(interim.confirmed_amount_krw) : 0,
       })
     : null
 
-  let interimProfitRate: number | null = null
-  let closingProfitRate: number | null = null
-  if (interimRate && marginPct && importUsd) {
-    const salesKrw = Math.round(importUsd * interimRate * (1 + marginPct / 100))
-    const interimCost = Number(interim?.confirmed_amount_krw ?? 0)
-    if (salesKrw > 0) {
-      interimProfitRate = ((salesKrw - interimCost) / salesKrw) * 100
-      if (closing?.confirmed_amount_krw != null) {
-        closingProfitRate = ((salesKrw - interimCost - Number(closing.confirmed_amount_krw)) / salesKrw) * 100
-      }
-    }
-  }
+  const customsDate = (t as Record<string, unknown>).customs_date as string | null | undefined
 
   return (
     <div className="max-w-5xl print:shadow-none">
@@ -113,6 +97,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         closingLocked={closing?.is_locked ?? false}
       />
 
+      {/* 헤더 배너 */}
       <div className="border border-green-200 rounded-lg px-6 py-5 flex items-center justify-between bg-white">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/CI_a1korea.png" alt="한국에이원" style={{ height: '48px', objectFit: 'contain' }} />
@@ -130,40 +115,67 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         ※ 모든 금액은 부가세 별도 기준입니다.
       </p>
 
+      {/* 섹션 1: 거래 기본 정보 */}
       <ReportSection title="섹션 1 — 거래 기본 정보">
         <div className="grid grid-cols-2 gap-x-8 gap-y-1">
           <InfoRow label="차수" value={t.round_label} />
           <InfoRow label="제조사" value={mfr?.name ?? '-'} />
+          <InfoRow label="수입금액 (USD)" value={formatUsd(importUsd)} />
           <InfoRow label="P/O No." value={t.order_no ?? '-'} />
-          <InfoRow label="LC번호" value={t.lc_no ?? '-'} />
+          <InfoRow label="LC 번호" value={t.lc_no ?? '-'} />
           <InfoRow label="L/C 개설일" value={formatDate(t.lc_open_date)} />
-          <InfoRow label="입금일(A1)" value={formatDate(t.a1_payment_date)} />
+          <InfoRow label="통관일" value={formatDate(customsDate ?? null)} />
+          <InfoRow
+            label="통관환율"
+            value={customsRate > 0 ? `${customsRate.toLocaleString('ko-KR')}원/$` : '-'}
+          />
           <InfoRow label="LC 만기일" value={formatDate(t.lc_expiry_date)} />
-          <InfoRow label="지불형태" value="LC (신용장)" />
-          <InfoRow label="수입금액(USD)" value={formatUsd(importUsd)} />
-          <InfoRow label="마진율" value={marginPct != null ? `${marginPct}%` : '-'} />
+          <InfoRow label="입금일 (A1)" value={formatDate(t.a1_payment_date)} />
         </div>
       </ReportSection>
 
-      <ReportItemsSection items={items ?? []} importAmountUsd={t.import_amount_usd ? Number(t.import_amount_usd) : null} marginRatePct={marginPct} />
-
-      {interim
-        ? (
+      {/* ===== 중간정산 ===== */}
+      {interim ? (
+        <>
+          {/* 섹션 2: 수입 원가 계산 */}
           <ReportInterimSection data={{
-            customs_exchange_rate: interimRate,
-            confirmed_amount_krw: interim.confirmed_amount_krw ? Number(interim.confirmed_amount_krw) : null,
-            updated_at: interim.updated_at, shippingItems, customsItems, vatAmountKrw, importAmountKrw: interimImportKrw,
+            customs_exchange_rate: customsRate,
+            importAmountUsd: importUsd,
+            importAmountKrw: interimImportKrw,
+            shippingItems,
+            customsItems,
+            vatAmountKrw,
           }} />
-        )
-        : (
-          <ReportSection title="섹션 3 — 중간정산 내역">
-            <p className="text-sm text-muted-foreground">정산 데이터 없음</p>
-          </ReportSection>
-        )
-      }
 
-      {closing && closingCalc
-        ? (
+          {/* 섹션 3: 포워딩 견적 */}
+          <ReportForwardingSection rows={fwdRows ?? []} />
+
+          {/* 섹션 4: 중간정산 확정금액 */}
+          <ReportInterimConfirmedSection data={{
+            confirmed_amount_krw: interim.confirmed_amount_krw ? Number(interim.confirmed_amount_krw) : null,
+            updated_at: interim.updated_at,
+          }} />
+        </>
+      ) : (
+        <ReportSection title="섹션 2 — 수입 원가 계산">
+          <p className="text-sm text-muted-foreground">중간정산 데이터 없음</p>
+        </ReportSection>
+      )}
+
+      {/* ===== 클로징정산 ===== */}
+      {closing && closingCalc ? (
+        <>
+          <div className="flex items-center gap-3 my-6">
+            <Separator className="flex-1" />
+            <span className="text-xs font-bold text-green-700 uppercase tracking-wider whitespace-nowrap px-2">
+              클로징정산
+            </span>
+            <Separator className="flex-1" />
+          </div>
+
+          {/* 섹션 1: 거래 기본 정보 (클로징용 - 위에 표시되어 생략) */}
+
+          {/* 섹션 2~6: 클로징 정산 */}
           <ReportClosingSection data={{
             closing_date: closing.closing_date,
             bok_exchange_rate: closing.bok_exchange_rate ? Number(closing.bok_exchange_rate) : null,
@@ -171,35 +183,25 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             customs_exchange_rate: txCustomsRate || null,
             importAmountKrw,
             fxGainLossKrw: closingCalc.fxGainLossKrw,
-            lcFeeItems: lcFeesParsed, lcFeeTotalKrw: closingCalc.lcFeeTotalKrw,
+            lcFeeItems: lcFeesParsed,
+            lcFeeTotalKrw: closingCalc.lcFeeTotalKrw,
             fx_burden_a1_pct: fxBurdenA1Pct,
-            a1BurdenKrw: closingCalc.a1BurdenKrw, a1BurdenWithVatKrw: closingCalc.a1BurdenWithVatKrw,
-            closingCostItems: closingCostsParsed, closingCostsTotalKrw: closingCalc.closingCostsTotalKrw,
+            a1BurdenKrw: closingCalc.a1BurdenKrw,
+            a1BurdenWithVatKrw: closingCalc.a1BurdenWithVatKrw,
+            closingCostItems: closingCostsParsed,
+            closingCostsTotalKrw: closingCalc.closingCostsTotalKrw,
             confirmed_amount_krw: closing.confirmed_amount_krw ? Number(closing.confirmed_amount_krw) : null,
             interimConfirmedKrw: interim?.confirmed_amount_krw ? Number(interim.confirmed_amount_krw) : null,
             grandTotalKrw: interim?.confirmed_amount_krw != null ? closingCalc.grandTotalKrw : null,
           }} />
-        )
-        : (
-          <ReportSection title="섹션 4 — 클로징정산 내역">
+        </>
+      ) : (
+        closing === null && (
+          <ReportSection title="클로징정산">
             <p className="text-sm text-muted-foreground">정산 데이터 없음</p>
           </ReportSection>
         )
-      }
-
-      {interim && closing && (
-        <ReportSection title="섹션 5 — 중간 vs 클로징 비교 요약">
-          <ComparisonTable data={{
-            interimRate,
-            closingRate: closing.bok_exchange_rate ? Number(closing.bok_exchange_rate) : null,
-            interimAmount: interim.confirmed_amount_krw ? Number(interim.confirmed_amount_krw) : null,
-            closingAmount: closing.confirmed_amount_krw ? Number(closing.confirmed_amount_krw) : null,
-            interimProfitRate, closingProfitRate,
-          }} />
-        </ReportSection>
       )}
-
-      <ReportForwardingSection rows={fwdRows ?? []} />
     </div>
   )
 }

@@ -28,7 +28,7 @@ export function ReportForwardingSection({ rows }: { rows: QuoteRow[] }) {
   const totalDiff = totalActual - totalQuote
 
   return (
-    <ReportSection title="섹션 6 — 포워딩 견적 vs 실제 비교">
+    <ReportSection title="섹션 3 — 포워딩 견적">
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>

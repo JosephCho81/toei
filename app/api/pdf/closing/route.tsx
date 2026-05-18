@@ -133,6 +133,8 @@ export async function GET(req: NextRequest) {
     roundLabel: t?.round_label ?? '-',
     manufacturerName: (mfr as { name: string } | null)?.name ?? '-',
     customsExchangeRate: Number(t?.customs_exchange_rate) || 0,
+    bokExchangeRate: closing.bok_exchange_rate != null ? Number(closing.bok_exchange_rate) : null,
+    closingDate: (closing.closing_date as string | null) ?? null,
     lcPaymentTotalKrw: Number(closing.lc_payment_total_krw) || 0,
     importAmountKrw: calc.importAmountKrw,
     fxGainLossKrw: calc.fxGainLossKrw,

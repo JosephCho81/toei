@@ -22,6 +22,8 @@ export interface ClosingPdfData {
   roundLabel: string
   manufacturerName: string
   customsExchangeRate: number
+  bokExchangeRate: number | null
+  closingDate: string | null
   lcPaymentTotalKrw: number
   importAmountKrw: number
   fxGainLossKrw: number
@@ -384,10 +386,28 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
         </View>
 
         <Text style={s.disclaimer}>※ 모든 금액은 부가세 별도 기준입니다.</Text>
-        <Text style={s.sectionLabel}>기본 정보</Text>
+        <Text style={s.sectionLabel}>섹션 1 — 기본 정보</Text>
         <View style={s.table}>
           <Row label="회 차" value={data.roundLabel} />
           <Row label="제조사명" value={data.manufacturerName} even isLast />
+        </View>
+
+        <Text style={s.sectionLabel}>섹션 2 — 환율 정보</Text>
+        <View style={s.table}>
+          <Row
+            label="통관환율 (입고시)"
+            value={`${data.customsExchangeRate.toLocaleString('ko-KR')}원/$`}
+          />
+          <Row
+            label="클로징환율 (L/C 결제)"
+            value={data.bokExchangeRate != null ? `${data.bokExchangeRate.toLocaleString('ko-KR')}원/$` : '-'}
+            even
+          />
+          <Row
+            label="LC 결제일"
+            value={data.closingDate ?? '-'}
+            isLast
+          />
         </View>
 
         {data.items.length > 0 && (
@@ -425,7 +445,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
 
         {data.interimRate != null && (
           <View>
-            <Text style={s.sectionLabel}>중간정산 내역</Text>
+            <Text style={s.sectionLabel}>중간정산 내역 (참고)</Text>
             <View style={s.table}>
               <Row label="통관환율" value={`${data.interimRate.toLocaleString('ko-KR')}원/$`} />
               {data.shippingItems.map((item, i) => (
@@ -460,7 +480,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
           </View>
         )}
 
-        <Text style={s.sectionLabel}>LC 결제비용 및 환차손익</Text>
+        <Text style={s.sectionLabel}>섹션 3 — LC 결제 내역</Text>
         <View style={s.table}>
           <Row
             label={`원금×통관환율 (${data.customsExchangeRate.toLocaleString('ko-KR')}원/$)`}
@@ -475,7 +495,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
           />
         </View>
 
-        <Text style={s.sectionLabel}>LC 수수료</Text>
+        <Text style={s.sectionLabel}>LC 수수료 내역</Text>
         <View style={s.table}>
           {data.lcFeeItems.map((item, i) => {
             const isLastItem = i === data.lcFeeItems.length - 1 && i > 0
@@ -498,7 +518,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
           />
         </View>
 
-        <Text style={s.sectionLabel}>분담 비율 및 에이원 부담분</Text>
+        <Text style={s.sectionLabel}>섹션 4 — 추가비용 및 분담</Text>
         <View style={s.table}>
           <Row label="추가비용 합계 (VAT 별도)" value={krwSigned(data.additionalCostKrw)} />
           <Row
@@ -510,7 +530,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
           <Row label="에이원 부담분 + VAT (VAT 포함)" value={krwSigned(data.a1BurdenWithVatKrw)} even isLast />
         </View>
 
-        <Text style={s.sectionLabel}>클로징 추가비용 (A+B+C)</Text>
+        <Text style={s.sectionLabel}>섹션 5 — 기타 미정산 비용 (A+B+C)</Text>
         <View style={s.table}>
           {data.closingCostItems.map((item, i) => {
             const prefix = String.fromCharCode(65 + i) + ')'
@@ -585,7 +605,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
           </View>
         )}
 
-        <Text style={s.sectionLabel}>최종 정산액</Text>
+        <Text style={s.sectionLabel}>섹션 6 — 종합 정산</Text>
         <View style={s.table}>
           <Row label="정산 방향" value={data.directionLabel} />
           <Row label="최종 정산액" value={krwSigned(data.confirmedAmountKrw)} even />

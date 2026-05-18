@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
     .select(`
       *,
       transactions (
+        id,
         round_label,
         import_amount_usd,
         lc_open_date,
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
         amount_krw,
         is_vat_taxable,
         vat_amount_krw,
+        group_type,
         sort_order
       )
     `)
@@ -52,6 +54,15 @@ export async function GET(req: NextRequest) {
   } | null
 
   const mfr = Array.isArray(t?.manufacturers) ? t?.manufacturers[0] : t?.manufacturers as { name: string } | null
+
+  const transactionId = (t as { id?: string } | null)?.id ?? null
+
+  const { data: fwdRows } = transactionId
+    ? await supabase.from('forwarding_quotes')
+        .select('forwarder_name,quote_amount_krw,actual_amount_krw')
+        .eq('transaction_id', transactionId)
+        .order('sort_order')
+    : { data: [] }
 
   const rawItems = Array.isArray(interim.interim_cost_items) ? interim.interim_cost_items : []
   const sortedItems = [...rawItems].sort((a, b) => ((a as { sort_order?: number }).sort_order ?? 0) - ((b as { sort_order?: number }).sort_order ?? 0))
@@ -91,6 +102,19 @@ export async function GET(req: NextRequest) {
     confirmedAmountKrw: Number(interim.confirmed_amount_krw) || 0,
     isPaid: (interim.is_paid as boolean) ?? false,
     issuedAt,
+    costItems: sortedItems.map((item) => {
+      const i = item as { item_name: string; amount_krw: number; group_type: string }
+      return {
+        itemName: String(i.item_name ?? ''),
+        amountKrw: Number(i.amount_krw) || 0,
+        groupType: String(i.group_type ?? 'customs'),
+      }
+    }),
+    forwardingQuotes: (fwdRows ?? []).map((r) => ({
+      itemName: r.forwarder_name ?? '',
+      quoteAmountKrw: r.quote_amount_krw != null ? Number(r.quote_amount_krw) : null,
+      actualAmountKrw: r.actual_amount_krw != null ? Number(r.actual_amount_krw) : null,
+    })),
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

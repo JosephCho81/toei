@@ -33,6 +33,8 @@ export interface InterimPdfData {
   confirmedAmountKrw: number
   isPaid: boolean
   issuedAt: string
+  costItems: { itemName: string; amountKrw: number; groupType: string }[]
+  forwardingQuotes: { itemName: string; quoteAmountKrw: number | null; actualAmountKrw: number | null }[]
 }
 
 const GREEN = '#2E7D32'
@@ -251,10 +253,36 @@ function PaidRow({ isPaid, even, isLast }: { isPaid: boolean; even?: boolean; is
   )
 }
 
+const triCol = StyleSheet.create({
+  table: { borderWidth: 1, borderColor: BORDER },
+  headerRow: { flexDirection: 'row', backgroundColor: GREEN, minHeight: 22, alignItems: 'center' },
+  headerCell: { color: WHITE, fontSize: 8.5, fontWeight: 700, paddingLeft: 8, paddingRight: 4, paddingTop: 4, paddingBottom: 4 },
+  dataRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center' },
+  dataRowEven: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center', backgroundColor: GRAY_BG },
+  dataRowLast: { flexDirection: 'row', minHeight: 22, alignItems: 'center' },
+  subtotalRow: { flexDirection: 'row', minHeight: 24, alignItems: 'center', backgroundColor: '#E8F5E9' },
+  cellItem: { width: '38%', paddingLeft: 8, paddingRight: 4, paddingTop: 4, paddingBottom: 4, borderRightWidth: 1, borderRightColor: BORDER, fontSize: 9 },
+  cellItemIndent: { width: '38%', paddingLeft: 18, paddingRight: 4, paddingTop: 4, paddingBottom: 4, borderRightWidth: 1, borderRightColor: BORDER, fontSize: 8.5, color: MUTED },
+  cellFormula: { width: '34%', paddingLeft: 6, paddingRight: 4, paddingTop: 4, paddingBottom: 4, borderRightWidth: 1, borderRightColor: BORDER, fontSize: 7.5, color: MUTED },
+  cellAmount: { width: '28%', paddingLeft: 4, paddingRight: 8, paddingTop: 4, paddingBottom: 4, textAlign: 'right', fontSize: 9 },
+})
+
 export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
-  const marginLabel = data.marginRatePct != null
-    ? `총 판매금액 (마진율 ${data.marginRatePct}%)`
-    : '총 판매금액'
+  const shippingItems = data.costItems.filter((c) => c.groupType === 'shipping')
+  const customsItems = data.costItems.filter((c) => c.groupType !== 'shipping')
+  const itemsTotal = data.costItems.reduce((s, c) => s + c.amountKrw, 0)
+  const subTotal = data.importAmountKrw + itemsTotal + data.vatAmountKrw
+
+  const direction = data.confirmedAmountKrw >= 0
+    ? '한국에이원 → 토에이산교 지급'
+    : '토에이산교 → 한국에이원 지급'
+
+  const allCostRows = [
+    { itemName: '수입금액 (원화환산)', formula: `$${data.importAmountUsd.toLocaleString('en-US')} × ${data.customsExchangeRate.toLocaleString('ko-KR')}원`, amountKrw: data.importAmountKrw, indent: false },
+    ...shippingItems.map((c) => ({ itemName: c.itemName, formula: '', amountKrw: c.amountKrw, indent: true })),
+    ...customsItems.map((c) => ({ itemName: c.itemName, formula: '', amountKrw: c.amountKrw, indent: true })),
+    { itemName: '부가세', formula: '(원가합계) × 10%', amountKrw: data.vatAmountKrw, indent: false },
+  ]
 
   return (
     <Document>
@@ -269,37 +297,80 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
         </View>
 
         <Text style={s.disclaimer}>※ 모든 금액은 부가세 별도 기준입니다.</Text>
-        <Text style={s.sectionLabel}>기본 정보</Text>
+
+        <Text style={s.sectionLabel}>섹션 1 — 거래 기본 정보</Text>
         <View style={s.table}>
           <Row label="회 차" value={data.roundLabel} />
           <Row label="제조사명" value={data.manufacturerName} even />
-          <Row label="L/C 개설일" value={fdate(data.lcOpenDate)} />
-          <Row label="지불일 (A1)" value={fdate(data.customsDate)} even isLast />
-        </View>
-
-        <Text style={s.sectionLabel}>수입 금액</Text>
-        <View style={s.table}>
           <Row label="수입금액 (USD)" value={usd(data.importAmountUsd)} />
-          <Row label="지정환율" value={data.customsExchangeRate.toLocaleString('ko-KR') + '원/$'} even />
-          <Row label="원화 환산" value={krw(data.importAmountKrw)} isLast />
+          <Row label="L/C 개설일" value={fdate(data.lcOpenDate)} even />
+          <Row label="통관일" value={fdate(data.customsDate)} />
+          <Row label="통관환율" value={`${data.customsExchangeRate.toLocaleString('ko-KR')}원/$`} even isLast />
         </View>
 
-        <Text style={s.sectionLabel}>비용 내역</Text>
-        <View style={s.table}>
-          <Row label="총 수입비용+관세 (VAT 별도)" value={krw(data.totalCostKrw)} />
-          <Row label="부가세" value={krw(data.vatAmountKrw)} even />
-          <Row label={`${marginLabel} (VAT 포함)`} value={krw(data.totalWithVatKrw)} isLast />
+        <Text style={s.sectionLabel}>섹션 2 — 수입 원가 계산</Text>
+        <View style={triCol.table}>
+          <View style={triCol.headerRow}>
+            <Text style={[triCol.headerCell, { width: '38%' }]}>항목</Text>
+            <Text style={[triCol.headerCell, { width: '34%', borderLeftWidth: 1, borderLeftColor: '#A5D6A7' }]}>계산식</Text>
+            <Text style={[triCol.headerCell, { width: '28%', borderLeftWidth: 1, borderLeftColor: '#A5D6A7', textAlign: 'right' }]}>금액 (KRW)</Text>
+          </View>
+          {allCostRows.map((row, i) => {
+            const isLast = i === allCostRows.length - 1
+            const isEven = i % 2 === 1
+            const rowStyle = isLast ? triCol.dataRowLast : (isEven ? triCol.dataRowEven : triCol.dataRow)
+            const cellItemStyle = row.indent ? triCol.cellItemIndent : triCol.cellItem
+            return (
+              <View key={i} style={rowStyle}>
+                <Text style={cellItemStyle}>{row.itemName}</Text>
+                <Text style={triCol.cellFormula}>{row.formula}</Text>
+                <Text style={[triCol.cellAmount, { fontWeight: row.indent ? 400 : 400 }]}>{row.amountKrw.toLocaleString('ko-KR')}원</Text>
+              </View>
+            )
+          })}
+          <View style={triCol.subtotalRow}>
+            <Text style={[triCol.cellItem, { color: GREEN, fontWeight: 700 }]}>소계</Text>
+            <Text style={triCol.cellFormula} />
+            <Text style={[triCol.cellAmount, { color: GREEN, fontWeight: 700 }]}>{subTotal.toLocaleString('ko-KR')}원</Text>
+          </View>
         </View>
 
-        <Text style={s.sectionLabel}>지불 현황</Text>
-        <View style={s.table}>
-          <Row label="최종 지급액 (VAT 포함)" value={krw(data.confirmedAmountKrw)} />
-          <PaidRow isPaid={data.isPaid} even isLast />
-        </View>
+        {data.forwardingQuotes.length > 0 && (
+          <View>
+            <Text style={s.sectionLabel}>섹션 3 — 포워딩 견적</Text>
+            <View style={[triCol.table, { marginBottom: 4 }]}>
+              <View style={triCol.headerRow}>
+                <Text style={[triCol.headerCell, { width: '40%' }]}>항목</Text>
+                <Text style={[triCol.headerCell, { width: '30%', borderLeftWidth: 1, borderLeftColor: '#A5D6A7', textAlign: 'right' }]}>견적금액</Text>
+                <Text style={[triCol.headerCell, { width: '30%', borderLeftWidth: 1, borderLeftColor: '#A5D6A7', textAlign: 'right' }]}>실청구액</Text>
+              </View>
+              {data.forwardingQuotes.map((r, i) => {
+                const isLast = i === data.forwardingQuotes.length - 1
+                const isEven = i % 2 === 1
+                const rowStyle = isLast ? triCol.dataRowLast : (isEven ? triCol.dataRowEven : triCol.dataRow)
+                return (
+                  <View key={i} style={rowStyle}>
+                    <Text style={[triCol.cellItem, { width: '40%' }]}>{r.itemName}</Text>
+                    <Text style={[triCol.cellAmount, { width: '30%' }]}>
+                      {r.quoteAmountKrw != null ? r.quoteAmountKrw.toLocaleString('ko-KR') + '원' : '-'}
+                    </Text>
+                    <Text style={[triCol.cellAmount, { width: '30%' }]}>
+                      {r.actualAmountKrw != null ? r.actualAmountKrw.toLocaleString('ko-KR') + '원' : '-'}
+                    </Text>
+                  </View>
+                )
+              })}
+            </View>
+          </View>
+        )}
 
+        <Text style={s.sectionLabel}>섹션 4 — 중간정산 확정금액</Text>
         <View style={s.summaryBox}>
-          <Text style={s.summaryLabel}>최종 지급액</Text>
-          <Text style={s.summaryValue}>{krw(data.confirmedAmountKrw)}</Text>
+          <View>
+            <Text style={s.summaryLabel}>중간정산 확정금액</Text>
+            <Text style={{ fontSize: 9, color: GREEN_LIGHT, marginTop: 4 }}>{direction}</Text>
+          </View>
+          <Text style={s.summaryValue}>{krw(Math.abs(data.confirmedAmountKrw))}</Text>
         </View>
 
         <View style={s.footer}>
