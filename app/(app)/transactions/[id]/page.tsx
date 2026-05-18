@@ -30,7 +30,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
     { data: closing },
   ] = await Promise.all([
     supabase.from('transactions').select('*, manufacturers(name)').eq('id', id).single(),
-    supabase.from('interim_settlements').select('id, confirmed_amount_krw, customs_exchange_rate, is_locked, is_paid, updated_at').eq('transaction_id', id).maybeSingle(),
+    supabase.from('interim_settlements').select('id, confirmed_amount_krw, customs_exchange_rate, rounding_policy, is_locked, is_paid, updated_at').eq('transaction_id', id).maybeSingle(),
     supabase.from('closing_settlements').select('id, confirmed_amount_krw, bok_exchange_rate, is_locked, is_paid, closing_date').eq('transaction_id', id).maybeSingle(),
   ])
 
@@ -41,6 +41,13 @@ export default async function TransactionDetailPage({ params }: { params: Promis
     ? Number(interim.customs_exchange_rate)
     : (t.customs_exchange_rate ? Number(t.customs_exchange_rate) : null)
   const bokRate = closing?.bok_exchange_rate ? Number(closing.bok_exchange_rate) : null
+
+  const ROUNDING_LABELS: Record<string, string> = {
+    floor_100: '100원 미만 버림',
+    floor_10: '10원 미만 버림',
+    none: '버림 없음',
+  }
+  const roundingLabel = interim?.rounding_policy ? (ROUNDING_LABELS[interim.rounding_policy] ?? interim.rounding_policy) : null
 
   return (
     <div className="space-y-6">
@@ -70,14 +77,17 @@ export default async function TransactionDetailPage({ params }: { params: Promis
           <CardContent className="space-y-2 text-sm">
             <Row label="제조사" value={mfr?.name ?? '-'} />
             <Row label="수입금액(USD)" value={t.import_amount_usd ? formatUsd(Number(t.import_amount_usd)) : '-'} />
-            <Row label="LC번호" value={t.lc_no ?? '-'} />
             <Row label="LC개설일" value={formatDate(t.lc_open_date)} />
             <Row label="통관일" value={formatDate(t.customs_date)} />
-            <Row label="통관환율" value={displayCustomsRate != null ? `${formatExchangeRate(displayCustomsRate)} (입고시)` : '-'} />
+            <Row label="통관환율" value={displayCustomsRate != null ? `${formatExchangeRate(displayCustomsRate)} (입고시 세관 신고 환율)` : '-'} />
             {bokRate != null && (
-              <Row label="클로징환율" value={`${formatExchangeRate(bokRate)} (BOK고시)`} />
+              <Row
+                label="클로징환율"
+                value={`${formatExchangeRate(bokRate)} (한국은행 최초 고시 환율${closing?.closing_date ? `, ${closing.closing_date} 기준` : ''})`}
+              />
             )}
             <Row label="마진율" value={t.margin_rate_pct ? `${t.margin_rate_pct}%` : '-'} />
+            {roundingLabel && <Row label="절사 정책" value={roundingLabel} />}
           </CardContent>
         </Card>
 

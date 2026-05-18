@@ -52,12 +52,14 @@ export function ContainerList({ transactionId, isLocked }: { transactionId: stri
         )}
         {containers.map((c) => (
           <div key={c.id} className="border rounded-lg p-3 text-sm">
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-mono font-semibold">{c.container_no}</span>
                 {c.container_size && <Badge variant="outline" className="text-xs">{c.container_size}</Badge>}
                 {c.carrier && <Badge variant="outline" className="text-xs">{c.carrier}</Badge>}
-                {c.tracking_status && <span className="text-xs text-muted-foreground">{c.tracking_status}</span>}
+                {c.tracking_status && (
+                  <Badge variant="secondary" className="text-xs">{c.tracking_status}</Badge>
+                )}
               </div>
               {!isLocked && (
                 <div className="flex gap-1 shrink-0 ml-2">
@@ -75,15 +77,15 @@ export function ContainerList({ transactionId, isLocked }: { transactionId: stri
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-0.5 text-xs text-muted-foreground mt-1">
-              <span>ETD: {formatDate(c.etd)}</span>
-              <span>ETA: {formatDate(c.eta)}</span>
-              {c.actual_arrival && <span>실착: {formatDate(c.actual_arrival)}</span>}
-              {c.bl_no && <span>B/L: {c.bl_no}</span>}
-              {c.vessel_name && <span>선박: {c.vessel_name}</span>}
-              {c.carton_count != null && <span>카톤: {c.carton_count.toLocaleString()}</span>}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span><span className="font-medium text-foreground/70">ETD:</span> {formatDate(c.etd) ?? '-'}</span>
+              <span><span className="font-medium text-foreground/70">ETA:</span> {formatDate(c.eta) ?? '-'}</span>
+              <span><span className="font-medium text-foreground/70">실착:</span> {c.actual_arrival ? formatDate(c.actual_arrival) : '-'}</span>
+              <span><span className="font-medium text-foreground/70">B/L:</span> {c.bl_no ?? '-'}</span>
+              <span><span className="font-medium text-foreground/70">선박:</span> {c.vessel_name ?? '-'}</span>
+              <span><span className="font-medium text-foreground/70">카톤:</span> {c.carton_count != null ? c.carton_count.toLocaleString() : '-'}</span>
             </div>
-            {c.manual_notes && <p className="mt-1 text-xs text-muted-foreground">{c.manual_notes}</p>}
+            {c.manual_notes && <p className="mt-2 text-xs text-muted-foreground border-t pt-1">{c.manual_notes}</p>}
           </div>
         ))}
         <ContainerForm

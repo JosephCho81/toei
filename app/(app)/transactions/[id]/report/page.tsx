@@ -173,14 +173,13 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
   // Section I 데이터
   const sectionIRows: [string, string, string, string][] = [
-    ['제조사', mfr?.name ?? '-', 'LC번호', t.lc_no ?? '-'],
-    ['수입금액', formatUsd(importUsd), 'LC개설일', formatDate(t.lc_open_date)],
-    ['통관일', formatDate(customsDate ?? null), '마진율', t.margin_rate_pct ? `${t.margin_rate_pct}%` : '-'],
+    ['제조사', mfr?.name ?? '-', 'LC개설일', formatDate(t.lc_open_date)],
+    ['수입금액', formatUsd(importUsd), '마진율', t.margin_rate_pct ? `${t.margin_rate_pct}%` : '-'],
+    ['통관일', formatDate(customsDate ?? null), '통관환율', customsRate > 0 ? `${formatExchangeRate(customsRate)} (입고시 세관 신고 환율)` : '-'],
     [
-      '통관환율',
-      customsRate > 0 ? formatExchangeRate(customsRate) : '-',
       '클로징환율',
-      bokRate != null ? formatExchangeRate(bokRate) : '-',
+      bokRate != null ? `${formatExchangeRate(bokRate)} (한국은행 최초 고시 환율${closing?.closing_date ? `, ${closing.closing_date} 기준` : ''})` : '-',
+      '', '',
     ],
   ]
 

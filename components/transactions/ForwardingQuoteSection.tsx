@@ -23,6 +23,18 @@ function formatKrw(v: number) {
   return v.toLocaleString('ko-KR') + '원'
 }
 
+function parseItemNames(notes: string): string {
+  try {
+    const items = notes.split('|').map(e => {
+      const colon = e.indexOf(':')
+      return colon > 0 ? e.slice(0, colon).trim() : ''
+    }).filter(Boolean)
+    return items.length ? items.join(' / ') : ''
+  } catch {
+    return ''
+  }
+}
+
 export function ForwardingQuoteSection({ transactionId, isLocked }: { transactionId: string; isLocked: boolean }) {
   const supabase = createClient()
   const [rows, setRows] = useState<Row[]>([])
@@ -90,10 +102,10 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
             <TableHeader>
               <TableRow>
                 <TableHead>포워더</TableHead><TableHead>견적일</TableHead>
+                <TableHead>항목</TableHead>
                 <TableHead className="text-right">견적금액(KRW)</TableHead>
                 <TableHead className="text-right">실청구액(KRW)</TableHead>
                 <TableHead className="text-right">차이</TableHead>
-                <TableHead>메모</TableHead>
                 {!isLocked && <TableHead className="w-8" />}
               </TableRow>
             </TableHeader>
@@ -102,16 +114,29 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
                 const q = parseInt(r.quote_amount_krw) || 0
                 const a = parseInt(r.actual_amount_krw) || 0
                 const diff = a && q ? a - q : null
+                const itemNames = r.notes ? parseItemNames(r.notes) : ''
                 return (
                   <TableRow key={r._key}>
                     <TableCell className="p-1">{isLocked ? <span className="text-sm px-2">{r.forwarder_name}</span> : <Input className="h-7 text-xs" value={r.forwarder_name} onChange={e => upd(r._key, 'forwarder_name', e.target.value)} />}</TableCell>
                     <TableCell className="p-1">{isLocked ? <span className="text-sm px-2">{r.quote_date||'-'}</span> : <Input type="date" className="h-7 text-xs" value={r.quote_date} onChange={e => upd(r._key, 'quote_date', e.target.value)} />}</TableCell>
+                    <TableCell className="p-1">
+                      {isLocked
+                        ? <span className="text-xs px-2 text-muted-foreground">{itemNames || '-'}</span>
+                        : <Input className="h-7 text-xs" value={r.notes} placeholder="해상운임:견적/실청구|THC:..." onChange={e => upd(r._key, 'notes', e.target.value)} />
+                      }
+                      {isLocked && itemNames && (
+                        <div className="px-2 flex flex-wrap gap-1 mt-0.5">
+                          {itemNames.split(' / ').map((n, i) => (
+                            <span key={i} className="text-xs bg-muted rounded px-1 py-0.5">{n}</span>
+                          ))}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="p-1">{isLocked ? <span className="text-sm px-2 block text-right">{q ? formatKrw(q) : '-'}</span> : <Input className="h-7 text-xs text-right w-28" type="number" value={r.quote_amount_krw} onChange={e => upd(r._key, 'quote_amount_krw', e.target.value)} />}</TableCell>
                     <TableCell className="p-1">{isLocked ? <span className="text-sm px-2 block text-right">{a ? formatKrw(a) : '-'}</span> : <Input className="h-7 text-xs text-right w-28" type="number" value={r.actual_amount_krw} onChange={e => upd(r._key, 'actual_amount_krw', e.target.value)} />}</TableCell>
                     <TableCell className={`text-right text-sm font-medium pr-2 ${diff == null ? '' : diff > 0 ? 'text-red-600' : 'text-green-600'}`}>
                       {diff == null ? '-' : `${diff > 0 ? '+' : ''}${formatKrw(diff)}${diff > 0 ? ' (초과)' : ' (절감)'}`}
                     </TableCell>
-                    <TableCell className="p-1">{isLocked ? <span className="text-sm px-2">{r.notes||'-'}</span> : <Input className="h-7 text-xs" value={r.notes} onChange={e => upd(r._key, 'notes', e.target.value)} />}</TableCell>
                     {!isLocked && <TableCell className="p-1"><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => { setRows(p => p.filter(x => x._key !== r._key)); setSaved(false) }} disabled={rows.length <= 1}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>}
                   </TableRow>
                 )
