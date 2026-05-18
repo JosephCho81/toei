@@ -96,7 +96,10 @@ export default async function DashboardPage({
   }
   const rawInterimAll = (rawInterimData ?? []) as unknown as RawInterimTx[]
   const interimPending = rawInterimAll.filter((t) => {
-    const settlements = t.interim_settlements ?? []
+    // Supabase는 1:1 관계를 단일 객체로 반환하므로 배열로 정규화
+    const raw = t.interim_settlements
+    const settlements: { id: string; confirmed_amount_krw: number | null; is_locked: boolean | null }[] =
+      raw == null ? [] : Array.isArray(raw) ? raw : [raw]
     if (settlements.length === 0) return true
     return settlements.some((s) => s.confirmed_amount_krw == null || s.is_locked === false)
   })
@@ -466,7 +469,9 @@ export default async function DashboardPage({
                 {containers.map((c, i) => {
                   const tx = Array.isArray(c.transactions) ? c.transactions[0] : c.transactions
                   const mfr = tx ? (Array.isArray(tx.manufacturers) ? tx.manufacturers[0] : tx.manufacturers) : null
-                  const items = tx?.transaction_items ?? []
+                  const rawItems = tx?.transaction_items
+                  const items: { spec: string | null }[] =
+                    rawItems == null ? [] : Array.isArray(rawItems) ? rawItems : [rawItems]
                   const productSummary = [...new Set(items.map((it) => it.spec).filter(Boolean))].join(', ') || '-'
                   const isArrivingSoon = c.eta
                     ? Math.floor((new Date(c.eta).getTime() - today.getTime()) / 86400000) <= 7
