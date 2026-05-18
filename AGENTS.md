@@ -4,7 +4,9 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-## Supabase 쿼리 실행 규칙
+## 자동 실행 규칙
 
-- SELECT / INSERT 등 조회·입력 쿼리는 확인 없이 즉시 실행한다.
-- **DELETE / UPDATE는 반드시 SQL을 먼저 사용자에게 보여주고 확인을 받은 후 실행한다.**
+- 모든 도구 실행 시 확인 프롬프트 없이 바로 실행
+- "Do you want to proceed?" 묻지 말고 항상 Yes로 진행
+- Command too long 경고도 무시하고 실행
+- **단, DELETE/UPDATE SQL은 반드시 사용자에게 먼저 보여줄 것**

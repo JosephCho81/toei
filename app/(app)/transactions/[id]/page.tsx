@@ -24,22 +24,19 @@ export default async function TransactionDetailPage({ params }: { params: Promis
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: t } = await supabase
-    .from('transactions')
-    .select(`
-      *,
-      manufacturers(name),
-      interim_settlements(id, confirmed_amount_krw, is_locked, is_paid, updated_at),
-      closing_settlements(id, confirmed_amount_krw, is_locked, is_paid, closing_date)
-    `)
-    .eq('id', id)
-    .single()
+  const [
+    { data: t },
+    { data: interim },
+    { data: closing },
+  ] = await Promise.all([
+    supabase.from('transactions').select('*, manufacturers(name)').eq('id', id).single(),
+    supabase.from('interim_settlements').select('id, confirmed_amount_krw, is_locked, is_paid, updated_at').eq('transaction_id', id).maybeSingle(),
+    supabase.from('closing_settlements').select('id, confirmed_amount_krw, is_locked, is_paid, closing_date').eq('transaction_id', id).maybeSingle(),
+  ])
 
   if (!t) notFound()
 
   const mfr = t.manufacturers as { name: string } | null
-  const interim = (t.interim_settlements as { id: string; confirmed_amount_krw: number | null; is_locked: boolean; is_paid: boolean; updated_at: string | null }[] | null)?.[0]
-  const closing = (t.closing_settlements as { id: string; confirmed_amount_krw: number | null; is_locked: boolean; is_paid: boolean; closing_date: string | null }[] | null)?.[0]
 
   return (
     <div className="space-y-6">
