@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Info } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export type VerRow = {
@@ -20,14 +21,14 @@ function formatDiff(diff: number | null, roundLabel: string): string {
 
   // 27차 특수 케이스
   if (roundLabel === '27차') {
-    return `계산값 대비 +${formatted}원 차이. 엑셀 기준 누락 비용 항목 추정 (원인 미확정). 실지불 확정액 유지.`
+    return `한국에이원이 토에이산교에 계산값보다 ${formatted}원 초과 지급. 엑셀 기준 누락 비용 항목 추정. 원인 미확정. 실지불 확정액 유지.`
   }
 
   if (diff < -100) {
-    return `계산값 대비 ${formatted}원 초과 지급 (한국에이원 → 토에이산교). 수입금액 또는 통관환율 소수점 불일치. 실지불 확정액 유지.`
+    return `한국에이원이 토에이산교에 계산값보다 ${formatted}원 초과 지급. 수입금액(USD) 또는 통관환율 소수점 입력값과 DB 저장값 차이에서 발생. 실지불 확정액 유지.`
   }
   if (diff > 100) {
-    return `계산값 대비 ${formatted}원 미달 (한국에이원 → 토에이산교 기준). 원인 미확정. 실지불 확정액 유지.`
+    return `한국에이원이 토에이산교에 계산값보다 ${formatted}원 미달 지급. 수입금액(USD) 또는 통관환율 소수점 입력값과 DB 저장값 차이에서 발생. 실지불 확정액 유지.`
   }
   return '계산값과 일치 (소수점 반올림 차이 이내)'
 }
@@ -55,6 +56,14 @@ export function VerificationIssueCard({ rows }: { rows: VerRow[] }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
+        <div className="px-4 py-3 flex items-start gap-2 text-sm" style={{ backgroundColor: '#F0F7F0', borderBottom: '1px solid #A5D6A7' }}>
+          <Info className="h-4 w-4 mt-0.5 shrink-0" style={{ color: '#388E3C' }} />
+          <div style={{ color: '#1B5E20' }}>
+            <span className="font-semibold">중간정산 계산 기준</span>
+            <br />
+            확정금액 = &#123; (수입금액<sub>USD</sub> × 통관환율 × (1 + 마진율)) + 통관비용 합계 &#125; × 1.10
+          </div>
+        </div>
         <table className="w-full text-sm">
           <thead>
             <tr style={{ backgroundColor: '#FFE0B2' }}>
