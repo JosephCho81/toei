@@ -10,6 +10,7 @@ import {
   Package, TrendingUp, CheckCircle2, AlertTriangle, Ship, ArrowRight,
 } from 'lucide-react'
 import { VerificationIssueCard } from '@/components/dashboard/VerificationIssueCard'
+import { YearFilterBar } from '@/components/dashboard/YearFilterBar'
 import type { VerRow } from '@/components/dashboard/VerificationIssueCard'
 
 export const metadata: Metadata = {
@@ -24,8 +25,37 @@ const STATUS_LABELS: Record<string, string> = {
   closing_done: '클로징 완료',
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string }>
+}) {
+  const { year } = await searchParams
   const supabase = await createClient()
+
+  // 연도 필터 조건 (lc_open_date 기준)
+  const yearFrom = year ? `${year}-01-01` : null
+  const yearTo = year ? `${year}-12-31` : null
+
+  const buildAllTxQ = () => {
+    let q = supabase.from('transactions').select('import_amount_usd, settlement_status')
+    if (yearFrom && yearTo) q = q.gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
+    return q
+  }
+  const buildInterimPendingQ = () => {
+    let q = supabase.from('transactions')
+      .select('id, round_label, import_amount_usd')
+      .in('settlement_status', ['pending', 'interim_saved'])
+    if (yearFrom && yearTo) q = q.gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
+    return q
+  }
+  const buildClosingPendingQ = () => {
+    let q = supabase.from('transactions')
+      .select('id, round_label, import_amount_usd')
+      .in('settlement_status', ['interim_done', 'closing_saved'])
+    if (yearFrom && yearTo) q = q.gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
+    return q
+  }
 
   const [
     { data: allTx },
@@ -36,18 +66,14 @@ export default async function DashboardPage() {
     { data: recentTx },
     { data: verificationIssues },
   ] = await Promise.all([
-    supabase.from('transactions').select('import_amount_usd, settlement_status'),
+    buildAllTxQ(),
     supabase.from('transactions')
       .select('id, round_label, a1_payment_date, settlement_status')
       .not('a1_payment_date', 'is', null)
       .neq('settlement_status', 'closing_done')
       .order('a1_payment_date'),
-    supabase.from('transactions')
-      .select('id, round_label, import_amount_usd')
-      .in('settlement_status', ['pending', 'interim_saved']),
-    supabase.from('transactions')
-      .select('id, round_label, import_amount_usd')
-      .in('settlement_status', ['interim_done', 'closing_saved']),
+    buildInterimPendingQ(),
+    buildClosingPendingQ(),
     supabase.from('containers')
       .select('id, eta, actual_arrival')
       .is('actual_arrival', null)
@@ -57,7 +83,7 @@ export default async function DashboardPage() {
       .order('round_no', { ascending: false })
       .limit(5),
     supabase.from('interim_settlements')
-      .select('id, notes, confirmed_amount_krw, transactions(round_no, round_label)')
+      .select('id, notes, confirmed_amount_krw, customs_exchange_rate, transactions(id, round_no, round_label, import_amount_usd, margin_rate_pct), interim_cost_items(amount_krw)')
       .like('notes', '%[검증]%')
       .not('notes', 'like', '%[확인완료]%')
       .order('created_at'),
@@ -93,22 +119,71 @@ export default async function DashboardPage() {
     id: string
     notes: string | null
     confirmed_amount_krw: number | null
-    transactions: { round_no: number; round_label: string } | { round_no: number; round_label: string }[] | null
+    customs_exchange_rate: number | null
+    transactions: {
+      id: string
+      round_no: number
+      round_label: string
+      import_amount_usd: number | null
+      margin_rate_pct: number | null
+    } | {
+      id: string
+      round_no: number
+      round_label: string
+      import_amount_usd: number | null
+      margin_rate_pct: number | null
+    }[] | null
+    interim_cost_items: { amount_krw: number | null }[] | null
   }
+
   const rawVerRows = (verificationIssues ?? []) as unknown as RawVerRow[]
   const verRows: VerRow[] = rawVerRows.map((row) => {
     const tx = Array.isArray(row.transactions) ? row.transactions[0] : row.transactions
+    const costSum = (row.interim_cost_items ?? []).reduce(
+      (s, c) => s + Number(c.amount_krw || 0), 0,
+    )
+
+    let diff: number | null = null
+    if (
+      tx &&
+      row.confirmed_amount_krw != null &&
+      row.customs_exchange_rate != null &&
+      tx.import_amount_usd != null &&
+      tx.margin_rate_pct != null
+    ) {
+      const calcAmount =
+        Math.round(
+          Number(tx.import_amount_usd) * Number(row.customs_exchange_rate)
+          * (1 + Number(tx.margin_rate_pct) / 100)
+          + costSum,
+        ) * 1.10
+      diff = Number(row.confirmed_amount_krw) - calcAmount
+    }
+
     return {
       id: row.id,
       notes: row.notes,
       confirmed_amount_krw: row.confirmed_amount_krw,
       round_label: tx?.round_label ?? '-',
+      transaction_id: tx?.id ?? '',
+      diff,
     }
   })
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>정산 현황</h2>
+
+      {/* 기간 필터 */}
+      <div className="space-y-1">
+        <p className="text-xs text-muted-foreground">LC 개설일 기준</p>
+        <YearFilterBar currentYear={year} />
+        {year && (
+          <p className="text-sm" style={{ color: '#388E3C' }}>
+            {year}년 거래 기준 · 총 {totalCount}건
+          </p>
+        )}
+      </div>
 
       {/* 요약 통계 카드 4개 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
