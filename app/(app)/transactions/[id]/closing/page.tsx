@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Trash2, Plus } from 'lucide-react'
 
 interface FeeRow {
@@ -67,17 +68,35 @@ export default function ClosingSettlementPage() {
     { item_name: '검역수수료', amount_krw: '0', includes_vat: false },
     { item_name: '운송추가운임', amount_krw: '0', includes_vat: true },
   ])
+  const [customsDetailItems, setCustomsDetailItems] = useState<{ item_name: string; amount_krw: number }[]>([])
+  const [forwardingQuotes, setForwardingQuotes] = useState<{ forwarder_name: string; quote_amount_krw: number | null; actual_amount_krw: number | null }[]>([])
   const [confirmedAmount, setConfirmedAmount] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     async function load() {
-      const [{ data: t }, { data: interim }] = await Promise.all([
+      const [{ data: t }, { data: interim }, { data: fwdRows }] = await Promise.all([
         supabase.from('transactions').select('import_amount_usd,customs_exchange_rate').eq('id', id).single(),
-        supabase.from('interim_settlements').select('confirmed_amount_krw,customs_exchange_rate,is_locked,updated_at').eq('transaction_id', id).single(),
+        supabase.from('interim_settlements').select('id,confirmed_amount_krw,customs_exchange_rate,is_locked,updated_at').eq('transaction_id', id).single(),
+        supabase.from('forwarding_quotes').select('forwarder_name,quote_amount_krw,actual_amount_krw').eq('transaction_id', id).order('sort_order'),
       ])
       setTransaction(t)
       if (interim) setInterimSummary(interim as typeof interimSummary)
+      setForwardingQuotes((fwdRows ?? []).map((r) => ({
+        forwarder_name: r.forwarder_name ?? '',
+        quote_amount_krw: r.quote_amount_krw != null ? Number(r.quote_amount_krw) : null,
+        actual_amount_krw: r.actual_amount_krw != null ? Number(r.actual_amount_krw) : null,
+      })))
+
+      if (interim?.id) {
+        const { data: costItems } = await supabase
+          .from('interim_cost_items')
+          .select('item_name,amount_krw')
+          .eq('interim_settlement_id', interim.id)
+          .eq('group_type', 'customs')
+          .order('sort_order')
+        setCustomsDetailItems((costItems ?? []).map((c) => ({ item_name: String(c.item_name ?? ''), amount_krw: Number(c.amount_krw) || 0 })))
+      }
 
       const { data: closing } = await supabase
         .from('closing_settlements')
@@ -462,6 +481,68 @@ export default function ClosingSettlementPage() {
           </p>
         </div>
       )}
+
+      {customsDetailItems.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">통관 세부내역</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>항목</TableHead>
+                  <TableHead className="text-right">금액</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {customsDetailItems.map((item, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="text-sm">{item.item_name}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{item.amount_krw.toLocaleString('ko-KR')}원</TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="font-semibold">
+                  <TableCell className="text-sm">합계</TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {customsDetailItems.reduce((s, i) => s + i.amount_krw, 0).toLocaleString('ko-KR')}원
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">포워딩 세부내역</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>항목</TableHead>
+                <TableHead className="text-right">견적금액</TableHead>
+                <TableHead className="text-right">실청구액</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {forwardingQuotes.length > 0 ? forwardingQuotes.map((r, i) => (
+                <TableRow key={i}>
+                  <TableCell className="text-sm">{r.forwarder_name}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {r.quote_amount_krw != null ? r.quote_amount_krw.toLocaleString('ko-KR') + '원' : '-'}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {r.actual_amount_krw != null ? r.actual_amount_krw.toLocaleString('ko-KR') + '원' : '-'}
+                  </TableCell>
+                </TableRow>
+              )) : (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground py-4 text-sm">포워딩 데이터 없음</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {!isLocked && (
         <div className="flex gap-2">

@@ -43,6 +43,8 @@ export interface ClosingPdfData {
   grandTotalKrw: number | null
   shippingItems: { itemName: string; amountKrw: number }[]
   customsItems: { itemName: string; amountKrw: number }[]
+  customsDetailItems: { itemName: string; amountKrw: number }[]
+  forwardingQuotes: { itemName: string; quoteAmountKrw: number | null; actualAmountKrw: number | null }[]
 }
 
 const GREEN = '#2E7D32'
@@ -531,6 +533,57 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
             isLast
           />
         </View>
+
+        {data.customsDetailItems.length > 0 && (
+          <View>
+            <Text style={s.sectionLabel}>통관 세부내역</Text>
+            <View style={s.table}>
+              {data.customsDetailItems.map((item, i) => {
+                const isLast = i === data.customsDetailItems.length - 1
+                return (
+                  <Row key={`cd-${i}`} label={item.itemName} value={krw(item.amountKrw)} even={i % 2 === 1} indent isLast={isLast} />
+                )
+              })}
+              <Row
+                label="통관비용 합계"
+                value={krw(data.customsDetailItems.reduce((s, r) => s + r.amountKrw, 0))}
+                even={data.customsDetailItems.length % 2 === 1}
+                isLast
+              />
+            </View>
+          </View>
+        )}
+
+        {data.forwardingQuotes.length > 0 && (
+          <View>
+            <Text style={s.sectionLabel}>포워딩 세부내역</Text>
+            <View style={[s.itemsTable, { marginBottom: 4 }]}>
+              <View style={s.itemsHeaderRow}>
+                <Text style={[s.itemsHeaderCell, { width: '40%' }]}>항목</Text>
+                <Text style={[s.itemsHeaderCell, { width: '30%', borderLeftWidth: 1, borderLeftColor: BORDER, textAlign: 'right' }]}>견적금액</Text>
+                <Text style={[s.itemsHeaderCell, { width: '30%', borderLeftWidth: 1, borderLeftColor: BORDER, textAlign: 'right' }]}>실청구액</Text>
+              </View>
+              {data.forwardingQuotes.map((r, i) => {
+                const isLast = i === data.forwardingQuotes.length - 1
+                const isEven = i % 2 === 1
+                const rowStyle = isLast
+                  ? (isEven ? s.itemsDataRowLastEven : s.itemsDataRowLast)
+                  : (isEven ? s.itemsDataRowEven : s.itemsDataRow)
+                return (
+                  <View key={i} style={rowStyle}>
+                    <Text style={[s.itemsCell, { width: '40%' }]}>{r.itemName}</Text>
+                    <Text style={[s.itemsCell, { width: '30%', textAlign: 'right' }]}>
+                      {r.quoteAmountKrw != null ? r.quoteAmountKrw.toLocaleString('ko-KR') + '원' : '-'}
+                    </Text>
+                    <Text style={[s.itemsCellLast, { width: '30%', textAlign: 'right' }]}>
+                      {r.actualAmountKrw != null ? r.actualAmountKrw.toLocaleString('ko-KR') + '원' : '-'}
+                    </Text>
+                  </View>
+                )
+              })}
+            </View>
+          </View>
+        )}
 
         <Text style={s.sectionLabel}>최종 정산액</Text>
         <View style={s.table}>

@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
   const [
     { data: txItems },
     { data: interimSettlement },
+    { data: fwdRows },
   ] = await Promise.all([
     supabase.from('transaction_items')
       .select('spec, color, size, unit_price_usd, quantity, unit, sort_order')
@@ -58,6 +59,10 @@ export async function GET(req: NextRequest) {
       .select('id, customs_exchange_rate, confirmed_amount_krw')
       .eq('transaction_id', transactionId)
       .single(),
+    supabase.from('forwarding_quotes')
+      .select('forwarder_name, quote_amount_krw, actual_amount_krw')
+      .eq('transaction_id', transactionId)
+      .order('sort_order'),
   ])
 
   let interimCostItems: { item_name: string; amount_krw: number; group_type: string }[] = []
@@ -172,6 +177,14 @@ export async function GET(req: NextRequest) {
     customsItems: interimCostItems
       .filter((c) => c.group_type !== 'shipping')
       .map((c) => ({ itemName: c.item_name, amountKrw: c.amount_krw })),
+    customsDetailItems: interimCostItems
+      .filter((c) => c.group_type === 'customs')
+      .map((c) => ({ itemName: c.item_name, amountKrw: c.amount_krw })),
+    forwardingQuotes: (fwdRows ?? []).map((r) => ({
+      itemName: r.forwarder_name ?? '',
+      quoteAmountKrw: r.quote_amount_krw != null ? Number(r.quote_amount_krw) : null,
+      actualAmountKrw: r.actual_amount_krw != null ? Number(r.actual_amount_krw) : null,
+    })),
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
