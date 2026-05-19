@@ -78,7 +78,7 @@ export function ContainerList({ transactionId, isLocked }: { transactionId: stri
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-sm text-muted-foreground">
               <span><span className="font-medium text-foreground/70">ETD:</span> {formatDate(c.etd) ?? '-'}</span>
               <span><span className="font-medium text-foreground/70">ETA:</span> {formatDate(c.eta) ?? '-'}</span>
               <span><span className="font-medium text-foreground/70">실착:</span> {c.actual_arrival ? formatDate(c.actual_arrival) : '-'}</span>
