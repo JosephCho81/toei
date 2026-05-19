@@ -2,16 +2,12 @@ export type RoundingPolicy = 'floor_100' | 'floor_10' | 'none'
 
 export interface CostItem {
   amountKrw: number
-  isVatTaxable: boolean
-  vatAmountKrw: number
 }
 
 export interface InterimCalculation {
-  importAmountKrw: number   // import × rate × (1 + margin/100)
-  totalCostKrw: number
-  vatAmountKrw: number      // (importAmountKrw + totalCostKrw) × 10%
-  totalWithVatKrw: number
-  roundedTotalKrw: number
+  importAmountKrw: number   // USD × 환율 × (1 + margin/100)
+  totalCostKrw: number      // 운송비 + 관세 + 기타 합계
+  confirmedKrw: number      // importAmountKrw + totalCostKrw
 }
 
 export function applyRounding(amount: number, policy: RoundingPolicy): number {
@@ -26,22 +22,15 @@ export function calculateInterim(params: {
   marginRatePct?: number
   costItems: CostItem[]
   roundingPolicy: RoundingPolicy
-  vatIncludedInTotal?: boolean
 }): InterimCalculation {
   const { importAmountUsd, customsExchangeRate, marginRatePct = 0, costItems, roundingPolicy } = params
-
   const importAmountKrw = Math.round(importAmountUsd * customsExchangeRate * (1 + marginRatePct / 100))
-
   const totalCostKrw = costItems.reduce((sum, item) => sum + item.amountKrw, 0)
-  const vatAmountKrw = Math.round((importAmountKrw + totalCostKrw) * 0.1)
-  const totalWithVatKrw = importAmountKrw + totalCostKrw + vatAmountKrw
-
+  const confirmedKrw = importAmountKrw + totalCostKrw
   return {
     importAmountKrw,
     totalCostKrw,
-    vatAmountKrw,
-    totalWithVatKrw,
-    roundedTotalKrw: applyRounding(totalWithVatKrw, roundingPolicy),
+    confirmedKrw: applyRounding(confirmedKrw, roundingPolicy),
   }
 }
 

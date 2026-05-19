@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { calculateInterim, computeVat, type RoundingPolicy, type CostItem } from '@/lib/calculations/interim'
+import { calculateInterim, type RoundingPolicy, type CostItem } from '@/lib/calculations/interim'
 import { formatKrw } from '@/lib/utils/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -93,14 +93,12 @@ export default function InterimSettlementPage() {
 
   const costItems: CostItem[] = [...shippingRows, ...customsRows].map((r) => ({
     amountKrw: parseFloat(r.amount_krw) || 0,
-    isVatTaxable: r.is_vat_taxable,
-    vatAmountKrw: r.is_vat_taxable ? computeVat(parseFloat(r.amount_krw) || 0) : parseFloat(r.vat_amount_krw) || 0,
   }))
 
   const calc = tx?.import_amount_usd && customsRate
     ? calculateInterim({ importAmountUsd: Number(tx.import_amount_usd), customsExchangeRate: parseFloat(customsRate), marginRatePct: tx.margin_rate_pct ?? 0, costItems, roundingPolicy })
     : null
-  const systemAmount = calc?.roundedTotalKrw ?? 0
+  const systemAmount = calc?.confirmedKrw ?? 0
 
   useEffect(() => { if (systemAmount > 0 && !confirmed) setConfirmed(String(systemAmount)) }, [systemAmount])
 

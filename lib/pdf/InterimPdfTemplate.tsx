@@ -28,8 +28,6 @@ export interface InterimPdfData {
   customsExchangeRate: number
   importAmountKrw: number
   totalCostKrw: number
-  vatAmountKrw: number
-  totalWithVatKrw: number
   confirmedAmountKrw: number
   isPaid: boolean
   issuedAt: string
@@ -271,7 +269,7 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
   const shippingItems = data.costItems.filter((c) => c.groupType === 'shipping')
   const customsItems = data.costItems.filter((c) => c.groupType !== 'shipping')
   const itemsTotal = data.costItems.reduce((s, c) => s + c.amountKrw, 0)
-  const subTotal = data.importAmountKrw + itemsTotal + data.vatAmountKrw
+  const subTotal = data.importAmountKrw + itemsTotal
 
   const direction = data.confirmedAmountKrw >= 0
     ? '한국에이원 → 토에이산교 지급'
@@ -281,7 +279,6 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
     { itemName: '수입금액 (원화환산)', formula: `$${data.importAmountUsd.toLocaleString('en-US')} × ${data.customsExchangeRate.toLocaleString('ko-KR')}원`, amountKrw: data.importAmountKrw, indent: false },
     ...shippingItems.map((c) => ({ itemName: c.itemName, formula: '', amountKrw: c.amountKrw, indent: true })),
     ...customsItems.map((c) => ({ itemName: c.itemName, formula: '', amountKrw: c.amountKrw, indent: true })),
-    { itemName: '부가세', formula: '(원가합계) × 10%', amountKrw: data.vatAmountKrw, indent: false },
   ]
 
   return (
@@ -378,12 +375,11 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
           <Text style={s.sectionLabel}>원가 구성 비율</Text>
           <View style={{ borderWidth: 1, borderColor: BORDER, padding: 8, backgroundColor: GRAY_BG }}>
             {(() => {
-              const total = data.importAmountKrw + itemsTotal + data.vatAmountKrw
+              const total = data.importAmountKrw + itemsTotal
               if (total <= 0) return null
               const segs = [
                 { label: '수입원가', amount: data.importAmountKrw, color: GREEN },
                 { label: '통관/운송비', amount: itemsTotal, color: '#f97316' },
-                { label: '부가세', amount: data.vatAmountKrw, color: '#eab308' },
               ].filter(s => s.amount > 0)
               return (
                 <View>

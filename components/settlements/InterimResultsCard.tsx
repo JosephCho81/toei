@@ -35,10 +35,9 @@ export function InterimResultsCard({
           <div className="space-y-1 text-sm">
             <Row label="해상운임 소계" value={formatKrw(shippingSubtotal)} />
             <Row label="통관 소계" value={formatKrw(customsSubtotal)} />
-            <Row label="부가세 합계" value={formatKrw(calc.vatAmountKrw)} />
             <Separator />
             <Row label="수입원가 (마진포함)" value={formatKrw(calc.importAmountKrw)} />
-            <Row label="총계 (부가세 포함)" value={formatKrw(calc.totalWithVatKrw)} bold />
+            <Row label="확정금액" value={formatKrw(calc.confirmedKrw)} bold />
           </div>
         )}
         <div className="flex items-end gap-6">

@@ -67,14 +67,9 @@ export async function GET(req: NextRequest) {
   const rawItems = Array.isArray(interim.interim_cost_items) ? interim.interim_cost_items : []
   const sortedItems = [...rawItems].sort((a, b) => ((a as { sort_order?: number }).sort_order ?? 0) - ((b as { sort_order?: number }).sort_order ?? 0))
 
-  const costItems: CostItem[] = sortedItems.map((item) => {
-    const i = item as { amount_krw: number; is_vat_taxable: boolean; vat_amount_krw: number }
-    return {
-      amountKrw: Number(i.amount_krw) || 0,
-      isVatTaxable: i.is_vat_taxable,
-      vatAmountKrw: Number(i.vat_amount_krw) || 0,
-    }
-  })
+  const costItems: CostItem[] = sortedItems.map((item) => ({
+    amountKrw: Number((item as { amount_krw: number }).amount_krw) || 0,
+  }))
 
   const calc = calculateInterim({
     importAmountUsd: Number(t?.import_amount_usd) || 0,
@@ -97,8 +92,6 @@ export async function GET(req: NextRequest) {
     customsExchangeRate: Number(interim.customs_exchange_rate) || 0,
     importAmountKrw: calc.importAmountKrw,
     totalCostKrw: calc.totalCostKrw,
-    vatAmountKrw: calc.vatAmountKrw,
-    totalWithVatKrw: calc.totalWithVatKrw,
     confirmedAmountKrw: Number(interim.confirmed_amount_krw) || 0,
     isPaid: (interim.is_paid as boolean) ?? false,
     issuedAt,
