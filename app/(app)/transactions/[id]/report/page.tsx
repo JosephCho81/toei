@@ -14,8 +14,6 @@ import { ReportTimeline } from '@/components/report/ReportTimeline'
 import { ReportCostBar } from '@/components/report/ReportCostBar'
 import { ReportFlowDiagram } from '@/components/report/ReportFlowDiagram'
 import { ReportBenchmark } from '@/components/report/ReportBenchmark'
-import { ReportSensitivityTable } from '@/components/report/ReportSensitivityTable'
-import { ReportRateSimulator } from '@/components/report/ReportRateSimulator'
 import { ReportRoundChart } from '@/components/report/ReportRoundChart'
 import { Separator } from '@/components/ui/separator'
 
@@ -185,7 +183,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
   // 원가 구성 바 세그먼트
   const costSegments = [
-    { label: '수입원가', amount: interimImportKrw, bgClass: 'bg-green-500', textClass: 'text-green-700' },
+    { label: '수입원가', amount: interimImportKrw, bgClass: 'bg-green-300', textClass: 'text-green-700' },
     { label: '통관/운송비', amount: nonVatCostsTotal, bgClass: 'bg-orange-400', textClass: 'text-orange-700' },
     { label: '부가세', amount: vatAmountKrw, bgClass: 'bg-yellow-400', textClass: 'text-yellow-700' },
   ]
@@ -367,29 +365,6 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             grandTotalKrw: interimConfirmedKrw != null ? closingCalc.grandTotalKrw : null,
           }} />
 
-          {/* 환율 시뮬레이터 (웹 전용) */}
-          {bokRate != null && (
-            <ReportRateSimulator
-              bokRate={bokRate}
-              importUsd={importUsd}
-              importAmountKrw={importAmountKrw}
-              lcFeeTotal={closingCalc.lcFeeTotalKrw}
-              fxBurdenPct={fxBurdenA1Pct}
-              closingCostsTotal={closingCalc.closingCostsTotalKrw}
-            />
-          )}
-
-          {/* 환율 민감도 분석 테이블 */}
-          {bokRate != null && (
-            <ReportSensitivityTable
-              bokRate={bokRate}
-              importUsd={importUsd}
-              importAmountKrw={importAmountKrw}
-              lcFeeTotal={closingCalc.lcFeeTotalKrw}
-              fxBurdenPct={fxBurdenA1Pct}
-              closingCostsTotal={closingCalc.closingCostsTotalKrw}
-            />
-          )}
         </>
       ) : (
         closing === null && (

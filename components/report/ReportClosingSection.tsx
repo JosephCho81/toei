@@ -196,7 +196,7 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
               {signed(confirmed)}
             </p>
             {closingDirection && (
-              <div className={`inline-flex items-center rounded px-3 py-1 ${confirmed < 0 ? 'bg-red-600' : 'bg-amber-600'} text-white`}>
+              <div className={`inline-flex items-center rounded px-3 py-1 ${confirmed < 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}`}>
                 <span className="text-sm font-semibold">{closingDirection}</span>
               </div>
             )}
@@ -224,8 +224,8 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
             </div>
           </div>
           {grandDirection && (
-            <div className="bg-green-700 text-white rounded-lg px-4 py-4 text-center">
-              <p className="text-xs text-green-200 mb-1">최종 정산</p>
+            <div className="bg-green-100 text-green-800 rounded-lg px-4 py-4 text-center">
+              <p className="text-xs text-green-600 mb-1">최종 정산</p>
               <p className="text-sm font-bold mb-1">{grandDirection}</p>
               <p className="text-2xl font-bold font-mono">₩ {Math.abs(data.grandTotalKrw!).toLocaleString('ko-KR')}</p>
             </div>
@@ -235,13 +235,13 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
 
       {!hasGrandTotal && confirmed != null && (
         <ReportSection title="VI. 종합 정산">
-          <div className="bg-green-50 border-2 border-green-600 rounded-lg p-4">
+          <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
             <p className="text-xs text-muted-foreground mb-1">클로징 최종 정산</p>
             <p className="text-2xl font-bold font-mono text-green-800">
               {formatKrw(Math.abs(confirmed))}
             </p>
             {closingDirection && (
-              <div className="mt-2 inline-flex items-center bg-green-700 text-white rounded px-3 py-1">
+              <div className="mt-2 inline-flex items-center bg-green-100 text-green-800 rounded px-3 py-1">
                 <span className="text-sm font-semibold">{closingDirection}</span>
               </div>
             )}

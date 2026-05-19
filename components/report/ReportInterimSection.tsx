@@ -74,11 +74,11 @@ export function ReportInterimSection({ data }: { data: InterimCostData }) {
             <TableCell className="text-right font-mono">{data.vatAmountKrw.toLocaleString('ko-KR')}원</TableCell>
           </TableRow>
           {showConfirmed ? (
-            <TableRow className="bg-green-700 font-bold border-t-2 border-green-800">
-              <TableCell className="text-white text-base">중간정산 확정금액</TableCell>
+            <TableRow className="bg-green-100 font-bold border-t-2 border-green-200">
+              <TableCell className="text-green-800 text-base">중간정산 확정금액</TableCell>
               <TableCell />
               <TableCell
-                className="text-right font-mono text-white text-base cursor-help"
+                className="text-right font-mono text-green-800 text-base cursor-help"
                 title={`수입원가 + 통관비 + 운송비 + 부가세 = ${data.confirmedAmountKrw!.toLocaleString('ko-KR')}원`}
               >
                 {data.confirmedAmountKrw!.toLocaleString('ko-KR')}원
@@ -94,7 +94,7 @@ export function ReportInterimSection({ data }: { data: InterimCostData }) {
         </TableBody>
       </Table>
       {data.interimDirection && (
-        <div className="mt-2 inline-flex items-center bg-green-700 text-white rounded px-3 py-1">
+        <div className="mt-2 inline-flex items-center bg-green-100 text-green-800 rounded px-3 py-1">
           <span className="text-sm font-semibold">{data.interimDirection}</span>
         </div>
       )}

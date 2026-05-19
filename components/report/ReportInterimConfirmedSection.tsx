@@ -17,13 +17,13 @@ export function ReportInterimConfirmedSection({ data }: { data: InterimConfirmed
   return (
     <ReportSection title="섹션 4 — 중간정산 확정금액">
       {confirmed != null ? (
-        <div className="border-2 border-green-600 rounded-lg p-5 bg-green-50">
+        <div className="border-2 border-green-300 rounded-lg p-5 bg-green-50">
           <p className="text-xs text-muted-foreground mb-1">중간정산 확정금액</p>
           <p className="text-3xl font-bold font-mono text-green-800">
             {formatKrw(Math.abs(confirmed))}
           </p>
           {direction && (
-            <div className="mt-3 inline-flex items-center bg-green-700 text-white rounded px-3 py-1.5">
+            <div className="mt-3 inline-flex items-center bg-green-100 text-green-800 rounded px-3 py-1.5">
               <span className="text-sm font-semibold">{direction}</span>
             </div>
           )}

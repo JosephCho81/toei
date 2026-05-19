@@ -21,7 +21,7 @@ function evalLabel(score: number): { text: string; icon: string } {
 }
 
 function scoreColor(score: number) {
-  if (score >= 70) return 'bg-green-500'
+  if (score >= 70) return 'bg-green-300'
   if (score >= 40) return 'bg-amber-400'
   return 'bg-red-400'
 }

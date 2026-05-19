@@ -25,7 +25,7 @@ export function ReportTimeline({ lcOpenDate, customsDate, closingDate, customsRa
       <div className="relative flex items-start justify-between min-w-[380px]">
         {/* LC개설 */}
         <div className="flex flex-col items-center w-28">
-          <div className="w-3 h-3 rounded-full bg-green-600 mb-1 shrink-0" />
+          <div className="w-3 h-3 rounded-full bg-green-400 mb-1 shrink-0" />
           <p className="text-xs font-semibold text-green-800">LC개설</p>
           <p className="text-xs font-mono text-muted-foreground mt-0.5">{formatDate(lcOpenDate)}</p>
         </div>
@@ -43,7 +43,7 @@ export function ReportTimeline({ lcOpenDate, customsDate, closingDate, customsRa
 
         {/* 통관/입고 */}
         <div className="flex flex-col items-center w-28">
-          <div className="w-3 h-3 rounded-full bg-amber-500 mb-1 shrink-0" />
+          <div className="w-3 h-3 rounded-full bg-amber-400 mb-1 shrink-0" />
           <p className="text-xs font-semibold text-amber-700">통관/입고</p>
           <p className="text-xs font-mono text-muted-foreground mt-0.5">{formatDate(customsDate)}</p>
           {customsRate != null && (
@@ -64,7 +64,7 @@ export function ReportTimeline({ lcOpenDate, customsDate, closingDate, customsRa
 
         {/* LC결제 */}
         <div className="flex flex-col items-center w-28">
-          <div className="w-3 h-3 rounded-full bg-blue-600 mb-1 shrink-0" />
+          <div className="w-3 h-3 rounded-full bg-blue-400 mb-1 shrink-0" />
           <p className="text-xs font-semibold text-blue-800">LC결제</p>
           <p className="text-xs font-mono text-muted-foreground mt-0.5">{formatDate(closingDate)}</p>
           {bokRate != null && (

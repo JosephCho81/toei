@@ -67,7 +67,7 @@ export function ReportFlowDiagram(props: Props) {
         <FlowTotal
           label="= 중간정산 확정금액"
           value={`${fmt(interimConfirmedKrw)}원`}
-          colorClass="bg-green-700 text-white"
+          colorClass="bg-green-100 text-green-800"
         />
         <Arrow />
 
@@ -96,7 +96,7 @@ export function ReportFlowDiagram(props: Props) {
         <FlowTotal
           label="= 클로징 정산금액"
           value={`${signed(closingConfirmedKrw)}원`}
-          colorClass={closingConfirmedKrw < 0 ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'}
+          colorClass={closingConfirmedKrw < 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}
         />
         <Arrow />
 
@@ -107,7 +107,7 @@ export function ReportFlowDiagram(props: Props) {
         <FlowTotal
           label="= 종합정산액"
           value={`${fmt(grandTotalKrw)}원`}
-          colorClass="bg-green-800 text-white text-base"
+          colorClass="bg-green-100 text-green-800 text-base"
         />
       </div>
     </div>
