@@ -11,6 +11,7 @@ import { ContainerList } from './container-list'
 import { SettlementPdfButton } from '@/components/settlements/SettlementPdfButton'
 import { ItemsEditTable } from '@/components/transactions/ItemsEditTable'
 import { ForwardingQuoteSection } from '@/components/transactions/ForwardingQuoteSection'
+import { TransactionNotesCard } from '@/components/transactions/TransactionNotesCard'
 
 const STATUS_LABELS: Record<string, string> = {
   pending: '미진행',
@@ -122,12 +123,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
 
       <ForwardingQuoteSection transactionId={id} isLocked={t.is_locked} />
 
-      {t.notes && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">메모</CardTitle></CardHeader>
-          <CardContent><p className="text-sm whitespace-pre-wrap">{t.notes}</p></CardContent>
-        </Card>
-      )}
+      {t.notes && <TransactionNotesCard transactionId={id} initialNotes={t.notes} />}
     </div>
   )
 }
