@@ -29,32 +29,27 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ year?: string }>
 }) {
-  const { year } = await searchParams
+  const year = (await searchParams).year ?? '2026'
   const supabase = await createClient()
 
-  const yearFrom = year ? `${year}-01-01` : null
-  const yearTo = year ? `${year}-12-31` : null
+  const yearFrom = `${year}-01-01`
+  const yearTo = `${year}-12-31`
 
-  const buildAllTxQ = () => {
-    let q = supabase.from('transactions').select('import_amount_usd, settlement_status')
-    if (yearFrom && yearTo) q = q.gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
-    return q
-  }
-  const buildInterimPendingQ = () => {
-    // LEFT JOIN 방식: interim_settlements가 없거나, confirmed_amount_krw가 NULL이거나, is_locked=false인 거래
-    let q = supabase.from('transactions')
+  const buildAllTxQ = () =>
+    supabase.from('transactions').select('import_amount_usd, settlement_status')
+      .gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
+
+  const buildInterimPendingQ = () =>
+    supabase.from('transactions')
       .select('id, round_label, import_amount_usd, interim_settlements(id, confirmed_amount_krw, is_locked)')
       .not('settlement_status', 'eq', 'closing_done')
-    if (yearFrom && yearTo) q = q.gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
-    return q
-  }
-  const buildClosingPendingQ = () => {
-    let q = supabase.from('transactions')
+      .gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
+
+  const buildClosingPendingQ = () =>
+    supabase.from('transactions')
       .select('id, round_label, import_amount_usd')
       .in('settlement_status', ['interim_done', 'closing_saved'])
-    if (yearFrom && yearTo) q = q.gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
-    return q
-  }
+      .gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
 
   const containerCutoffDate = new Date()
   containerCutoffDate.setDate(containerCutoffDate.getDate() - 7)
@@ -213,11 +208,9 @@ export default async function DashboardPage({
       <div className="space-y-1">
         <p className="text-xs text-muted-foreground">LC 개설일 기준</p>
         <YearFilterBar currentYear={year} />
-        {year && (
-          <p className="text-sm" style={{ color: '#388E3C' }}>
-            {year}년 거래 기준 · 총 {totalCount}건
-          </p>
-        )}
+        <p className="text-sm" style={{ color: '#388E3C' }}>
+          {year}년 거래 기준 · 총 {totalCount}건
+        </p>
       </div>
 
       {/* KPI 카드 4개 */}

@@ -86,6 +86,8 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
 
   if (!loaded) return null
 
+  const colSpan = isLocked ? 4 : 5
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -106,26 +108,84 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>포워더</TableHead><TableHead>견적일</TableHead>
+                <TableHead>포워더</TableHead>
+                <TableHead>견적일</TableHead>
                 <TableHead>항목</TableHead>
                 <TableHead className="text-right">견적금액(KRW)</TableHead>
-                <TableHead className="text-right">실청구액(KRW)</TableHead>
-                <TableHead className="text-right">차이</TableHead>
                 {!isLocked && <TableHead className="w-8" />}
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((r) => {
                 const q = parseInt(r.quote_amount_krw) || 0
-                const a = parseInt(r.actual_amount_krw) || 0
-                const diff = a && q ? a - q : null
                 const hasItems = r.items.length > 0
-                const colSpan = isLocked ? 6 : 7
+
+                // 잠금 + 세부항목 있음: 항목별 행 분리 + 합계 행
+                if (isLocked && hasItems) {
+                  const rowCount = r.items.length + 1  // 세부항목 + 합계
+                  return (
+                    <React.Fragment key={r._key}>
+                      {r.items.map((item, idx) => (
+                        <TableRow key={item.id}>
+                          {idx === 0 && (
+                            <>
+                              <TableCell rowSpan={rowCount} className="align-top text-sm px-3 py-2 border-r">
+                                {r.forwarder_name}
+                              </TableCell>
+                              <TableCell rowSpan={rowCount} className="align-top text-sm px-3 py-2 border-r">
+                                {r.quote_date || '-'}
+                              </TableCell>
+                            </>
+                          )}
+                          <TableCell className="px-3 py-1 text-xs">
+                            <span className="font-medium">{item.item_name ?? '-'}</span>
+                            {item.currency && item.currency !== 'KRW' && item.amount_cur != null && (
+                              <span className="text-muted-foreground ml-1.5 text-[10px]">
+                                {item.currency} {item.amount_cur.toLocaleString('ko-KR')}
+                              </span>
+                            )}
+                            {item.is_vat_taxable && (
+                              <span className="text-blue-500 text-[10px] ml-1">VAT</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right text-xs font-mono px-3 py-1">
+                            {item.amount_krw != null ? formatKrw(item.amount_krw) : '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="bg-muted/30">
+                        <TableCell className="text-right text-xs font-semibold text-muted-foreground px-3 py-1.5">
+                          합계
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-semibold font-mono px-3 py-1.5">
+                          {q ? formatKrw(q) : '-'}
+                        </TableCell>
+                      </TableRow>
+                      {r.notes && (
+                        <TableRow className="border-t-0">
+                          <TableCell colSpan={colSpan} className="px-3 pb-2 pt-0">
+                            <p className="text-xs text-muted-foreground">메모: {r.notes}</p>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  )
+                }
+
+                // 편집 모드 또는 세부항목 없음
                 return (
                   <React.Fragment key={r._key}>
                     <TableRow>
-                      <TableCell className="p-1">{isLocked ? <span className="text-sm px-2">{r.forwarder_name}</span> : <Input className="h-7 text-xs" value={r.forwarder_name} onChange={e => upd(r._key, 'forwarder_name', e.target.value)} />}</TableCell>
-                      <TableCell className="p-1">{isLocked ? <span className="text-sm px-2">{r.quote_date||'-'}</span> : <Input type="date" className="h-7 text-xs" value={r.quote_date} onChange={e => upd(r._key, 'quote_date', e.target.value)} />}</TableCell>
+                      <TableCell className="p-1">
+                        {isLocked
+                          ? <span className="text-sm px-2">{r.forwarder_name}</span>
+                          : <Input className="h-7 text-xs" value={r.forwarder_name} onChange={e => upd(r._key, 'forwarder_name', e.target.value)} />}
+                      </TableCell>
+                      <TableCell className="p-1">
+                        {isLocked
+                          ? <span className="text-sm px-2">{r.quote_date || '-'}</span>
+                          : <Input type="date" className="h-7 text-xs" value={r.quote_date} onChange={e => upd(r._key, 'quote_date', e.target.value)} />}
+                      </TableCell>
                       <TableCell className="p-1 align-top">
                         {hasItems ? (
                           <ul className="space-y-0.5 px-1 py-0.5">
@@ -134,9 +194,6 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
                                 <span className="font-medium">{item.item_name ?? '-'}</span>
                                 {item.currency && item.currency !== 'KRW' && item.amount_cur != null && (
                                   <span className="text-muted-foreground">{item.currency} {item.amount_cur.toLocaleString('ko-KR')}</span>
-                                )}
-                                {item.amount_krw != null && (
-                                  <span className="text-muted-foreground font-mono">{formatKrw(item.amount_krw)}</span>
                                 )}
                                 {item.is_vat_taxable && (
                                   <span className="text-blue-500 text-[10px]">VAT</span>
@@ -148,12 +205,20 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
                           <span className="text-xs px-2 text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="p-1">{isLocked ? <span className="text-sm px-2 block text-right">{q ? formatKrw(q) : '-'}</span> : <Input className="h-7 text-xs text-right w-28" type="number" value={r.quote_amount_krw} onChange={e => upd(r._key, 'quote_amount_krw', e.target.value)} />}</TableCell>
-                      <TableCell className="p-1">{isLocked ? <span className="text-sm px-2 block text-right">{a ? formatKrw(a) : '-'}</span> : <Input className="h-7 text-xs text-right w-28" type="number" value={r.actual_amount_krw} onChange={e => upd(r._key, 'actual_amount_krw', e.target.value)} />}</TableCell>
-                      <TableCell className={`text-right text-sm font-medium pr-2 ${diff == null ? '' : diff > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {diff == null ? '-' : `${diff > 0 ? '+' : ''}${formatKrw(diff)}${diff > 0 ? ' (초과)' : ' (절감)'}`}
+                      <TableCell className="p-1">
+                        {isLocked
+                          ? <span className="text-sm px-2 block text-right">{q ? formatKrw(q) : '-'}</span>
+                          : <Input className="h-7 text-xs text-right w-28" type="number" value={r.quote_amount_krw} onChange={e => upd(r._key, 'quote_amount_krw', e.target.value)} />}
                       </TableCell>
-                      {!isLocked && <TableCell className="p-1"><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => { setRows(p => p.filter(x => x._key !== r._key)); setSaved(false) }} disabled={rows.length <= 1}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>}
+                      {!isLocked && (
+                        <TableCell className="p-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"
+                            onClick={() => { setRows(p => p.filter(x => x._key !== r._key)); setSaved(false) }}
+                            disabled={rows.length <= 1}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                     {(r.notes || !isLocked) && (
                       <TableRow key={`${r._key}-notes`} className="border-t-0">
@@ -173,9 +238,11 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
                 )
               })}
               {rows.length === 0 && (
-                <TableRow><TableCell colSpan={isLocked ? 6 : 7} className="text-center text-muted-foreground py-4 text-sm">
-                  견적 데이터가 없습니다.{!isLocked && ' 행 추가 버튼을 눌러 추가하세요.'}
-                </TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={colSpan} className="text-center text-muted-foreground py-4 text-sm">
+                    견적 데이터가 없습니다.{!isLocked && ' 행 추가 버튼을 눌러 추가하세요.'}
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>
