@@ -9,9 +9,7 @@ import { ReportInterimSection } from '@/components/report/ReportInterimSection'
 import { ReportForwardingSection } from '@/components/report/ReportForwardingSection'
 import { ReportClosingSection } from '@/components/report/ReportClosingSection'
 import { ReportKpiCards } from '@/components/report/ReportKpiCards'
-import { ReportScorecard } from '@/components/report/ReportScorecard'
 import { ReportTimeline } from '@/components/report/ReportTimeline'
-import { ReportCostBar } from '@/components/report/ReportCostBar'
 import { ReportFlowDiagram } from '@/components/report/ReportFlowDiagram'
 import { ReportBenchmark } from '@/components/report/ReportBenchmark'
 import { ReportRoundChart } from '@/components/report/ReportRoundChart'
@@ -122,9 +120,6 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const shippingItemsTotal = shippingItems.reduce((s, i) => s + i.amount_krw, 0)
   const nonVatCostsTotal = customsItemsTotal + shippingItemsTotal
   const allCostsTotal = nonVatCostsTotal + vatAmountKrw
-  const isSettled = (interim?.is_locked ?? false) && (closing?.is_locked ?? false)
-  const fxRiskRatio = interimImportKrw > 0 && closingCalc ? Math.abs(closingCalc.fxGainLossKrw) / interimImportKrw : 0
-  const costRatio = interimImportKrw > 0 ? allCostsTotal / interimImportKrw : 0
   const marginRatePct = t.margin_rate_pct ? Number(t.margin_rate_pct) : null
   const settledDays = t.lc_open_date && closing?.closing_date
     ? Math.round((new Date(closing.closing_date).getTime() - new Date(t.lc_open_date as string).getTime()) / (1000 * 60 * 60 * 24))
@@ -179,13 +174,6 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       bokRate != null ? `${formatExchangeRate(bokRate)} (한국은행 최초 고시 환율${closing?.closing_date ? `, ${closing.closing_date} 기준` : ''})` : '-',
       '', '',
     ],
-  ]
-
-  // 원가 구성 바 세그먼트
-  const costSegments = [
-    { label: '수입원가', amount: interimImportKrw, bgClass: 'bg-green-300', textClass: 'text-green-700' },
-    { label: '통관/운송비', amount: nonVatCostsTotal, bgClass: 'bg-orange-400', textClass: 'text-orange-700' },
-    { label: '부가세', amount: vatAmountKrw, bgClass: 'bg-yellow-400', textClass: 'text-yellow-700' },
   ]
 
   const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -247,16 +235,6 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         grandTotalKrw={interimConfirmedKrw != null && closingCalc ? closingCalc.grandTotalKrw : null}
       />
 
-      {/* 거래 종합 평가 스코어카드 */}
-      {interim && (
-        <ReportScorecard
-          fxRiskRatio={fxRiskRatio}
-          marginPct={marginRatePct}
-          isSettled={isSettled}
-          costRatio={costRatio}
-        />
-      )}
-
       {/* I. 거래 개요 */}
       <ReportSection title="I. 거래 개요">
         <div className="border border-green-200 rounded-lg overflow-hidden text-sm">
@@ -286,11 +264,6 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           importAmountUsd={importUsd || null}
           marginRatePct={marginRatePct}
         />
-      )}
-
-      {/* 원가 구성 바 */}
-      {interim && interimImportKrw > 0 && (
-        <ReportCostBar segments={costSegments} />
       )}
 
       {/* ===== 중간정산 ===== */}
