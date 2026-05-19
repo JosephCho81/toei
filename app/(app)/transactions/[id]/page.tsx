@@ -89,6 +89,11 @@ export default async function TransactionDetailPage({ params }: { params: Promis
             )}
             <Row label="마진율" value={t.margin_rate_pct ? `${t.margin_rate_pct}%` : '-'} />
             {roundingLabel && <Row label="절사 정책" value={roundingLabel} />}
+            {(() => {
+              const entries = Array.isArray(t.delivery_dates) ? t.delivery_dates as Array<{seq: number; date: string}> : []
+              if (entries.length === 0) return null
+              return <Row label="납기일" value={entries.map(d => `${d.seq}차: ${d.date}`).join(' / ')} />
+            })()}
           </CardContent>
         </Card>
 

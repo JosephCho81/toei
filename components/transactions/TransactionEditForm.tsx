@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusFields } from './StatusFields'
+import { Plus, Trash2 } from 'lucide-react'
 
 const schema = z.object({
   round_label: z.string().min(1, '필수'),
@@ -31,6 +32,7 @@ interface InitData {
   customs_exchange_rate: string | number | null; margin_rate_pct: string | number | null
   lc_status: string | null; logistics_status: string | null; document_status: string | null
   notes: string | null
+  delivery_dates?: Array<{seq: number; date: string}> | null
 }
 
 function s(v: unknown): string { return v == null ? '' : String(v) }
@@ -45,6 +47,23 @@ export default function TransactionEditForm({
   const router = useRouter()
   const supabase = createClient()
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [deliveryDates, setDeliveryDates] = useState<Array<{_key: string; date: string}>>(
+    (initialData.delivery_dates ?? []).map((d) => ({ _key: crypto.randomUUID(), date: d.date }))
+  )
+  const [deliveryDatesDirty, setDeliveryDatesDirty] = useState(false)
+
+  function addDeliveryDate() {
+    setDeliveryDates((p) => [...p, { _key: crypto.randomUUID(), date: '' }])
+    setDeliveryDatesDirty(true)
+  }
+  function removeDeliveryDate(key: string) {
+    setDeliveryDates((p) => p.filter((d) => d._key !== key))
+    setDeliveryDatesDirty(true)
+  }
+  function updateDeliveryDate(key: string, date: string) {
+    setDeliveryDates((p) => p.map((d) => d._key === key ? { ...d, date } : d))
+    setDeliveryDatesDirty(true)
+  }
 
   const defaults: FV = {
     round_label: initialData.round_label,
@@ -85,6 +104,9 @@ export default function TransactionEditForm({
       logistics_status: v.logistics_status || null,
       document_status: v.document_status || null,
       notes: v.notes || null,
+      delivery_dates: deliveryDates.length > 0
+        ? deliveryDates.map((d, i) => ({ seq: i + 1, date: d.date }))
+        : null,
     }).eq('id', transactionId)
     if (error) { setSubmitError(error.message); return }
     router.push(`/transactions/${transactionId}`)
@@ -118,12 +140,39 @@ export default function TransactionEditForm({
           <div className="col-span-2">
             <F label="메모"><Input {...register('notes')} /></F>
           </div>
+          <div className="col-span-2 space-y-1">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">납기일</Label>
+              <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addDeliveryDate}>
+                <Plus className="h-3 w-3 mr-1" />추가
+              </Button>
+            </div>
+            {deliveryDates.length === 0 && (
+              <p className="text-sm text-muted-foreground py-1">납기일이 없습니다.</p>
+            )}
+            <div className="space-y-1">
+              {deliveryDates.map((d, i) => (
+                <div key={d._key} className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground w-8 shrink-0">{i + 1}차</span>
+                  <Input
+                    value={d.date}
+                    onChange={(e) => updateDeliveryDate(d._key, e.target.value)}
+                    placeholder="3월 22일"
+                    className="h-8 text-sm"
+                  />
+                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive shrink-0" onClick={() => removeDeliveryDate(d._key)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
         </CardContent>
       </Card>
       {submitError && <p className="text-sm text-destructive">{submitError}</p>}
       <div className="flex gap-2">
         <Button type="button" variant="outline" onClick={() => router.back()}>취소</Button>
-        <Button type="submit" disabled={isSubmitting || !isDirty}>
+        <Button type="submit" disabled={isSubmitting || (!isDirty && !deliveryDatesDirty)}>
           {isSubmitting ? '저장 중...' : '저장'}
         </Button>
       </div>

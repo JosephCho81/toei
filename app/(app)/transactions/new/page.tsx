@@ -22,6 +22,11 @@ interface ContainerRow {
   eta: string
 }
 
+interface DeliveryDateRow {
+  _key: string
+  date: string
+}
+
 interface ForwardingDetailRow {
   _key: string
   item_name: string
@@ -65,6 +70,7 @@ export default function NewTransactionPage() {
   const [items, setItems] = useState<ItemRow[]>([blankItem()])
   const [containers, setContainers] = useState<ContainerRow[]>([])
   const [forwardings, setForwardings] = useState<ForwardingRow[]>([])
+  const [deliveryDates, setDeliveryDates] = useState<DeliveryDateRow[]>([])
   const [form, setForm] = useState({
     round_no: '', round_label: '', order_no: '', manufacturer_id: '',
     import_amount_usd: '', lc_no: '', lc_open_date: '', customs_date: '',
@@ -124,6 +130,9 @@ export default function NewTransactionPage() {
       customs_date: form.customs_date || null,
       customs_exchange_rate: form.customs_exchange_rate ? parseFloat(form.customs_exchange_rate) : null,
       notes: form.notes || null,
+      delivery_dates: deliveryDates.length > 0
+        ? deliveryDates.map((d, i) => ({ seq: i + 1, date: d.date }))
+        : null,
     }).select('id').single()
 
     if (err) { setSaving(false); setError(err.message); return }
@@ -227,6 +236,39 @@ export default function NewTransactionPage() {
               <Field label="메모">
                 <Input value={form.notes} onChange={(e) => set('notes', e.target.value)} />
               </Field>
+            </div>
+            <div className="col-span-2 space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">납기일</label>
+                <Button
+                  type="button" size="sm" variant="outline" className="h-7 text-xs"
+                  onClick={() => setDeliveryDates((p) => [...p, { _key: crypto.randomUUID(), date: '' }])}
+                >
+                  <Plus className="h-3 w-3 mr-1" />추가
+                </Button>
+              </div>
+              {deliveryDates.length === 0 && (
+                <p className="text-sm text-muted-foreground py-1">납기일이 없습니다.</p>
+              )}
+              <div className="space-y-1">
+                {deliveryDates.map((d, i) => (
+                  <div key={d._key} className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground w-8 shrink-0">{i + 1}차</span>
+                    <Input
+                      value={d.date}
+                      onChange={(e) => setDeliveryDates((p) => p.map((x) => x._key === d._key ? { ...x, date: e.target.value } : x))}
+                      placeholder="3월 22일"
+                      className="h-8 text-sm"
+                    />
+                    <Button
+                      type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive shrink-0"
+                      onClick={() => setDeliveryDates((p) => p.filter((x) => x._key !== d._key))}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>
