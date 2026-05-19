@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,30 +9,32 @@ import {
 } from '@/components/ui/table'
 import { Plus, Trash2 } from 'lucide-react'
 
+type QuoteItem = {
+  id: string
+  item_name: string | null
+  currency: string | null
+  exchange_rate: number | null
+  rate: number | null
+  amount_cur: number | null
+  amount_krw: number | null
+  vat_amount_krw: number | null
+  is_vat_taxable: boolean | null
+  sort_order: number | null
+}
+
 type Row = {
   _key: string
   forwarder_name: string; quote_date: string; quote_amount_krw: string
   actual_amount_krw: string; notes: string
+  items: QuoteItem[]
 }
 
 function blank(): Row {
-  return { _key: crypto.randomUUID(), forwarder_name: '오션마스터', quote_date: '', quote_amount_krw: '', actual_amount_krw: '', notes: '' }
+  return { _key: crypto.randomUUID(), forwarder_name: '오션마스터', quote_date: '', quote_amount_krw: '', actual_amount_krw: '', notes: '', items: [] }
 }
 
 function formatKrw(v: number) {
   return v.toLocaleString('ko-KR') + '원'
-}
-
-function parseItemNames(notes: string): string {
-  try {
-    const items = notes.split('|').map(e => {
-      const colon = e.indexOf(':')
-      return colon > 0 ? e.slice(0, colon).trim() : ''
-    }).filter(Boolean)
-    return items.length ? items.join(' / ') : ''
-  } catch {
-    return ''
-  }
 }
 
 export function ForwardingQuoteSection({ transactionId, isLocked }: { transactionId: string; isLocked: boolean }) {
@@ -44,7 +46,7 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
 
   useEffect(() => {
     supabase.from('forwarding_quotes')
-      .select('forwarder_name,quote_date,quote_amount_krw,actual_amount_krw,notes,sort_order')
+      .select('id,forwarder_name,quote_date,quote_amount_krw,actual_amount_krw,notes,sort_order,forwarding_quote_items(id,item_name,currency,exchange_rate,rate,amount_cur,amount_krw,vat_amount_krw,is_vat_taxable,sort_order)')
       .eq('transaction_id', transactionId).order('sort_order')
       .then(({ data }) => {
         setRows(data?.length ? data.map(d => ({
@@ -53,6 +55,9 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
           quote_amount_krw: d.quote_amount_krw?.toString() ?? '',
           actual_amount_krw: d.actual_amount_krw?.toString() ?? '',
           notes: d.notes ?? '',
+          items: ((d.forwarding_quote_items as QuoteItem[]) ?? [])
+            .slice()
+            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
         })) : [])
         setLoaded(true)
       })
@@ -114,31 +119,57 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
                 const q = parseInt(r.quote_amount_krw) || 0
                 const a = parseInt(r.actual_amount_krw) || 0
                 const diff = a && q ? a - q : null
-                const itemNames = r.notes ? parseItemNames(r.notes) : ''
+                const hasItems = r.items.length > 0
+                const colSpan = isLocked ? 6 : 7
                 return (
-                  <TableRow key={r._key}>
-                    <TableCell className="p-1">{isLocked ? <span className="text-sm px-2">{r.forwarder_name}</span> : <Input className="h-7 text-xs" value={r.forwarder_name} onChange={e => upd(r._key, 'forwarder_name', e.target.value)} />}</TableCell>
-                    <TableCell className="p-1">{isLocked ? <span className="text-sm px-2">{r.quote_date||'-'}</span> : <Input type="date" className="h-7 text-xs" value={r.quote_date} onChange={e => upd(r._key, 'quote_date', e.target.value)} />}</TableCell>
-                    <TableCell className="p-1">
-                      {isLocked
-                        ? <span className="text-xs px-2 text-muted-foreground">{itemNames || '-'}</span>
-                        : <Input className="h-7 text-xs" value={r.notes} placeholder="해상운임:견적/실청구|THC:..." onChange={e => upd(r._key, 'notes', e.target.value)} />
-                      }
-                      {isLocked && itemNames && (
-                        <div className="px-2 flex flex-wrap gap-1 mt-0.5">
-                          {itemNames.split(' / ').map((n, i) => (
-                            <span key={i} className="text-xs bg-muted rounded px-1 py-0.5">{n}</span>
-                          ))}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="p-1">{isLocked ? <span className="text-sm px-2 block text-right">{q ? formatKrw(q) : '-'}</span> : <Input className="h-7 text-xs text-right w-28" type="number" value={r.quote_amount_krw} onChange={e => upd(r._key, 'quote_amount_krw', e.target.value)} />}</TableCell>
-                    <TableCell className="p-1">{isLocked ? <span className="text-sm px-2 block text-right">{a ? formatKrw(a) : '-'}</span> : <Input className="h-7 text-xs text-right w-28" type="number" value={r.actual_amount_krw} onChange={e => upd(r._key, 'actual_amount_krw', e.target.value)} />}</TableCell>
-                    <TableCell className={`text-right text-sm font-medium pr-2 ${diff == null ? '' : diff > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                      {diff == null ? '-' : `${diff > 0 ? '+' : ''}${formatKrw(diff)}${diff > 0 ? ' (초과)' : ' (절감)'}`}
-                    </TableCell>
-                    {!isLocked && <TableCell className="p-1"><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => { setRows(p => p.filter(x => x._key !== r._key)); setSaved(false) }} disabled={rows.length <= 1}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>}
-                  </TableRow>
+                  <React.Fragment key={r._key}>
+                    <TableRow>
+                      <TableCell className="p-1">{isLocked ? <span className="text-sm px-2">{r.forwarder_name}</span> : <Input className="h-7 text-xs" value={r.forwarder_name} onChange={e => upd(r._key, 'forwarder_name', e.target.value)} />}</TableCell>
+                      <TableCell className="p-1">{isLocked ? <span className="text-sm px-2">{r.quote_date||'-'}</span> : <Input type="date" className="h-7 text-xs" value={r.quote_date} onChange={e => upd(r._key, 'quote_date', e.target.value)} />}</TableCell>
+                      <TableCell className="p-1 align-top">
+                        {hasItems ? (
+                          <ul className="space-y-0.5 px-1 py-0.5">
+                            {r.items.map((item) => (
+                              <li key={item.id} className="text-xs flex items-baseline gap-1.5">
+                                <span className="font-medium">{item.item_name ?? '-'}</span>
+                                {item.currency && item.currency !== 'KRW' && item.amount_cur != null && (
+                                  <span className="text-muted-foreground">{item.currency} {item.amount_cur.toLocaleString('ko-KR')}</span>
+                                )}
+                                {item.amount_krw != null && (
+                                  <span className="text-muted-foreground font-mono">{formatKrw(item.amount_krw)}</span>
+                                )}
+                                {item.is_vat_taxable && (
+                                  <span className="text-blue-500 text-[10px]">VAT</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-xs px-2 text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="p-1">{isLocked ? <span className="text-sm px-2 block text-right">{q ? formatKrw(q) : '-'}</span> : <Input className="h-7 text-xs text-right w-28" type="number" value={r.quote_amount_krw} onChange={e => upd(r._key, 'quote_amount_krw', e.target.value)} />}</TableCell>
+                      <TableCell className="p-1">{isLocked ? <span className="text-sm px-2 block text-right">{a ? formatKrw(a) : '-'}</span> : <Input className="h-7 text-xs text-right w-28" type="number" value={r.actual_amount_krw} onChange={e => upd(r._key, 'actual_amount_krw', e.target.value)} />}</TableCell>
+                      <TableCell className={`text-right text-sm font-medium pr-2 ${diff == null ? '' : diff > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {diff == null ? '-' : `${diff > 0 ? '+' : ''}${formatKrw(diff)}${diff > 0 ? ' (초과)' : ' (절감)'}`}
+                      </TableCell>
+                      {!isLocked && <TableCell className="p-1"><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => { setRows(p => p.filter(x => x._key !== r._key)); setSaved(false) }} disabled={rows.length <= 1}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>}
+                    </TableRow>
+                    {(r.notes || !isLocked) && (
+                      <TableRow key={`${r._key}-notes`} className="border-t-0">
+                        <TableCell colSpan={colSpan} className="px-3 pb-2 pt-0">
+                          {isLocked ? (
+                            r.notes && <p className="text-xs text-muted-foreground">메모: {r.notes}</p>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground shrink-0">메모</span>
+                              <Input className="h-6 text-xs" value={r.notes} placeholder="메모 입력" onChange={e => upd(r._key, 'notes', e.target.value)} />
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
                 )
               })}
               {rows.length === 0 && (
