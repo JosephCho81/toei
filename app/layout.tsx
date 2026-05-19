@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
+import { Toaster } from 'sonner'
 import './globals.css'
 
 const geistSans = Geist({
@@ -24,7 +25,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={`${geistSans.variable} ${geistMono.variable} h-full print:h-auto antialiased`}>
-      <body className="min-h-full print:min-h-0 flex flex-col bg-background text-foreground">{children}</body>
+      <body className="min-h-full print:min-h-0 flex flex-col bg-background text-foreground">
+        {children}
+        <Toaster richColors />
+      </body>
     </html>
   )
 }

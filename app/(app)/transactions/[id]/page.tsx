@@ -123,7 +123,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
 
       <ForwardingQuoteSection transactionId={id} isLocked={t.is_locked} />
 
-      {t.notes && <TransactionNotesCard transactionId={id} initialNotes={t.notes} />}
+      <TransactionNotesCard transactionId={id} initialNotes={t.notes ?? null} />
     </div>
   )
 }

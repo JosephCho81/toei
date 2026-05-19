@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ContainerForm } from '@/components/containers/ContainerForm'
+import { MemoField } from '@/components/ui/MemoField'
 import { formatDate } from '@/lib/utils/format'
-import { Plus, Pencil, Trash2, X } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 
 interface Container {
   id: string; container_no: string; bl_no: string | null; lc_number: string | null
@@ -34,13 +35,6 @@ export function ContainerList({ transactionId, isLocked }: { transactionId: stri
   async function handleDelete(id: string) {
     await supabase.from('containers').delete().eq('id', id)
     setDeleteId(null); load()
-  }
-
-  async function deleteNoteLine(containerId: string, lineIdx: number, currentNotes: string) {
-    const newLines = currentNotes.split('\n').filter((_, i) => i !== lineIdx).filter(l => l.trim() !== '')
-    const newNotes = newLines.join('\n') || null
-    await supabase.from('containers').update({ manual_notes: newNotes }).eq('id', containerId)
-    setContainers(prev => prev.map(c => c.id === containerId ? { ...c, manual_notes: newNotes } : c))
   }
 
   return (
@@ -92,25 +86,17 @@ export function ContainerList({ transactionId, isLocked }: { transactionId: stri
               <span><span className="font-medium text-foreground/70">선박:</span> {c.vessel_name ?? '-'}</span>
               <span><span className="font-medium text-foreground/70">카톤:</span> {c.carton_count != null ? c.carton_count.toLocaleString() : '-'}</span>
             </div>
-            {c.manual_notes && (
-              <div className="mt-2 text-xs text-muted-foreground border-t pt-1 space-y-0.5">
-                {c.manual_notes.split('\n').map((line, i) => (
-                  <div key={i} className="flex items-center gap-1">
-                    <span className="flex-1">{line}</span>
-                    {/^\d/.test(line.trim()) && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-4 w-4 text-muted-foreground hover:text-destructive shrink-0"
-                        onClick={() => deleteNoteLine(c.id, i, c.manual_notes!)}
-                      >
-                        <X className="h-2.5 w-2.5" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="mt-2 border-t pt-2">
+              <MemoField
+                notes={c.manual_notes}
+                disabled={isLocked}
+                onSave={async (newNotes) => {
+                  const { error } = await supabase.from('containers').update({ manual_notes: newNotes }).eq('id', c.id)
+                  if (error) throw error
+                  setContainers(prev => prev.map(cnt => cnt.id === c.id ? { ...cnt, manual_notes: newNotes } : cnt))
+                }}
+              />
+            </div>
           </div>
         ))}
         <ContainerForm

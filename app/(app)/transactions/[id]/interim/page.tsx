@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ShippingCostItems, type CostRow, DEFAULT_SHIPPING } from '@/components/settlements/ShippingCostItems'
 import { CustomsCostItems, DEFAULT_CUSTOMS } from '@/components/settlements/CustomsCostItems'
 import { InterimResultsCard } from '@/components/settlements/InterimResultsCard'
+import { MemoField } from '@/components/ui/MemoField'
 
 function toRow(item: Record<string, unknown>): CostRow {
   return {
@@ -39,6 +40,7 @@ export default function InterimSettlementPage() {
   const [prefilled, setPrefilled] = useState(false)
   const [confirmed, setConfirmed] = useState('')
   const [saving, setSaving] = useState(false)
+  const [notes, setNotes] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -53,6 +55,7 @@ export default function InterimSettlementPage() {
         setCustomsRate(String(interim.customs_exchange_rate))
         setRoundingPolicy(interim.rounding_policy as RoundingPolicy)
         setConfirmed(String(interim.confirmed_amount_krw ?? ''))
+        setNotes((interim as Record<string, unknown>).notes as string | null ?? null)
 
         const { data: items } = await supabase.from('interim_cost_items').select('*').eq('interim_settlement_id', interim.id).order('sort_order')
         if (items?.length) {
@@ -167,6 +170,22 @@ export default function InterimSettlementPage() {
         onConfirmedChange={setConfirmed} isLocked={isLocked}
         shippingSubtotal={shippingSubtotal} customsSubtotal={customsSubtotal}
       />
+      {sid && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">메모</CardTitle></CardHeader>
+          <CardContent>
+            <MemoField
+              notes={notes}
+              disabled={isLocked}
+              onSave={async (newNotes) => {
+                const { error } = await supabase.from('interim_settlements').update({ notes: newNotes }).eq('id', sid)
+                if (error) throw error
+                setNotes(newNotes)
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
       {!isLocked && (
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => handleSave(false)} disabled={saving}>저장</Button>

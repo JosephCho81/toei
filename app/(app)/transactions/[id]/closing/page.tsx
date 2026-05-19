@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Trash2, Plus } from 'lucide-react'
+import { MemoField } from '@/components/ui/MemoField'
 
 interface FeeRow {
   id?: string
@@ -72,6 +73,7 @@ export default function ClosingSettlementPage() {
   const [forwardingQuotes, setForwardingQuotes] = useState<{ forwarder_name: string; quote_amount_krw: number | null; actual_amount_krw: number | null }[]>([])
   const [confirmedAmount, setConfirmedAmount] = useState('')
   const [saving, setSaving] = useState(false)
+  const [notes, setNotes] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -113,6 +115,7 @@ export default function ClosingSettlementPage() {
         setFxBurdenA1Pct(closing.fx_burden_a1_pct ?? 50)
         setRoundingPolicy(closing.rounding_policy as RoundingPolicy)
         setConfirmedAmount(String(closing.confirmed_amount_krw ?? ''))
+        setNotes((closing as Record<string, unknown>).notes as string | null ?? null)
 
         const { data: fees } = await supabase
           .from('lc_fee_items')
@@ -544,6 +547,22 @@ export default function ClosingSettlementPage() {
         </CardContent>
       </Card>
 
+      {settlementId && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">메모</CardTitle></CardHeader>
+          <CardContent>
+            <MemoField
+              notes={notes}
+              disabled={isLocked}
+              onSave={async (newNotes) => {
+                const { error } = await supabase.from('closing_settlements').update({ notes: newNotes }).eq('id', settlementId)
+                if (error) throw error
+                setNotes(newNotes)
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
       {!isLocked && (
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => handleSave(false)} disabled={saving}>저장</Button>
