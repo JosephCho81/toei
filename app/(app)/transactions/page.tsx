@@ -16,7 +16,8 @@ export default async function TransactionsPage() {
       margin_rate_pct, settlement_status, is_locked,
       manufacturers(name),
       transaction_items(spec, size, glove_type, unit_price_usd, quantity, unit, color, sort_order),
-      containers(etd, eta, eta_source)
+      containers(etd, eta, eta_source),
+      delivery_dates
     `)
     .order('round_no', { ascending: false })
 

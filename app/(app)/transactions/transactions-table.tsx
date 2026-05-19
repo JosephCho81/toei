@@ -19,6 +19,7 @@ export type TxRow = {
   manufacturers: { name: string } | { name: string }[] | null
   transaction_items: Item[] | null
   containers: { etd: string | null; eta: string | null }[] | null
+  delivery_dates: Array<{ seq: number; date: string }> | null
 }
 
 function getMfr(raw: TxRow['manufacturers']): string {
@@ -49,6 +50,11 @@ function getEta(containers: { eta: string | null }[]): string | null {
   return dates.sort().at(-1) ?? null
 }
 
+function formatDeliveryDates(dates: Array<{ seq: number; date: string }> | null): string {
+  if (!dates || dates.length === 0) return '-'
+  return dates.map((d) => `${d.seq}차: ${d.date}`).join(' / ')
+}
+
 export function TransactionTable({ rows }: { rows: TxRow[] }) {
   const router = useRouter()
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -65,13 +71,14 @@ export function TransactionTable({ rows }: { rows: TxRow[] }) {
             <TableHead>LC 개설일</TableHead>
             <TableHead>ETD</TableHead>
             <TableHead>ETA</TableHead>
+            <TableHead>납기일</TableHead>
             <TableHead>상태</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {!rows.length && (
             <TableRow>
-              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                 등록된 거래가 없습니다.
               </TableCell>
             </TableRow>
@@ -111,13 +118,14 @@ export function TransactionTable({ rows }: { rows: TxRow[] }) {
                   <TableCell className="text-sm whitespace-nowrap">{formatDate(t.lc_open_date)}</TableCell>
                   <TableCell className="text-sm whitespace-nowrap">{formatDate(etd)}</TableCell>
                   <TableCell className="text-sm whitespace-nowrap">{formatDate(eta)}</TableCell>
+                  <TableCell className="text-sm whitespace-nowrap">{formatDeliveryDates(t.delivery_dates)}</TableCell>
                   <TableCell>
                     <Badge variant={done ? 'default' : 'secondary'}>{done ? '완료' : '진행중'}</Badge>
                   </TableCell>
                 </TableRow>
                 {isExpanded && (
                   <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableCell colSpan={8} className="pt-0 pb-3 px-6">
+                    <TableCell colSpan={9} className="pt-0 pb-3 px-6">
                       {items.length === 0
                         ? <p className="text-xs text-muted-foreground py-2">품목 데이터가 없습니다.</p>
                         : (
