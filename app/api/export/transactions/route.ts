@@ -6,7 +6,7 @@ export async function GET() {
 
   const [{ data: txs }, { data: interims }, { data: closings }] = await Promise.all([
     supabase
-      .from('transactions')
+      .from('v_transaction_status')
       .select('round_no,round_label,order_no,import_amount_usd,margin_rate_pct,settlement_status,lc_open_date,customs_date,manufacturers(name)')
       .order('round_no'),
     supabase

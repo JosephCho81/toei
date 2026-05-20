@@ -219,9 +219,6 @@ export default function ClosingSettlementPage() {
       )
     }
 
-    await supabase.from('transactions')
-      .update({ settlement_status: lock ? 'closing_done' : 'closing_saved' })
-      .eq('id', id)
     setSaving(false)
     if (lock) {
       setIsLocked(true)

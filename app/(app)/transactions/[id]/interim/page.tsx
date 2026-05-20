@@ -129,9 +129,6 @@ export default function InterimSettlementPage() {
         ...customsRows.map((r, i) => mkRow(r, shippingRows.length + i, 'customs')),
       ])
     }
-    await supabase.from('transactions')
-      .update({ settlement_status: lock ? 'interim_done' : 'interim_saved' })
-      .eq('id', id)
     setSaving(false)
     if (lock) { setIsLocked(true); router.push(`/transactions/${id}`) }
   }

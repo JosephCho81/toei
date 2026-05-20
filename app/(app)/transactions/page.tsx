@@ -9,7 +9,7 @@ export default async function TransactionsPage() {
   const supabase = await createClient()
 
   const { data } = await supabase
-    .from('transactions')
+    .from('v_transaction_status')
     .select(`
       id, round_no, round_label, order_no, lc_open_date, lc_expiry_date,
       a1_payment_date, import_amount_usd_actual, import_amount_usd_theoretical,

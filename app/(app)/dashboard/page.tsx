@@ -36,17 +36,17 @@ export default async function DashboardPage({
   const yearTo = `${year}-12-31`
 
   const buildAllTxQ = () =>
-    supabase.from('transactions').select('import_amount_usd, settlement_status')
+    supabase.from('v_transaction_status').select('import_amount_usd, settlement_status')
       .gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
 
   const buildInterimPendingQ = () =>
     supabase.from('transactions')
       .select('id, round_label, import_amount_usd, interim_settlements(id, confirmed_amount_krw, is_locked)')
-      .not('settlement_status', 'eq', 'closing_done')
+      .eq('is_locked', false)
       .gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
 
   const buildClosingPendingQ = () =>
-    supabase.from('transactions')
+    supabase.from('v_transaction_status')
       .select('id, round_label, import_amount_usd')
       .in('settlement_status', ['interim_done', 'closing_saved'])
       .gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
@@ -65,7 +65,7 @@ export default async function DashboardPage({
     { data: verificationIssues },
   ] = await Promise.all([
     buildAllTxQ(),
-    supabase.from('transactions')
+    supabase.from('v_transaction_status')
       .select('id, round_label, a1_payment_date, settlement_status')
       .not('a1_payment_date', 'is', null)
       .neq('settlement_status', 'closing_done')
@@ -78,7 +78,7 @@ export default async function DashboardPage({
       .gte('eta', containerCutoffStr)
       .order('eta', { ascending: true, nullsFirst: false })
       .limit(10),
-    supabase.from('transactions')
+    supabase.from('v_transaction_status')
       .select('id, round_label, round_no, import_amount_usd, settlement_status, manufacturers(name), containers(etd, eta)')
       .order('round_no', { ascending: false })
       .limit(5),

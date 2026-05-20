@@ -30,7 +30,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
     { data: interim },
     { data: closing },
   ] = await Promise.all([
-    supabase.from('transactions').select('*, manufacturers(name)').eq('id', id).single(),
+    supabase.from('v_transaction_status').select('*, manufacturers(name)').eq('id', id).single(),
     supabase.from('interim_settlements').select('id, confirmed_amount_krw, customs_exchange_rate, rounding_policy, is_locked, is_paid, updated_at').eq('transaction_id', id).maybeSingle(),
     supabase.from('closing_settlements').select('id, confirmed_amount_krw, bok_exchange_rate, is_locked, is_paid, closing_date').eq('transaction_id', id).maybeSingle(),
   ])
