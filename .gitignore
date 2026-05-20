@@ -47,3 +47,5 @@ next-env.d.ts
 
 # migration temp files
 scripts/_insert_only.sql
+
+_source_docs/
