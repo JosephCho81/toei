@@ -275,11 +275,19 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
     ? '한국에이원 → 토에이산교 지급'
     : '토에이산교 → 한국에이원 지급'
 
+  const marginSuffix = data.marginRatePct
+    ? ` × ${(1 + data.marginRatePct / 100).toFixed(2)}(마진율 1+${data.marginRatePct}%)`
+    : ''
+  const importFormula = `$${data.importAmountUsd.toLocaleString('en-US')} × ${data.customsExchangeRate.toLocaleString('ko-KR')}원${marginSuffix}`
+
   const allCostRows = [
-    { itemName: '수입금액 (원화환산)', formula: `$${data.importAmountUsd.toLocaleString('en-US')} × ${data.customsExchangeRate.toLocaleString('ko-KR')}원`, amountKrw: data.importAmountKrw, indent: false },
+    { itemName: '수입금액 (원화환산)', formula: importFormula, amountKrw: data.importAmountKrw, indent: false },
     ...shippingItems.map((c) => ({ itemName: c.itemName, formula: '', amountKrw: c.amountKrw, indent: true })),
     ...customsItems.map((c) => ({ itemName: c.itemName, formula: '', amountKrw: c.amountKrw, indent: true })),
   ]
+
+  const systemSubTotal = data.importAmountKrw + itemsTotal
+  const confirmedDiff = data.confirmedAmountKrw - systemSubTotal
 
   return (
     <Document>
@@ -362,6 +370,24 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
         )}
 
         <Text style={s.sectionLabel}>섹션 4 — 중간정산 확정금액</Text>
+        {/* 시스템 계산 vs 확정 비교 */}
+        <View style={{ borderWidth: 1, borderColor: BORDER, marginBottom: 8 }}>
+          <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center', backgroundColor: GRAY_BG }}>
+            <Text style={{ flex: 1, paddingLeft: 10, fontSize: 8.5, color: MUTED }}>소계 (시스템 계산)</Text>
+            <Text style={{ width: '40%', textAlign: 'right', paddingRight: 10, fontSize: 8.5 }}>{systemSubTotal.toLocaleString('ko-KR')}원</Text>
+          </View>
+          <View style={{ flexDirection: 'row', minHeight: 22, alignItems: 'center', backgroundColor: '#E8F5E9' }}>
+            <View style={{ flex: 1, paddingLeft: 10, paddingTop: 3, paddingBottom: 3 }}>
+              <Text style={{ fontSize: 8.5, color: GREEN, fontWeight: 700 }}>확정금액 (수기입력 엑셀 기준)</Text>
+              {Math.abs(confirmedDiff) > 0 && (
+                <Text style={{ fontSize: 7.5, color: '#ea580c', marginTop: 1 }}>
+                  ※ 시스템 대비 {confirmedDiff > 0 ? '+' : ''}{confirmedDiff.toLocaleString('ko-KR')}원 차이
+                </Text>
+              )}
+            </View>
+            <Text style={{ width: '40%', textAlign: 'right', paddingRight: 10, fontSize: 9, color: GREEN, fontWeight: 700 }}>{krw(data.confirmedAmountKrw)}</Text>
+          </View>
+        </View>
         <View style={s.summaryBox}>
           <View>
             <Text style={s.summaryLabel}>중간정산 확정금액</Text>

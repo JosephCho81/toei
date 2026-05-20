@@ -502,17 +502,29 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
 
         <Text style={s.sectionLabel}>섹션 3 — LC 결제 내역</Text>
         <View style={s.table}>
-          <Row
-            label={`원금×통관환율 (${data.customsExchangeRate.toLocaleString('ko-KR')}원/$)`}
-            value={krw(data.importAmountKrw)}
-          />
+          <View style={s.rowOdd}>
+            <View style={s.cellLabel}>
+              <Text>{`원금×통관환율 (${data.customsExchangeRate.toLocaleString('ko-KR')}원/$)`}</Text>
+            </View>
+            <View style={s.cellValue}>
+              <Text>{krw(data.importAmountKrw)}</Text>
+              {data.importAmountUsd ? (
+                <Text style={{ fontSize: 7, color: MUTED, marginTop: 1 }}>
+                  {`$${data.importAmountUsd.toLocaleString('en-US')}(수입금액USD) × ${data.customsExchangeRate.toLocaleString('ko-KR')}원 = ${data.importAmountKrw.toLocaleString('ko-KR')}원`}
+                </Text>
+              ) : null}
+            </View>
+          </View>
           <Row label="LC 결제비용" value={krw(data.lcPaymentTotalKrw)} even />
-          <Row
-            label={fxLabel}
-            value={krwSigned(data.fxGainLossKrw)}
-            isLast
-            valueStyle={fxIsGain ? s.fxGainText : s.fxLossText}
-          />
+          <View style={s.lastRowOdd}>
+            <View style={s.cellLabel}><Text style={fxIsGain ? s.fxGainText : s.fxLossText}>{fxLabel}</Text></View>
+            <View style={s.cellValue}>
+              <Text style={fxIsGain ? s.fxGainText : s.fxLossText}>{krwSigned(data.fxGainLossKrw)}</Text>
+              <Text style={{ fontSize: 7, color: MUTED, marginTop: 1 }}>
+                {`LC결제 ${data.lcPaymentTotalKrw.toLocaleString('ko-KR')}원 - 원금×통관환율 ${data.importAmountKrw.toLocaleString('ko-KR')}원 = ${krwSigned(data.fxGainLossKrw)}`}
+              </Text>
+            </View>
+          </View>
         </View>
 
         <Text style={s.sectionLabel}>LC 수수료 내역</Text>
@@ -540,14 +552,38 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
 
         <Text style={s.sectionLabel}>섹션 4 — 추가비용 및 분담</Text>
         <View style={s.table}>
-          <Row label="추가비용 합계 (VAT 별도)" value={krwSigned(data.additionalCostKrw)} />
+          <View style={s.rowOdd}>
+            <View style={s.cellLabel}><Text>추가비용 합계 (VAT 별도)</Text></View>
+            <View style={s.cellValue}>
+              <Text>{krwSigned(data.additionalCostKrw)}</Text>
+              <Text style={{ fontSize: 7, color: MUTED, marginTop: 1 }}>
+                {`환차${fxIsGain ? '익' : '손'} ${krwSigned(data.fxGainLossKrw)} + LC제비용 ${krwSigned(data.lcFeeTotalKrw)} = ${krwSigned(data.additionalCostKrw)}`}
+              </Text>
+            </View>
+          </View>
           <Row
             label={`에이원 부담 비율`}
             value={`${data.fxBurdenA1Pct}% (토에이 ${100 - data.fxBurdenA1Pct}%)`}
             even
           />
-          <Row label="에이원 부담분 (VAT 별도)" value={krwSigned(data.a1BurdenKrw)} />
-          <Row label="에이원 부담분 + VAT (VAT 포함)" value={krwSigned(data.a1BurdenWithVatKrw)} even isLast />
+          <View style={s.rowOdd}>
+            <View style={s.cellLabel}><Text>에이원 부담분 (VAT 별도)</Text></View>
+            <View style={s.cellValue}>
+              <Text>{krwSigned(data.a1BurdenKrw)}</Text>
+              <Text style={{ fontSize: 7, color: MUTED, marginTop: 1 }}>
+                {`추가비용 ${krwSigned(data.additionalCostKrw)} × ${data.fxBurdenA1Pct}%(에이원분담) = ${krwSigned(data.a1BurdenKrw)}`}
+              </Text>
+            </View>
+          </View>
+          <View style={s.lastRowEven}>
+            <View style={s.cellLabel}><Text>에이원 부담분 + VAT (VAT 포함)</Text></View>
+            <View style={s.cellValue}>
+              <Text>{krwSigned(data.a1BurdenWithVatKrw)}</Text>
+              <Text style={{ fontSize: 7, color: MUTED, marginTop: 1 }}>
+                {`VAT별도 ${krwSigned(data.a1BurdenKrw)} × 1.1(VAT 10%) = ${krwSigned(data.a1BurdenWithVatKrw)}`}
+              </Text>
+            </View>
+          </View>
         </View>
 
         <Text style={s.sectionLabel}>섹션 5 — 기타 미정산 비용 (A+B+C)</Text>
@@ -626,6 +662,29 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
         )}
 
         <Text style={s.sectionLabel}>섹션 6 — 종합 정산</Text>
+        {/* 최종정산 계산 breakdown */}
+        <View style={{ borderWidth: 1, borderColor: BORDER, marginBottom: 8 }}>
+          <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center', backgroundColor: GRAY_BG }}>
+            <Text style={{ flex: 1, paddingLeft: 10, fontSize: 8.5, color: MUTED }}>에이원 부담 (VAT 포함)</Text>
+            <Text style={{ width: '40%', textAlign: 'right', paddingRight: 10, fontSize: 8.5 }}>{krwSigned(data.a1BurdenWithVatKrw)}</Text>
+          </View>
+          {data.closingCostItems.map((item, i) => (
+            <View key={i} style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 20, alignItems: 'center' }}>
+              <Text style={{ flex: 1, paddingLeft: 20, fontSize: 8, color: MUTED }}>+ {item.itemName}</Text>
+              <Text style={{ width: '40%', textAlign: 'right', paddingRight: 10, fontSize: 8, color: MUTED }}>{krwSigned(item.amountKrw)}</Text>
+            </View>
+          ))}
+          {data.closingCostItems.length > 0 && (
+            <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 20, alignItems: 'center' }}>
+              <Text style={{ flex: 1, paddingLeft: 10, fontSize: 8, color: MUTED }}>기타 미정산 합계</Text>
+              <Text style={{ width: '40%', textAlign: 'right', paddingRight: 10, fontSize: 8, color: MUTED }}>{krwSigned(data.closingCostsTotalKrw)}</Text>
+            </View>
+          )}
+          <View style={{ flexDirection: 'row', minHeight: 24, alignItems: 'center', backgroundColor: '#E8F5E9' }}>
+            <Text style={{ flex: 1, paddingLeft: 10, fontSize: 9, color: GREEN, fontWeight: 700 }}>= 최종 정산금액</Text>
+            <Text style={{ width: '40%', textAlign: 'right', paddingRight: 10, fontSize: 9, color: GREEN, fontWeight: 700 }}>{krwSigned(data.confirmedAmountKrw)}</Text>
+          </View>
+        </View>
         <View style={s.table}>
           <Row label="정산 방향" value={data.directionLabel} />
           <Row label="최종 정산액" value={krwSigned(data.confirmedAmountKrw)} even />

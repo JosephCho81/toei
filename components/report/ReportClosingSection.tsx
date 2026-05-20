@@ -11,6 +11,7 @@ export interface ClosingData {
   bok_exchange_rate: number | null
   lc_payment_total_krw: number | null
   customs_exchange_rate: number | null
+  importAmountUsd?: number | null
   importAmountKrw: number
   fxGainLossKrw: number
   lcFeeItems: FeeItem[]
@@ -38,13 +39,16 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function AmountRow({ label, value, color, bold }: {
-  label: string; value: string; color?: string; bold?: boolean
+function AmountRow({ label, value, color, bold, formula }: {
+  label: string; value: string; color?: string; bold?: boolean; formula?: string
 }) {
   return (
-    <div className="flex justify-between text-sm py-0.5">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={`font-mono ${bold ? 'font-semibold' : 'font-medium'} ${color ?? ''}`}>{value}</span>
+    <div className="py-0.5">
+      <div className="flex justify-between text-sm">
+        <span className="text-muted-foreground">{label}</span>
+        <span className={`font-mono ${bold ? 'font-semibold' : 'font-medium'} ${color ?? ''}`}>{value}</span>
+      </div>
+      {formula && <p className="text-xs text-gray-400 mt-0.5 font-mono">{formula}</p>}
     </div>
   )
 }
@@ -84,6 +88,9 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
   const fxIsGain = data.fxGainLossKrw >= 0
   const confirmed = data.confirmed_amount_krw
   const hasGrandTotal = data.interimConfirmedKrw != null && data.grandTotalKrw != null
+  const additionalCost = data.fxGainLossKrw + data.lcFeeTotalKrw
+  const systemClosingConfirmed = data.a1BurdenWithVatKrw + data.closingCostsTotalKrw
+  const closingDiff = confirmed != null ? confirmed - systemClosingConfirmed : 0
 
   const closingDirection = confirmed != null && confirmed !== 0
     ? confirmed > 0 ? '한국에이원 → 토에이산교 지급' : '토에이산교 → 한국에이원 지급'
@@ -127,15 +134,24 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
           <AmountRow
             label={`원금 × 통관환율 (${data.customs_exchange_rate?.toLocaleString('ko-KR')}원/$)`}
             value={formatKrw(data.importAmountKrw)}
+            formula={
+              data.importAmountUsd && data.customs_exchange_rate
+                ? `$${data.importAmountUsd.toLocaleString('en-US')}(수입금액USD) × ${data.customs_exchange_rate.toLocaleString('ko-KR')}원(통관환율) = ${data.importAmountKrw.toLocaleString('ko-KR')}원`
+                : undefined
+            }
           />
-          <div
-            className="flex justify-between text-sm py-0.5 cursor-help"
-            title={`LC결제비용(${data.lc_payment_total_krw?.toLocaleString('ko-KR')}원) - 원금×통관환율(${data.importAmountKrw.toLocaleString('ko-KR')}원) = ${data.fxGainLossKrw >= 0 ? '+' : ''}${data.fxGainLossKrw.toLocaleString('ko-KR')}원`}
-          >
-            <span className="text-muted-foreground">{`환율차액 (환차${fxIsGain ? '익' : '손'})`}</span>
-            <span className={`font-mono font-semibold ${fxIsGain ? 'text-blue-600' : 'text-red-600'}`}>
-              {signed(data.fxGainLossKrw)}
-            </span>
+          <div className="py-0.5">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">{`환율차액 (환차${fxIsGain ? '익' : '손'})`}</span>
+              <span className={`font-mono font-semibold ${fxIsGain ? 'text-blue-600' : 'text-red-600'}`}>
+                {signed(data.fxGainLossKrw)}
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5 font-mono">
+              {data.lc_payment_total_krw != null
+                ? `LC결제비용 ${data.lc_payment_total_krw.toLocaleString('ko-KR')}원 - 원금×통관환율 ${data.importAmountKrw.toLocaleString('ko-KR')}원 = ${signed(data.fxGainLossKrw)}`
+                : `LC결제비용 - 원금×통관환율 = ${signed(data.fxGainLossKrw)}`}
+            </p>
           </div>
         </div>
         {data.lcFeeItems.length > 0 && (
@@ -149,26 +165,38 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
           </div>
         )}
         <div className="border border-border rounded-lg overflow-hidden">
-          <div className="flex text-sm py-1.5 px-3 border-b bg-muted/20">
-            <span className="w-56 text-muted-foreground shrink-0">추가비용 합계 (VAT 별도)</span>
-            <span className={`font-mono font-medium ${(data.fxGainLossKrw + data.lcFeeTotalKrw) < 0 ? 'text-red-600' : ''}`}>
-              {signed(data.fxGainLossKrw + data.lcFeeTotalKrw)}
-            </span>
+          <div className="px-3 py-1.5 border-b bg-muted/20">
+            <div className="flex text-sm">
+              <span className="w-56 text-muted-foreground shrink-0">추가비용 합계 (VAT 별도)</span>
+              <span className={`font-mono font-medium ${additionalCost < 0 ? 'text-red-600' : ''}`}>
+                {signed(additionalCost)}
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5 font-mono">
+              환차{fxIsGain ? '익' : '손'} {signed(data.fxGainLossKrw)} + LC제비용 {signed(data.lcFeeTotalKrw)} = {signed(additionalCost)}
+            </p>
           </div>
           <div className="flex text-sm py-1.5 px-3 border-b">
             <span className="w-56 text-muted-foreground shrink-0">분담 비율</span>
             <span>에이원 {data.fx_burden_a1_pct}% / 토에이 {100 - data.fx_burden_a1_pct}%</span>
           </div>
-          <div className="flex text-sm py-1.5 px-3 border-b">
-            <span className="w-56 text-muted-foreground shrink-0">에이원 부담 (VAT 별도)</span>
-            <span className="font-mono font-medium">{signed(data.a1BurdenKrw)}</span>
+          <div className="px-3 py-1.5 border-b">
+            <div className="flex text-sm">
+              <span className="w-56 text-muted-foreground shrink-0">에이원 부담 (VAT 별도)</span>
+              <span className="font-mono font-medium">{signed(data.a1BurdenKrw)}</span>
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5 font-mono">
+              추가비용 {signed(additionalCost)} × {data.fx_burden_a1_pct}%(에이원분담) = {signed(data.a1BurdenKrw)}
+            </p>
           </div>
-          <div
-            className="flex text-sm py-1.5 px-3 cursor-help"
-            title={`에이원 부담 VAT별도(${data.a1BurdenKrw >= 0 ? '+' : ''}${data.a1BurdenKrw.toLocaleString('ko-KR')}원) × 1.1 = ${data.a1BurdenWithVatKrw >= 0 ? '+' : ''}${data.a1BurdenWithVatKrw.toLocaleString('ko-KR')}원`}
-          >
-            <span className="w-56 text-muted-foreground shrink-0">에이원 부담 (VAT 포함)</span>
-            <span className="font-mono font-semibold">{signed(data.a1BurdenWithVatKrw)}</span>
+          <div className="px-3 py-1.5">
+            <div className="flex text-sm">
+              <span className="w-56 text-muted-foreground shrink-0">에이원 부담 (VAT 포함)</span>
+              <span className="font-mono font-semibold">{signed(data.a1BurdenWithVatKrw)}</span>
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5 font-mono">
+              VAT별도 {signed(data.a1BurdenKrw)} × 1.1(VAT 10%) = {signed(data.a1BurdenWithVatKrw)}
+            </p>
           </div>
         </div>
       </ReportSection>
@@ -191,10 +219,38 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
       {/* V-4: 클로징 정산금액 */}
       {confirmed != null && (
         <ReportSection title="V-4. 클로징 정산금액">
+          {/* 계산 breakdown */}
+          <div className="border border-border rounded-lg overflow-hidden mb-3 text-sm">
+            <div className="flex justify-between px-4 py-2 border-b bg-muted/10">
+              <span className="text-muted-foreground">에이원 부담 (VAT 포함)</span>
+              <span className="font-mono">{signed(data.a1BurdenWithVatKrw)}</span>
+            </div>
+            {data.closingCostItems.map((item, i) => (
+              <div key={i} className="flex justify-between px-4 py-1.5 border-b bg-muted/5">
+                <span className="text-muted-foreground pl-3">+ {item.item_name}</span>
+                <span className="font-mono">{signed(item.amount_krw)}</span>
+              </div>
+            ))}
+            {data.closingCostItems.length > 0 && (
+              <div className="flex justify-between px-4 py-1.5 border-b">
+                <span className="text-muted-foreground">기타 미정산 합계</span>
+                <span className="font-mono">{signed(data.closingCostsTotalKrw)}</span>
+              </div>
+            )}
+            <div className="flex justify-between px-4 py-2 bg-muted/20 border-t-2">
+              <span className="text-muted-foreground font-medium">= 최종정산 (시스템 계산)</span>
+              <span className="font-mono font-semibold">{signed(systemClosingConfirmed)}</span>
+            </div>
+          </div>
           <div className={`border-2 rounded-lg p-4 ${confirmed < 0 ? 'border-red-400 bg-red-50' : 'border-amber-400 bg-amber-50'}`}>
-            <p className={`text-2xl font-bold font-mono mb-2 ${confirmed < 0 ? 'text-red-700' : 'text-amber-800'}`}>
+            <p className={`text-2xl font-bold font-mono mb-1 ${confirmed < 0 ? 'text-red-700' : 'text-amber-800'}`}>
               {signed(confirmed)}
             </p>
+            {Math.abs(closingDiff) > 0 && (
+              <p className="text-xs text-orange-600 mb-2 font-mono">
+                ※ 엑셀 확정값 {confirmed.toLocaleString('ko-KR')}원 (시스템 {systemClosingConfirmed.toLocaleString('ko-KR')}원 대비 {closingDiff > 0 ? '+' : ''}{closingDiff.toLocaleString('ko-KR')}원)
+              </p>
+            )}
             {closingDirection && (
               <div className={`inline-flex items-center rounded px-3 py-1 ${confirmed < 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}`}>
                 <span className="text-sm font-semibold">{closingDirection}</span>
