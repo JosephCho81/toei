@@ -4,6 +4,7 @@ import { renderToBuffer } from '@react-pdf/renderer'
 import { createElement } from 'react'
 import { ClosingPdfDocument, type ClosingPdfData } from '@/lib/pdf/ClosingPdfTemplate'
 import { calculateClosing } from '@/lib/calculations/closing'
+import { normalizeOne } from '@/lib/utils/normalize'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -79,14 +80,17 @@ export async function GET(req: NextRequest) {
     }))
   }
 
-  const t = Array.isArray(closing.transactions) ? closing.transactions[0] : closing.transactions as {
-    round_label: string
-    import_amount_usd: number | null
+  const t = normalizeOne(closing.transactions as {
+    round_label: string; import_amount_usd: number | null
     customs_exchange_rate: number | null
     manufacturers: { name: string } | { name: string }[] | null
-  } | null
+  } | {
+    round_label: string; import_amount_usd: number | null
+    customs_exchange_rate: number | null
+    manufacturers: { name: string } | { name: string }[] | null
+  }[] | null)
 
-  const mfr = Array.isArray(t?.manufacturers) ? t?.manufacturers[0] : t?.manufacturers as { name: string } | null
+  const mfr = normalizeOne(t?.manufacturers as { name: string } | { name: string }[] | null)
 
   const rawFeeItems = Array.isArray(closing.lc_fee_items) ? closing.lc_fee_items : []
   const sortedFeeItems = [...rawFeeItems].sort((a, b) =>

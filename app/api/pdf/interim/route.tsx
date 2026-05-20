@@ -4,6 +4,7 @@ import { renderToBuffer } from '@react-pdf/renderer'
 import { createElement } from 'react'
 import { InterimPdfDocument, type InterimPdfData } from '@/lib/pdf/InterimPdfTemplate'
 import { calculateInterim, type CostItem } from '@/lib/calculations/interim'
+import { normalizeOne } from '@/lib/utils/normalize'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -44,16 +45,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: '정산 데이터를 찾을 수 없습니다.' }, { status: 404 })
   }
 
-  const t = Array.isArray(interim.transactions) ? interim.transactions[0] : interim.transactions as {
-    round_label: string
-    import_amount_usd: number | null
-    lc_open_date: string | null
-    customs_date: string | null
-    margin_rate_pct: number | null
+  const t = normalizeOne(interim.transactions as {
+    id?: string; round_label: string; import_amount_usd: number | null
+    lc_open_date: string | null; customs_date: string | null; margin_rate_pct: number | null
     manufacturers: { name: string } | { name: string }[] | null
-  } | null
+  } | {
+    id?: string; round_label: string; import_amount_usd: number | null
+    lc_open_date: string | null; customs_date: string | null; margin_rate_pct: number | null
+    manufacturers: { name: string } | { name: string }[] | null
+  }[] | null)
 
-  const mfr = Array.isArray(t?.manufacturers) ? t?.manufacturers[0] : t?.manufacturers as { name: string } | null
+  const mfr = normalizeOne(t?.manufacturers as { name: string } | { name: string }[] | null)
 
   const transactionId = (t as { id?: string } | null)?.id ?? null
 

@@ -13,14 +13,8 @@ type Item = {
   unit_price_usd: number | null; sort_order: number
 }
 
-export type TxRow = {
-  id: string; round_no: number; round_label: string; order_no: string | null
-  lc_open_date: string | null; settlement_status: string; is_locked: boolean
-  manufacturers: { name: string } | { name: string }[] | null
-  transaction_items: Item[] | null
-  containers: { etd: string | null; eta: string | null }[] | null
-  delivery_dates: Array<{ seq: number; date: string }> | null
-}
+export type { TxRow } from '@/types/transaction'
+import type { TxRow } from '@/types/transaction'
 
 function getMfr(raw: TxRow['manufacturers']): string {
   if (!raw) return '-'

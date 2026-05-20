@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { normalizeOne } from '@/lib/utils/normalize'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 
@@ -48,8 +49,7 @@ export async function DeadlineAlerts() {
       <CardHeader><CardTitle className="text-base">마감일 알림 (D-30 이내)</CardTitle></CardHeader>
       <CardContent className="space-y-2">
         {deadlines.map((d) => {
-          const txArr = d.transactions as { id: string; round_label: string }[] | null
-          const tx = Array.isArray(txArr) ? txArr[0] : (txArr as unknown as { id: string; round_label: string } | null)
+          const tx = normalizeOne(d.transactions as { id: string; round_label: string } | { id: string; round_label: string }[] | null)
           const due = new Date(d.due_date)
           const diffDays = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 

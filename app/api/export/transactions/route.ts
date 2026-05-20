@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/server'
+import { normalizeOne } from '@/lib/utils/normalize'
 
 export async function GET() {
   const supabase = await createClient()
@@ -23,7 +24,7 @@ export async function GET() {
 
   // 시트 1: 거래현황
   const txRows = (txs ?? []).map((t) => {
-    const mfr = Array.isArray(t.manufacturers) ? t.manufacturers[0] : t.manufacturers
+    const mfr = normalizeOne(t.manufacturers)
     return {
       '차수': t.round_no,
       '라벨': t.round_label,
@@ -40,7 +41,7 @@ export async function GET() {
 
   // 시트 2: 중간정산 요약
   const intRows = (interims ?? []).map((s) => {
-    const tx = Array.isArray(s.transactions) ? s.transactions[0] : s.transactions
+    const tx = normalizeOne(s.transactions)
     return {
       '차수': (tx as { round_no: number } | null)?.round_no ?? '',
       '라벨': (tx as { round_label: string } | null)?.round_label ?? '',
@@ -54,7 +55,7 @@ export async function GET() {
 
   // 시트 3: 클로징정산 요약
   const clsRows = (closings ?? []).map((s) => {
-    const tx = Array.isArray(s.transactions) ? s.transactions[0] : s.transactions
+    const tx = normalizeOne(s.transactions)
     return {
       '차수': (tx as { round_no: number } | null)?.round_no ?? '',
       '라벨': (tx as { round_label: string } | null)?.round_label ?? '',

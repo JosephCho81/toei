@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { normalizeOne } from '@/lib/utils/normalize'
 import { notFound } from 'next/navigation'
 import { calculateClosing } from '@/lib/calculations/closing'
 import { formatDate, formatUsd, formatExchangeRate } from '@/lib/utils/format'
@@ -137,7 +138,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const benchRows = (benchRaw ?? []) as BenchRow[]
   let sumMargin = 0, countMargin = 0, sumFxAbs = 0, countFx = 0, sumDays = 0, countDays = 0
   for (const row of benchRows) {
-    const tx = Array.isArray(row.transactions) ? row.transactions[0] : row.transactions
+    const tx = normalizeOne(row.transactions)
     if (!tx) continue
     const mp = tx.margin_rate_pct != null ? Number(tx.margin_rate_pct) : null
     if (mp != null) { sumMargin += mp; countMargin++ }
@@ -158,7 +159,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   type RoundRow = { round_no: number; round_label: string; interim_settlements: { confirmed_amount_krw: unknown }[] | null }
   const roundChartData = ((allRoundsRaw ?? []) as RoundRow[])
     .map(r => {
-      const s = Array.isArray(r.interim_settlements) ? r.interim_settlements[0] : null
+      const s = normalizeOne(r.interim_settlements)
       if (!s?.confirmed_amount_krw) return null
       return { roundNo: r.round_no, roundLabel: r.round_label, confirmedAmountKrw: Number(s.confirmed_amount_krw) }
     })

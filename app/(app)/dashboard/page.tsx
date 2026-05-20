@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
+import { normalizeOne } from '@/lib/utils/normalize'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
@@ -168,7 +169,7 @@ export default async function DashboardPage({
 
   const rawVerRows = (verificationIssues ?? []) as unknown as RawVerRow[]
   const verRows: VerRow[] = rawVerRows.map((row) => {
-    const tx = Array.isArray(row.transactions) ? row.transactions[0] : row.transactions
+    const tx = normalizeOne(row.transactions)
     const costSum = (row.interim_cost_items ?? []).reduce(
       (s, c) => s + Number(c.amount_krw || 0), 0,
     )
@@ -399,8 +400,8 @@ export default async function DashboardPage({
               </thead>
               <tbody>
                 {containers.map((c, i) => {
-                  const tx = Array.isArray(c.transactions) ? c.transactions[0] : c.transactions
-                  const mfr = tx ? (Array.isArray(tx.manufacturers) ? tx.manufacturers[0] : tx.manufacturers) : null
+                  const tx = normalizeOne(c.transactions)
+                  const mfr = tx ? normalizeOne(tx.manufacturers) : null
                   const rawItems = tx?.transaction_items
                   const items: { spec: string | null }[] =
                     rawItems == null ? [] : Array.isArray(rawItems) ? rawItems : [rawItems]
@@ -475,7 +476,7 @@ export default async function DashboardPage({
             </thead>
             <tbody>
               {(recentTx ?? []).map((t, i) => {
-                const mfr = Array.isArray(t.manufacturers) ? t.manufacturers[0] : t.manufacturers
+                const mfr = normalizeOne(t.manufacturers)
                 const ctrs = (Array.isArray(t.containers) ? t.containers : []) as { etd: string | null; eta: string | null }[]
                 const etd = ctrs.map((c) => c.etd).filter(Boolean).sort()[0] ?? null
                 const eta = ctrs.map((c) => c.eta).filter(Boolean).sort().at(-1) ?? null

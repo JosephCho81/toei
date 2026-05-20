@@ -6,13 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plus, Trash2 } from 'lucide-react'
 import { computeVat } from '@/lib/calculations/interim'
 
-export interface CostRow {
-  id?: string
-  item_name: string
-  amount_krw: string
-  is_vat_taxable: boolean
-  vat_amount_krw: string
-}
+export type { CostRow } from '@/types/settlement'
+import type { CostRow } from '@/types/settlement'
 
 export const DEFAULT_SHIPPING: CostRow[] = [
   { item_name: '해상운임', amount_krw: '', is_vat_taxable: false, vat_amount_krw: '0' },
