@@ -4,13 +4,14 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, FileText, Building2, LogOut } from 'lucide-react'
+import { LayoutDashboard, FileText, Building2, LogOut, ClipboardList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const navItems = [
-  { href: '/dashboard', label: '정산 현황', icon: LayoutDashboard },
-  { href: '/transactions', label: '거래 목록', icon: FileText },
-  { href: '/manufacturers', label: '제조사', icon: Building2 },
+  { href: '/dashboard', label: '정산 현황', icon: LayoutDashboard, badge: null },
+  { href: '/transactions', label: '거래 목록', icon: FileText, badge: null },
+  { href: '/manufacturers', label: '제조사', icon: Building2, badge: null },
+  { href: '/verification', label: '검증 리포트', icon: ClipboardList, badge: '임시' },
 ]
 
 export function Sidebar() {
@@ -31,7 +32,7 @@ export function Sidebar() {
         <p className="text-xs text-muted-foreground mt-0.5">토에이↔에이원</p>
       </div>
       <nav className="flex-1 px-2 py-3 space-y-1">
-        {navItems.map(({ href, label, icon: Icon }) => (
+        {navItems.map(({ href, label, icon: Icon, badge }) => (
           <Link
             key={href}
             href={href}
@@ -43,7 +44,8 @@ export function Sidebar() {
             )}
           >
             <Icon className="h-4 w-4 shrink-0" />
-            {label}
+            <span className="flex-1">{label}</span>
+            {badge && <span className="text-xs text-orange-500 font-medium">({badge})</span>}
           </Link>
         ))}
       </nav>
