@@ -56,7 +56,7 @@ export function ReportItemsSection({ items, importAmountUsd, marginRatePct }: Pr
                   <TableCell className="text-sm">{r.color ?? '-'}</TableCell>
                   <TableCell className="text-sm">{r.size ?? '-'}</TableCell>
                   <TableCell className="text-right text-sm">
-                    {r.unit_price_usd != null ? `$${Number(r.unit_price_usd).toFixed(2)}` : '-'}
+                    {r.unit_price_usd != null ? usd(r.unit_price_usd) : '-'}
                   </TableCell>
                   <TableCell className="text-right text-sm">{r.quantity?.toLocaleString('ko-KR') ?? '-'}</TableCell>
                   <TableCell className="text-sm">{r.unit ?? 'DZ'}</TableCell>

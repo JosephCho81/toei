@@ -77,7 +77,7 @@ export function ItemsInputSection({ items, onChange }: Props) {
                   <td className="py-1 pr-1">
                     <Input className="h-7 text-xs w-12" value={r.unit} onChange={(e) => upd(r._key, 'unit', e.target.value)} />
                   </td>
-                  <td className="py-1 pr-1 text-right font-medium whitespace-nowrap">${sub.toFixed(2)}</td>
+                  <td className="py-1 pr-1 text-right font-medium whitespace-nowrap">${sub.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="py-1">
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"
                       onClick={() => onChange(items.filter((x) => x._key !== r._key))}

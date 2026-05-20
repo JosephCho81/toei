@@ -63,7 +63,7 @@ export async function ItemsTable({ transactionId }: { transactionId: string }) {
                     <TableCell className="text-sm">{r.size ?? '-'}</TableCell>
                     <TableCell className="text-right text-sm">
                       {r.unit_price_usd != null
-                        ? `$${Number(r.unit_price_usd).toFixed(2)}`
+                        ? `$${Number(r.unit_price_usd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                         : '-'}
                     </TableCell>
                     <TableCell className="text-right text-sm">

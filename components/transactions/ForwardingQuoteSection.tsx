@@ -83,7 +83,6 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
     const validRows = rows.filter(r => r.forwarder_name)
     const currentIds = new Set(validRows.filter(r => r.id).map(r => r.id!))
 
-    // 현재 DB에 있는 id 조회 → UI에서 삭제된 행은 DELETE
     const { data: dbQuotes } = await supabase.from('forwarding_quotes')
       .select('id').eq('transaction_id', transactionId)
     const toDelete = (dbQuotes ?? []).map(q => q.id).filter((id: string) => !currentIds.has(id))
@@ -91,7 +90,6 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
       await supabase.from('forwarding_quotes').delete().in('id', toDelete)
     }
 
-    // 기존 행 UPDATE, 새 행 INSERT (items는 CASCADE 삭제 없이 보존)
     for (const [i, r] of validRows.entries()) {
       const payload = {
         transaction_id: transactionId,
@@ -116,8 +114,8 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
 
   if (!loaded) return null
 
-  // 컬럼 순서: 포워더 | 견적일 | 견적금액(KRW) | 항목 | [삭제]
-  const colSpan = isLocked ? 4 : 5
+  // 컬럼: 포워더(+견적일 서브텍스트) | 항목 | 견적금액(KRW) | [삭제]
+  const colSpan = isLocked ? 3 : 4
 
   return (
     <Card>
@@ -135,13 +133,12 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
         )}
       </CardHeader>
       <CardContent className="p-0">
-        <Table className="w-auto ml-auto">
+        <Table className="w-full">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-24">포워더</TableHead>
-              <TableHead>견적일</TableHead>
-              <TableHead className="text-right">견적금액(KRW)</TableHead>
-              <TableHead className="text-center">항목</TableHead>
+              <TableHead className="w-28">포워더</TableHead>
+              <TableHead>항목</TableHead>
+              <TableHead className="text-right w-36">견적금액(KRW)</TableHead>
               {!isLocked && <TableHead className="w-8" />}
             </TableRow>
           </TableHeader>
@@ -152,25 +149,18 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
 
               // 잠금 + 세부항목 있음: 항목별 행 분리
               if (isLocked && hasItems) {
-                const rowCount = r.items.length + 1  // 세부항목 + 합계
+                const rowCount = r.items.length + 1  // 세부항목 + 합계행
                 return (
                   <React.Fragment key={r._key}>
                     {r.items.map((item, idx) => (
                       <TableRow key={item.id}>
                         {idx === 0 && (
-                          <>
-                            <TableCell rowSpan={rowCount} className="align-top text-sm px-3 py-2 border-r">
-                              {r.forwarder_name}
-                            </TableCell>
-                            <TableCell rowSpan={rowCount} className="align-top text-sm px-3 py-2 border-r">
-                              {r.quote_date || '-'}
-                            </TableCell>
-                          </>
+                          <TableCell rowSpan={rowCount} className="align-top text-sm px-3 py-2 border-r">
+                            <div className="font-medium">{r.forwarder_name}</div>
+                            <div className="text-xs text-muted-foreground mt-0.5">{r.quote_date || '-'}</div>
+                          </TableCell>
                         )}
-                        <TableCell className="text-right text-xs font-mono px-3 py-1">
-                          {item.amount_krw != null ? formatKrw(item.amount_krw) : '-'}
-                        </TableCell>
-                        <TableCell className="px-3 py-1 text-xs text-center">
+                        <TableCell className="px-3 py-1 text-xs text-left">
                           <span className="font-medium">{item.item_name ?? '-'}</span>
                           {item.currency && item.currency !== 'KRW' && item.amount_cur != null && (
                             <span className="text-muted-foreground ml-1.5 text-[10px]">
@@ -181,14 +171,15 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
                             <span className="text-blue-500 text-[10px] ml-1">VAT</span>
                           )}
                         </TableCell>
+                        <TableCell className="text-right text-xs font-mono px-3 py-1">
+                          {item.amount_krw != null ? formatKrw(item.amount_krw) : '-'}
+                        </TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="bg-muted/30">
+                      <TableCell className="px-3 py-1.5 text-xs text-muted-foreground">합계</TableCell>
                       <TableCell className="text-right text-sm font-semibold font-mono px-3 py-1.5">
                         {q ? formatKrw(q) : '-'}
-                      </TableCell>
-                      <TableCell className="text-center text-xs font-semibold text-muted-foreground px-3 py-1.5">
-                        합계
                       </TableCell>
                     </TableRow>
                     {r.notes && (
@@ -206,24 +197,22 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
               return (
                 <React.Fragment key={r._key}>
                   <TableRow>
-                    <TableCell className="p-1">
-                      {isLocked
-                        ? <span className="text-sm px-2">{r.forwarder_name}</span>
-                        : <Input className="h-7 text-xs" value={r.forwarder_name} onChange={e => upd(r._key, 'forwarder_name', e.target.value)} />}
+                    <TableCell className="p-1 align-top">
+                      {isLocked ? (
+                        <div>
+                          <div className="text-sm px-2">{r.forwarder_name}</div>
+                          <div className="text-xs text-muted-foreground px-2 mt-0.5">{r.quote_date || '-'}</div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <Input className="h-7 text-xs" value={r.forwarder_name} onChange={e => upd(r._key, 'forwarder_name', e.target.value)} />
+                          <Input type="date" className="h-7 text-xs" value={r.quote_date} onChange={e => upd(r._key, 'quote_date', e.target.value)} />
+                        </div>
+                      )}
                     </TableCell>
-                    <TableCell className="p-1">
-                      {isLocked
-                        ? <span className="text-sm px-2">{r.quote_date || '-'}</span>
-                        : <Input type="date" className="h-7 text-xs" value={r.quote_date} onChange={e => upd(r._key, 'quote_date', e.target.value)} />}
-                    </TableCell>
-                    <TableCell className="p-1">
-                      {isLocked
-                        ? <span className="text-sm px-2 block text-right">{q ? formatKrw(q) : '-'}</span>
-                        : <Input className="h-7 text-xs text-right w-28" type="number" value={r.quote_amount_krw} onChange={e => upd(r._key, 'quote_amount_krw', e.target.value)} />}
-                    </TableCell>
-                    <TableCell className="p-1 align-top text-center">
+                    <TableCell className="p-1 align-top">
                       {hasItems ? (
-                        <ul className="space-y-0.5 px-1 py-0.5 text-left inline-block">
+                        <ul className="space-y-0.5 px-1 py-0.5">
                           {r.items.map((item) => (
                             <li key={item.id} className="text-xs flex items-baseline gap-1.5">
                               <span className="font-medium">{item.item_name ?? '-'}</span>
@@ -239,6 +228,11 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
                       ) : (
                         <span className="text-xs px-2 text-muted-foreground">-</span>
                       )}
+                    </TableCell>
+                    <TableCell className="p-1">
+                      {isLocked
+                        ? <span className="text-sm px-2 block text-right">{q ? formatKrw(q) : '-'}</span>
+                        : <Input className="h-7 text-xs text-right w-28" type="number" value={r.quote_amount_krw} onChange={e => upd(r._key, 'quote_amount_krw', e.target.value)} />}
                     </TableCell>
                     {!isLocked && (
                       <TableCell className="p-1">

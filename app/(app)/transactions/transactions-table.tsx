@@ -147,7 +147,7 @@ export function TransactionTable({ rows }: { rows: TxRow[] }) {
                                   <td className="py-1.5 pr-6">{item.color || '-'}</td>
                                   <td className="py-1.5 pr-6">{item.size || '-'}</td>
                                   <td className="py-1.5 pr-6 text-right font-mono">
-                                    {item.unit_price_usd != null ? `$${Number(item.unit_price_usd).toFixed(2)}` : '-'}
+                                    {item.unit_price_usd != null ? `$${Number(item.unit_price_usd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                   </td>
                                   <td className="py-1.5 pr-6 text-right">
                                     {item.quantity != null ? item.quantity.toLocaleString('ko-KR') : '-'}

@@ -453,7 +453,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
                     <Text style={[s.itemsCell, { width: '26%' }]}>{item.spec}</Text>
                     <Text style={[s.itemsCell, { width: '18%' }]}>{item.color}</Text>
                     <Text style={[s.itemsCell, { width: '12%' }]}>{item.size}</Text>
-                    <Text style={[s.itemsCell, { width: '20%' }]}>{item.unitPriceUsd.toFixed(2)}</Text>
+                    <Text style={[s.itemsCell, { width: '20%' }]}>{item.unitPriceUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                     <Text style={[s.itemsCell, { width: '13%' }]}>{item.quantity.toLocaleString('ko-KR')}</Text>
                     <Text style={[s.itemsCellLast, { width: '11%' }]}>{item.unit}</Text>
                   </View>

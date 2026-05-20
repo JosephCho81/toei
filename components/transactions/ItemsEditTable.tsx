@@ -140,7 +140,7 @@ export function ItemsEditTable({ transactionId, isLocked }: {
                         ? <span className="text-sm px-2">{r.unit}</span>
                         : <Input className="h-7 text-xs w-14" value={r.unit} onChange={(e) => upd(r._key, 'unit', e.target.value)} />}
                     </TableCell>
-                    <TableCell className="text-right text-sm font-medium pr-3">${sub.toFixed(2)}</TableCell>
+                    <TableCell className="text-right text-sm font-medium pr-3">${sub.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                     {!isLocked && (
                       <TableCell className="p-1">
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"
@@ -158,7 +158,7 @@ export function ItemsEditTable({ transactionId, isLocked }: {
                   <TableCell colSpan={5} className="text-right text-sm">합계</TableCell>
                   <TableCell className="text-right text-sm">{totalQty.toLocaleString('ko-KR')}</TableCell>
                   <TableCell />
-                  <TableCell className="text-right text-sm pr-3">${totalUsd.toFixed(2)}</TableCell>
+                  <TableCell className="text-right text-sm pr-3">${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                   {!isLocked && <TableCell />}
                 </TableRow>
               )}
