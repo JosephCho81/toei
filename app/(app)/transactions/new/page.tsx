@@ -167,26 +167,24 @@ export default function NewTransactionPage() {
     }
 
     const validForwardings = forwardings.filter((r) => r.forwarder_name)
-    if (validForwardings.length > 0) {
-      await supabase.from('forwarding_quotes').insert(
-        validForwardings.map((r, i) => {
-          const quoteTotal = r.details.reduce((s, d) => s + (parseInt(d.quote_amount_krw) || 0), 0)
-          const actualTotal = r.details.reduce((s, d) => s + (parseInt(d.actual_amount_krw) || 0), 0)
-          const notes = r.details
-            .filter((d) => d.item_name)
-            .map((d) => `${d.item_name}:${d.quote_amount_krw || 0}/${d.actual_amount_krw || 0}`)
-            .join('|')
-          return {
-            transaction_id: data.id,
-            forwarder_name: r.forwarder_name,
-            quote_date: r.quote_date || null,
-            quote_amount_krw: quoteTotal || null,
-            actual_amount_krw: actualTotal || null,
-            notes: notes || null,
-            sort_order: i,
-          }
+    for (const [i, r] of validForwardings.entries()) {
+      const { data: fq } = await supabase.from('forwarding_quotes').insert({
+        transaction_id: data.id,
+        forwarder_name: r.forwarder_name,
+        quote_date: r.quote_date || null,
+        sort_order: i,
+      }).select('id').single()
+      if (fq?.id) {
+        const itemRows = r.details.filter(d => d.item_name).flatMap((d, j) => {
+          const quoteAmt = parseInt(d.quote_amount_krw) || 0
+          const actualAmt = parseInt(d.actual_amount_krw) || 0
+          const rows = []
+          if (quoteAmt) rows.push({ forwarding_quote_id: fq.id, item_type: 'quote', item_name: d.item_name, amount_krw: quoteAmt, is_vat_taxable: false, sort_order: j * 2 })
+          if (actualAmt) rows.push({ forwarding_quote_id: fq.id, item_type: 'invoice', item_name: d.item_name, amount_krw: actualAmt, is_vat_taxable: d.is_vat_taxable, sort_order: j * 2 + 1 })
+          return rows
         })
-      )
+        if (itemRows.length) await supabase.from('forwarding_quote_items').insert(itemRows)
+      }
     }
 
     setSaving(false)

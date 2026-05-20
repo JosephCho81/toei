@@ -11,6 +11,7 @@ import { Plus, Trash2 } from 'lucide-react'
 
 type QuoteItem = {
   id: string
+  item_type: string | null
   item_name: string | null
   currency: string | null
   exchange_rate: number | null
@@ -25,20 +26,20 @@ type QuoteItem = {
 type Row = {
   _key: string
   id?: string
-  forwarder_name: string; quote_date: string; quote_amount_krw: string
-  actual_amount_krw: string; notes: string
+  forwarder_name: string; quote_date: string
+  notes: string
   items: QuoteItem[]
 }
 
 function blank(): Row {
-  return { _key: crypto.randomUUID(), forwarder_name: '오션마스터', quote_date: '', quote_amount_krw: '', actual_amount_krw: '', notes: '', items: [] }
+  return { _key: crypto.randomUUID(), forwarder_name: '오션마스터', quote_date: '', notes: '', items: [] }
 }
 
 function formatKrw(v: number) {
   return v.toLocaleString('ko-KR') + '원'
 }
 
-const SELECT_QUERY = 'id,forwarder_name,quote_date,quote_amount_krw,actual_amount_krw,notes,sort_order,forwarding_quote_items(id,item_name,currency,exchange_rate,rate,amount_cur,amount_krw,vat_amount_krw,is_vat_taxable,sort_order)'
+const SELECT_QUERY = 'id,forwarder_name,quote_date,notes,sort_order,forwarding_quote_items(id,item_type,item_name,currency,exchange_rate,rate,amount_cur,amount_krw,vat_amount_krw,is_vat_taxable,sort_order)'
 
 function mapRow(d: Record<string, unknown>): Row {
   return {
@@ -46,8 +47,6 @@ function mapRow(d: Record<string, unknown>): Row {
     id: d.id as string,
     forwarder_name: (d.forwarder_name as string) ?? '',
     quote_date: (d.quote_date as string) ?? '',
-    quote_amount_krw: d.quote_amount_krw != null ? String(d.quote_amount_krw) : '',
-    actual_amount_krw: d.actual_amount_krw != null ? String(d.actual_amount_krw) : '',
     notes: (d.notes as string) ?? '',
     items: ((d.forwarding_quote_items as QuoteItem[]) ?? [])
       .slice()
@@ -95,8 +94,6 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
         transaction_id: transactionId,
         forwarder_name: r.forwarder_name,
         quote_date: r.quote_date || null,
-        quote_amount_krw: r.quote_amount_krw ? parseInt(r.quote_amount_krw) : null,
-        actual_amount_krw: r.actual_amount_krw ? parseInt(r.actual_amount_krw) : null,
         notes: r.notes || null,
         sort_order: i,
       }
@@ -144,7 +141,7 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
           </TableHeader>
           <TableBody>
             {rows.map((r) => {
-              const q = parseInt(r.quote_amount_krw) || 0
+              const q = r.items.reduce((s, item) => s + (item.amount_krw ?? 0), 0)
               const hasItems = r.items.length > 0
 
               // 잠금 + 세부항목 있음: 항목별 행 분리
@@ -230,9 +227,7 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
                       )}
                     </TableCell>
                     <TableCell className="p-1">
-                      {isLocked
-                        ? <span className="text-sm px-2 block text-right">{q ? formatKrw(q) : '-'}</span>
-                        : <Input className="h-7 text-xs text-right w-28" type="number" value={r.quote_amount_krw} onChange={e => upd(r._key, 'quote_amount_krw', e.target.value)} />}
+                      <span className="text-sm px-2 block text-right">{q ? formatKrw(q) : '-'}</span>
                     </TableCell>
                     {!isLocked && (
                       <TableCell className="p-1">

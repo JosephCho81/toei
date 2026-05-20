@@ -67,27 +67,28 @@ export default function InterimSettlementPage() {
       }
 
       if (!hasShippingItems) {
-        const { data: fqList } = await supabase.from('forwarding_quotes').select('actual_amount_krw,notes').eq('transaction_id', id).order('sort_order')
-        const fq = (fqList ?? []).find((q: { actual_amount_krw: number | null; notes: string | null }) => q.actual_amount_krw)
-        if (fq?.actual_amount_krw) {
-          let rows: CostRow[] = []
-          if (fq.notes) {
-            try {
-              const parsed = fq.notes.split('|').map((entry: string) => {
-                const colonIdx = entry.indexOf(':')
-                const itemName = entry.slice(0, colonIdx)
-                const amounts = entry.slice(colonIdx + 1).split('/')
-                const actual = amounts[1] ?? amounts[0]
-                return { item_name: itemName, amount_krw: String(parseInt(actual) || 0), is_vat_taxable: false, vat_amount_krw: '0' } as CostRow
-              }).filter((r: CostRow) => r.item_name)
-              if (parsed.length) rows = parsed
-            } catch { /* notes 파싱 실패 시 단일 항목으로 폴백 */ }
+        const { data: fqList } = await supabase
+          .from('forwarding_quotes')
+          .select('id,forwarding_quote_items(item_name,amount_krw,vat_amount_krw,is_vat_taxable,sort_order,item_type)')
+          .eq('transaction_id', id)
+          .order('sort_order')
+        type InvoiceItem = { item_name: string | null; amount_krw: number | null; vat_amount_krw: number | null; is_vat_taxable: boolean | null; sort_order: number | null; item_type: string }
+        const firstFq = (fqList ?? []).find(fq =>
+          (fq.forwarding_quote_items as InvoiceItem[]).some(i => i.item_type === 'invoice')
+        )
+        if (firstFq) {
+          const invoiceItems = (firstFq.forwarding_quote_items as InvoiceItem[])
+            .filter(i => i.item_type === 'invoice')
+            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+          if (invoiceItems.length) {
+            setShippingRows(invoiceItems.map(item => ({
+              item_name: item.item_name ?? '',
+              amount_krw: String(item.amount_krw ?? '0'),
+              is_vat_taxable: item.is_vat_taxable ?? false,
+              vat_amount_krw: String(item.vat_amount_krw ?? '0'),
+            })))
+            setPrefilled(true)
           }
-          if (!rows.length) {
-            rows = [{ item_name: '해상운임', amount_krw: String(fq.actual_amount_krw), is_vat_taxable: false, vat_amount_krw: '0' }]
-          }
-          setShippingRows(rows)
-          setPrefilled(true)
         }
       }
     }

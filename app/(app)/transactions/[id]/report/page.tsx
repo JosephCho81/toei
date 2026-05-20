@@ -35,7 +35,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       .select('id,closing_date,bok_exchange_rate,lc_payment_total_krw,fx_burden_a1_pct,confirmed_amount_krw,is_locked')
       .eq('transaction_id', id).single(),
     supabase.from('forwarding_quotes')
-      .select('forwarder_name,quote_date,quote_amount_krw,actual_amount_krw,notes')
+      .select('forwarder_name,quote_date,notes,forwarding_quote_items(item_type,amount_krw)')
       .eq('transaction_id', id).order('sort_order'),
     supabase.from('transaction_items')
       .select('id,spec,glove_type,color,size,unit_price_usd,quantity,unit')
@@ -283,7 +283,17 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           }} />
 
           {/* IV. 포워딩 견적 */}
-          <ReportForwardingSection rows={fwdRows ?? []} />
+          <ReportForwardingSection rows={(fwdRows ?? []).map(r => {
+            type FqItem = { item_type: string; amount_krw: number }
+            const items = (r.forwarding_quote_items as FqItem[]) ?? []
+            return {
+              forwarder_name: r.forwarder_name ?? null,
+              quote_date: r.quote_date ?? null,
+              notes: r.notes ?? null,
+              quote_amount_krw: items.filter(i => i.item_type === 'quote').reduce((s, i) => s + Number(i.amount_krw ?? 0), 0) || null,
+              actual_amount_krw: items.filter(i => i.item_type === 'invoice').reduce((s, i) => s + Number(i.amount_krw ?? 0), 0) || null,
+            }
+          })} />
         </>
       ) : (
         <ReportSection title="III. 중간정산 내역">

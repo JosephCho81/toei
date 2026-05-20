@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
       .eq('transaction_id', transactionId)
       .single(),
     supabase.from('forwarding_quotes')
-      .select('forwarder_name, quote_amount_krw, actual_amount_krw')
+      .select('forwarder_name,forwarding_quote_items(item_type,amount_krw)')
       .eq('transaction_id', transactionId)
       .order('sort_order'),
   ])
@@ -194,11 +194,15 @@ export async function GET(req: NextRequest) {
     customsDetailItems: interimCostItems
       .filter((c) => c.group_type === 'customs')
       .map((c) => ({ itemName: c.item_name, amountKrw: c.amount_krw })),
-    forwardingQuotes: (fwdRows ?? []).map((r) => ({
-      itemName: r.forwarder_name ?? '',
-      quoteAmountKrw: r.quote_amount_krw != null ? Number(r.quote_amount_krw) : null,
-      actualAmountKrw: r.actual_amount_krw != null ? Number(r.actual_amount_krw) : null,
-    })),
+    forwardingQuotes: (fwdRows ?? []).map((r) => {
+      type FqItem = { item_type: string; amount_krw: number }
+      const items = (r.forwarding_quote_items as FqItem[] | null) ?? []
+      return {
+        itemName: r.forwarder_name ?? '',
+        quoteAmountKrw: items.filter(i => i.item_type === 'quote').reduce((s, i) => s + Number(i.amount_krw ?? 0), 0) || null,
+        actualAmountKrw: items.filter(i => i.item_type === 'invoice').reduce((s, i) => s + Number(i.amount_krw ?? 0), 0) || null,
+      }
+    }),
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

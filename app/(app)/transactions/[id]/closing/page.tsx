@@ -80,15 +80,19 @@ export default function ClosingSettlementPage() {
       const [{ data: t }, { data: interim }, { data: fwdRows }] = await Promise.all([
         supabase.from('transactions').select('import_amount_usd,customs_exchange_rate').eq('id', id).single(),
         supabase.from('interim_settlements').select('id,confirmed_amount_krw,customs_exchange_rate,is_locked,updated_at').eq('transaction_id', id).single(),
-        supabase.from('forwarding_quotes').select('forwarder_name,quote_amount_krw,actual_amount_krw').eq('transaction_id', id).order('sort_order'),
+        supabase.from('forwarding_quotes').select('forwarder_name,forwarding_quote_items(item_type,amount_krw)').eq('transaction_id', id).order('sort_order'),
       ])
       setTransaction(t)
       if (interim) setInterimSummary(interim as typeof interimSummary)
-      setForwardingQuotes((fwdRows ?? []).map((r) => ({
-        forwarder_name: r.forwarder_name ?? '',
-        quote_amount_krw: r.quote_amount_krw != null ? Number(r.quote_amount_krw) : null,
-        actual_amount_krw: r.actual_amount_krw != null ? Number(r.actual_amount_krw) : null,
-      })))
+      type FqItem = { item_type: string; amount_krw: number }
+      setForwardingQuotes((fwdRows ?? []).map((r) => {
+        const items = (r.forwarding_quote_items as FqItem[]) ?? []
+        return {
+          forwarder_name: r.forwarder_name ?? '',
+          quote_amount_krw: items.filter(i => i.item_type === 'quote').reduce((s, i) => s + Number(i.amount_krw ?? 0), 0) || null,
+          actual_amount_krw: items.filter(i => i.item_type === 'invoice').reduce((s, i) => s + Number(i.amount_krw ?? 0), 0) || null,
+        }
+      }))
 
       if (interim?.id) {
         const { data: costItems } = await supabase
