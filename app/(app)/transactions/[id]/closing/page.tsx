@@ -4,19 +4,19 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { calculateClosing, type RoundingPolicy } from '@/lib/calculations/closing'
-import { formatKrw, formatDate } from '@/lib/utils/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Trash2, Plus } from 'lucide-react'
 import { MemoField } from '@/components/ui/MemoField'
+import { aggregateForwardingQuotes } from '@/lib/utils/forwarding'
+import { fetchTransactionBase, fetchInterimSettlement, fetchForwardingQuotes } from '@/lib/data/queries'
+import { ClosingFxCard } from '@/components/settlements/ClosingFxCard'
+import { ClosingLcFeeCard } from '@/components/settlements/ClosingLcFeeCard'
+import { ClosingCostCard } from '@/components/settlements/ClosingCostCard'
+import { ClosingSummaryCard } from '@/components/settlements/ClosingSummaryCard'
 
 interface FeeRow {
   id?: string
@@ -77,22 +77,18 @@ export default function ClosingSettlementPage() {
 
   useEffect(() => {
     async function load() {
-      const [{ data: t }, { data: interim }, { data: fwdRows }] = await Promise.all([
-        supabase.from('transactions').select('import_amount_usd,customs_exchange_rate').eq('id', id).single(),
-        supabase.from('interim_settlements').select('id,confirmed_amount_krw,customs_exchange_rate,is_locked,updated_at').eq('transaction_id', id).single(),
-        supabase.from('forwarding_quotes').select('forwarder_name,forwarding_quote_items(item_type,amount_krw)').eq('transaction_id', id).order('sort_order'),
+      const [t, interim, fwdRows] = await Promise.all([
+        fetchTransactionBase(supabase, id),
+        fetchInterimSettlement(supabase, id),
+        fetchForwardingQuotes(supabase, id),
       ])
       setTransaction(t)
       if (interim) setInterimSummary(interim as typeof interimSummary)
-      type FqItem = { item_type: string; amount_krw: number }
-      setForwardingQuotes((fwdRows ?? []).map((r) => {
-        const items = (r.forwarding_quote_items as FqItem[]) ?? []
-        return {
-          forwarder_name: r.forwarder_name ?? '',
-          quote_amount_krw: items.filter(i => i.item_type === 'quote').reduce((s, i) => s + Number(i.amount_krw ?? 0), 0) || null,
-          actual_amount_krw: items.filter(i => i.item_type === 'invoice').reduce((s, i) => s + Number(i.amount_krw ?? 0), 0) || null,
-        }
-      }))
+      setForwardingQuotes(aggregateForwardingQuotes(fwdRows).map(q => ({
+        forwarder_name: q.forwarderName,
+        quote_amount_krw: q.quoteAmountKrw || null,
+        actual_amount_krw: q.actualAmountKrw || null,
+      })))
 
       if (interim?.id) {
         const { data: costItems } = await supabase
@@ -306,188 +302,37 @@ export default function ClosingSettlementPage() {
         </CardContent>
       </Card>
 
-      {calc && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">환차손익</CardTitle></CardHeader>
-          <CardContent className="space-y-1 text-sm">
-            <CalcRow label={`원금×통관환율 (${Number(transaction.customs_exchange_rate).toLocaleString('ko-KR')}원/$)`} value={formatKrw(calc.importAmountKrw)} />
-            <CalcRow label="LC 결제비용" value={formatKrw(parseFloat(lcPayment) || 0)} />
-            <Separator />
-            <div className="flex justify-between font-semibold">
-              <span>환차손익</span>
-              <span className={`font-mono ${calc.fxGainLossKrw >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {calc.fxGainLossKrw >= 0 ? '+' : ''}{formatKrw(calc.fxGainLossKrw)}
-                <span className="text-xs ml-1">{calc.fxGainLossKrw >= 0 ? '(환차익)' : '(환차손)'}</span>
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <ClosingFxCard
+        calc={calc}
+        customsExchangeRate={Number(transaction.customs_exchange_rate)}
+        lcPayment={lcPayment}
+      />
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">LC 수수료</CardTitle>
-          {!isLocked && (
-            <Button size="sm" variant="outline" onClick={() => setLcFeeRows((p) => [...p, { item_name: '', amount_krw: '0' }])}>
-              <Plus className="h-4 w-4 mr-1" />항목 추가
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {lcFeeRows.map((row, i) => (
-            <div key={i} className="flex gap-2 items-center">
-              <Input
-                className="flex-1 text-sm"
-                value={row.item_name}
-                onChange={(e) => setLcFeeRows((p) => p.map((r, j) => j === i ? { ...r, item_name: e.target.value } : r))}
-                disabled={isLocked}
-              />
-              <Input
-                className="w-36 font-mono text-sm"
-                type="number"
-                value={row.amount_krw}
-                onChange={(e) => setLcFeeRows((p) => p.map((r, j) => j === i ? { ...r, amount_krw: e.target.value } : r))}
-                disabled={isLocked}
-              />
-              {!isLocked && i >= 6 && (
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setLcFeeRows((p) => p.filter((_, j) => j !== i))}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </div>
-          ))}
-          {calc && (
-            <div className="flex justify-between pt-2 text-sm font-semibold">
-              <span>LC 수수료 합계</span>
-              <span className="font-mono">{formatKrw(calc.lcFeeTotalKrw)}</span>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <ClosingLcFeeCard
+        lcFeeRows={lcFeeRows}
+        onLcFeeChange={setLcFeeRows}
+        isLocked={isLocked}
+        calc={calc}
+        fxBurdenA1Pct={fxBurdenA1Pct}
+        onFxBurdenChange={setFxBurdenA1Pct}
+      />
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">환차손익 분담 비율</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between text-sm">
-            <span>에이원 {fxBurdenA1Pct}%</span>
-            <span>토에이 {100 - fxBurdenA1Pct}%</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={fxBurdenA1Pct}
-            onChange={(e) => setFxBurdenA1Pct(parseInt(e.target.value))}
-            disabled={isLocked}
-            className="w-full"
-          />
-          {calc && (
-            <div className="space-y-1 text-sm">
-              <CalcRow label="추가비용 합계" value={`${calc.additionalCostKrw >= 0 ? '+' : ''}${formatKrw(calc.additionalCostKrw)}`} />
-              <CalcRow label="에이원 부담분" value={`${calc.a1BurdenKrw >= 0 ? '+' : ''}${formatKrw(calc.a1BurdenKrw)}`} />
-              <CalcRow label="에이원 부담분 + VAT" value={`${calc.a1BurdenWithVatKrw >= 0 ? '+' : ''}${formatKrw(calc.a1BurdenWithVatKrw)}`} bold />
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <ClosingCostCard
+        closingCostRows={closingCostRows}
+        onCostChange={setClosingCostRows}
+        isLocked={isLocked}
+        calc={calc}
+      />
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">클로징 추가비용 (A+B+C)</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          {closingCostRows.map((row, i) => (
-            <div key={i} className="flex gap-2 items-center">
-              <span className="text-sm w-6 text-muted-foreground">{String.fromCharCode(65 + i)})</span>
-              <Input
-                className="flex-1 text-sm"
-                value={row.item_name}
-                onChange={(e) => setClosingCostRows((p) => p.map((r, j) => j === i ? { ...r, item_name: e.target.value } : r))}
-                disabled={isLocked}
-              />
-              <Input
-                className="w-36 font-mono text-sm"
-                type="number"
-                value={row.amount_krw}
-                onChange={(e) => setClosingCostRows((p) => p.map((r, j) => j === i ? { ...r, amount_krw: e.target.value } : r))}
-                disabled={isLocked}
-              />
-              <label className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-                <input
-                  type="checkbox"
-                  checked={row.includes_vat}
-                  onChange={(e) => setClosingCostRows((p) => p.map((r, j) => j === i ? { ...r, includes_vat: e.target.checked } : r))}
-                  disabled={isLocked}
-                />
-                VAT포함
-              </label>
-            </div>
-          ))}
-          {calc && (
-            <div className="flex justify-between pt-2 text-sm font-semibold">
-              <span>소계</span>
-              <span className="font-mono">{formatKrw(calc.closingCostsTotalKrw)}</span>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle className="text-base">최종 정산액</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="space-y-1">
-              <Label>절사 정책</Label>
-              <Select value={roundingPolicy} onValueChange={(v) => setRoundingPolicy(v as RoundingPolicy)} disabled={isLocked}>
-                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="floor_100">100원 미만 버림</SelectItem>
-                  <SelectItem value="floor_10">10원 미만 버림</SelectItem>
-                  <SelectItem value="none">버림 없음</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {calc && (
-              <div className="space-y-1">
-                <Label>시스템 계산값</Label>
-                <p className={`text-xl font-mono font-bold ${calc.roundedFinalKrw >= 0 ? '' : 'text-red-600'}`}>
-                  {calc.roundedFinalKrw >= 0 ? '' : ''}{formatKrw(calc.roundedFinalKrw)}
-                </p>
-              </div>
-            )}
-          </div>
-          <div className="space-y-1">
-            <Label>확정 금액 (원) — 음수: 토에이→에이원 환급</Label>
-            <Input
-              type="number"
-              value={confirmedAmount}
-              onChange={(e) => setConfirmedAmount(e.target.value)}
-              disabled={isLocked}
-              className="font-mono text-lg max-w-xs"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {calc && interimSummary?.is_locked && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
-          <p className="text-sm font-bold text-blue-800">최종 종합 정산 (중간 + 클로징)</p>
-          <div className="flex justify-between text-sm">
-            <span className="text-blue-700">중간정산 확정금액</span>
-            <span className="font-mono text-blue-700">{formatKrw(calc.interimConfirmedKrw)}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-blue-700">클로징 정산액</span>
-            <span className="font-mono text-blue-700">{calc.roundedFinalKrw >= 0 ? '+' : ''}{formatKrw(calc.roundedFinalKrw)}</span>
-          </div>
-          <Separator className="border-blue-200" />
-          <div className="flex justify-between font-bold">
-            <span className="text-blue-900">최종 합계</span>
-            <span className="font-mono text-blue-900 text-lg">{formatKrw(calc.grandTotalKrw)}</span>
-          </div>
-          <p className="text-xs text-blue-600">
-            {calc.grandTotalKrw >= 0 ? '한국에이원 → 토에이산교 지급' : '토에이산교 → 한국에이원 지급'}
-          </p>
-        </div>
-      )}
+      <ClosingSummaryCard
+        calc={calc}
+        roundingPolicy={roundingPolicy}
+        onRoundingChange={setRoundingPolicy}
+        confirmedAmount={confirmedAmount}
+        onConfirmedChange={setConfirmedAmount}
+        isLocked={isLocked}
+        interimIsLocked={interimSummary?.is_locked ?? false}
+      />
 
       {customsDetailItems.length > 0 && (
         <Card>
@@ -578,11 +423,3 @@ export default function ClosingSettlementPage() {
   )
 }
 
-function CalcRow({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
-  return (
-    <div className={`flex justify-between ${bold ? 'font-semibold' : ''}`}>
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-mono">{value}</span>
-    </div>
-  )
-}

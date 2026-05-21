@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
+import { formatKrw, formatDiff } from '@/lib/utils/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,16 +87,6 @@ function buildRows(srcItems: SrcItem[], dbItems: DbItem[]): CompRow[] {
   return rows
 }
 
-// ─── Formatters ──────────────────────────────────────────────────────────────
-
-function fmtKrw(v: number): string {
-  return v.toLocaleString('ko-KR')
-}
-
-function fmtDiff(v: number): string {
-  return (v >= 0 ? '+' : '') + v.toLocaleString('ko-KR')
-}
-
 // ─── Row renderer ────────────────────────────────────────────────────────────
 
 function CompRows({ rows }: { rows: CompRow[] }) {
@@ -126,19 +117,19 @@ function CompRows({ rows }: { rows: CompRow[] }) {
             <td className="px-3 py-1.5 font-mono whitespace-nowrap">{row.name}</td>
             <td className="px-3 py-1.5 text-right font-mono tabular-nums whitespace-nowrap">
               {row.srcAmt !== null
-                ? fmtKrw(row.srcAmt)
+                ? formatKrw(row.srcAmt)
                 : <span className="text-muted-foreground">-</span>}
             </td>
             <td className="px-3 py-1.5 text-right font-mono tabular-nums whitespace-nowrap">
               {row.dbAmt !== null
-                ? fmtKrw(row.dbAmt)
+                ? formatKrw(row.dbAmt)
                 : <span className="text-muted-foreground">-</span>}
             </td>
             <td className={cn(
               'px-3 py-1.5 text-right font-mono tabular-nums whitespace-nowrap',
               diffCls
             )}>
-              {row.diff !== null ? fmtDiff(row.diff) : '-'}
+              {row.diff !== null ? formatDiff(row.diff) : '-'}
             </td>
             <td className="px-3 py-1.5 text-center">{rowIcon}</td>
           </tr>
@@ -171,7 +162,7 @@ export default async function VerificationPage() {
   type SrcEntry = { invoice: SrcItem[]; customs: SrcItem[]; customsParseFailed: boolean }
   const srcByRound = new Map<number, SrcEntry>()
 
-  for (const row of srcDocs ?? []) {
+  for (const row of (srcDocs ?? []).filter(r => r.item_name != null)) {
     const rn = row.round_no as number
     if (!srcByRound.has(rn)) {
       srcByRound.set(rn, { invoice: [], customs: [], customsParseFailed: false })

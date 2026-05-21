@@ -5,6 +5,8 @@ import { createElement } from 'react'
 import { InterimPdfDocument, type InterimPdfData } from '@/lib/pdf/InterimPdfTemplate'
 import { calculateInterim, type CostItem } from '@/lib/calculations/interim'
 import { normalizeOne } from '@/lib/utils/normalize'
+import { aggregateForwardingQuotes } from '@/lib/utils/forwarding'
+import { fetchForwardingQuotes } from '@/lib/data/queries'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -59,12 +61,7 @@ export async function GET(req: NextRequest) {
 
   const transactionId = (t as { id?: string } | null)?.id ?? null
 
-  const { data: fwdRows } = transactionId
-    ? await supabase.from('forwarding_quotes')
-        .select('forwarder_name,forwarding_quote_items(item_type,amount_krw)')
-        .eq('transaction_id', transactionId)
-        .order('sort_order')
-    : { data: [] }
+  const fwdRows = transactionId ? await fetchForwardingQuotes(supabase, transactionId) : []
 
   const rawItems = Array.isArray(interim.interim_cost_items) ? interim.interim_cost_items : []
   const sortedItems = [...rawItems].sort((a, b) => ((a as { sort_order?: number }).sort_order ?? 0) - ((b as { sort_order?: number }).sort_order ?? 0))
@@ -105,15 +102,11 @@ export async function GET(req: NextRequest) {
         groupType: String(i.group_type ?? 'customs'),
       }
     }),
-    forwardingQuotes: (fwdRows ?? []).map((r) => {
-      type FqItem = { item_type: string; amount_krw: number }
-      const items = (r.forwarding_quote_items as FqItem[] | null) ?? []
-      return {
-        itemName: r.forwarder_name ?? '',
-        quoteAmountKrw: items.filter(i => i.item_type === 'quote').reduce((s, i) => s + Number(i.amount_krw ?? 0), 0) || null,
-        actualAmountKrw: items.filter(i => i.item_type === 'invoice').reduce((s, i) => s + Number(i.amount_krw ?? 0), 0) || null,
-      }
-    }),
+    forwardingQuotes: aggregateForwardingQuotes(fwdRows).map(q => ({
+      itemName: q.forwarderName,
+      quoteAmountKrw: q.quoteAmountKrw || null,
+      actualAmountKrw: q.actualAmountKrw || null,
+    })),
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

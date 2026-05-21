@@ -2,6 +2,12 @@ import { createClient } from '@/lib/supabase/server'
 import { normalizeOne } from '@/lib/utils/normalize'
 import { notFound } from 'next/navigation'
 import { calculateClosing } from '@/lib/calculations/closing'
+import { calcImportAmountKrw } from '@/lib/calculations/helpers'
+import { aggregateForwardingQuotes } from '@/lib/utils/forwarding'
+import {
+  fetchTransactionBase, fetchInterimSettlement, fetchClosingSettlement,
+  fetchForwardingQuotes, fetchInterimCostItems, fetchClosingCostItems,
+} from '@/lib/data/queries'
 import { formatDate, formatUsd, formatExchangeRate } from '@/lib/utils/format'
 import { ReportHeader } from '@/components/report/ReportHeader'
 import { ReportSection } from '@/components/report/ReportSection'
@@ -20,23 +26,11 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const { id } = await params
   const supabase = await createClient()
 
-  const [
-    { data: t },
-    { data: interim },
-    { data: closing },
-    { data: fwdRows },
-    { data: txItems },
-  ] = await Promise.all([
-    supabase.from('transactions').select('*, manufacturers(name)').eq('id', id).single(),
-    supabase.from('interim_settlements')
-      .select('id,customs_exchange_rate,confirmed_amount_krw,is_locked,updated_at')
-      .eq('transaction_id', id).single(),
-    supabase.from('closing_settlements')
-      .select('id,closing_date,bok_exchange_rate,lc_payment_total_krw,fx_burden_a1_pct,confirmed_amount_krw,is_locked')
-      .eq('transaction_id', id).single(),
-    supabase.from('forwarding_quotes')
-      .select('forwarder_name,quote_date,notes,forwarding_quote_items(item_type,amount_krw)')
-      .eq('transaction_id', id).order('sort_order'),
+  const [t, interim, closing, fwdRows, { data: txItems }] = await Promise.all([
+    fetchTransactionBase(supabase, id),
+    fetchInterimSettlement(supabase, id),
+    fetchClosingSettlement(supabase, id),
+    fetchForwardingQuotes(supabase, id),
     supabase.from('transaction_items')
       .select('id,spec,glove_type,color,size,unit_price_usd,quantity,unit')
       .eq('transaction_id', id).order('sort_order'),
@@ -44,26 +38,9 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
   if (!t) notFound()
 
-  const [
-    { data: interimCosts },
-    { data: lcFees },
-    { data: closingCosts },
-    { data: benchRaw },
-    { data: allRoundsRaw },
-  ] = await Promise.all([
-    interim?.id
-      ? supabase.from('interim_cost_items')
-          .select('item_name,amount_krw,is_vat_taxable,vat_amount_krw,group_type')
-          .eq('interim_settlement_id', interim.id).order('sort_order')
-      : Promise.resolve({ data: [] }),
-    closing?.id
-      ? supabase.from('lc_fee_items').select('item_name,amount_krw')
-          .eq('closing_settlement_id', closing.id).order('sort_order')
-      : Promise.resolve({ data: [] }),
-    closing?.id
-      ? supabase.from('closing_cost_items').select('item_name,amount_krw')
-          .eq('closing_settlement_id', closing.id).order('sort_order')
-      : Promise.resolve({ data: [] }),
+  const [interimCosts, closingCostData, { data: benchRaw }, { data: allRoundsRaw }] = await Promise.all([
+    interim?.id ? fetchInterimCostItems(supabase, interim.id) : Promise.resolve([]),
+    closing?.id ? fetchClosingCostItems(supabase, closing.id) : Promise.resolve({ lcFees: [], closingCosts: [] }),
     // 벤치마크: 확정된 클로징 정산 전체
     supabase
       .from('closing_settlements')
@@ -75,6 +52,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       .select('round_no, round_label, interim_settlements(confirmed_amount_krw)')
       .order('round_no'),
   ])
+  const lcFees = closingCostData.lcFees
+  const closingCosts = closingCostData.closingCosts
 
   const mfr = t.manufacturers as { name: string } | null
   const importUsd = Number(t.import_amount_usd ?? 0)
@@ -83,13 +62,11 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const customsRate = interimRate ?? txCustomsRate
   const bokRate = closing?.bok_exchange_rate ? Number(closing.bok_exchange_rate) : null
 
-  type IC = { item_name: string; amount_krw: unknown; is_vat_taxable: boolean; vat_amount_krw: unknown; group_type: string }
-  const allCosts = (interimCosts ?? []) as IC[]
-  const toRow = (i: IC) => ({ ...i, amount_krw: Number(i.amount_krw), vat_amount_krw: Number(i.vat_amount_krw ?? 0) })
-  const shippingItems = allCosts.filter((i) => i.group_type === 'shipping').map(toRow)
-  const customsItems = allCosts.filter((i) => i.group_type !== 'shipping').map(toRow)
-  const vatAmountKrw = allCosts.reduce((s, i) => s + Number(i.vat_amount_krw ?? 0), 0)
-  const interimImportKrw = customsRate ? Math.round(importUsd * customsRate) : 0
+  const shippingItems = interimCosts.filter(i => i.group_type === 'shipping')
+  const customsItems = interimCosts.filter(i => i.group_type !== 'shipping')
+  const vatAmountKrw = interimCosts.reduce((s, i) => s + i.vat_amount_krw, 0)
+  const marginRatePct = t.margin_rate_pct ? Number(t.margin_rate_pct) : null
+  const interimImportKrw = customsRate ? calcImportAmountKrw(importUsd, customsRate, marginRatePct ?? 0) : 0
   const interimConfirmedKrw = interim?.confirmed_amount_krw ? Number(interim.confirmed_amount_krw) : null
   const interimDirection = interimConfirmedKrw != null && interimConfirmedKrw !== 0
     ? interimConfirmedKrw >= 0 ? '한국에이원 → 토에이산교 지급' : '토에이산교 → 한국에이원 지급'
@@ -99,7 +76,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const closingCostsParsed = (closingCosts ?? []).map((c) => ({ item_name: String(c.item_name), amount_krw: Number(c.amount_krw) }))
   const fxBurdenA1Pct = closing?.fx_burden_a1_pct ?? 50
   const lcPayment = closing?.lc_payment_total_krw ? Number(closing.lc_payment_total_krw) : 0
-  const importAmountKrw = txCustomsRate > 0 ? Math.round(importUsd * txCustomsRate) : 0
+  const importAmountKrw = txCustomsRate > 0 ? calcImportAmountKrw(importUsd, txCustomsRate, 0) : 0
 
   const closingCalc = closing && txCustomsRate > 0
     ? calculateClosing({
@@ -121,7 +98,6 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const shippingItemsTotal = shippingItems.reduce((s, i) => s + i.amount_krw, 0)
   const nonVatCostsTotal = customsItemsTotal + shippingItemsTotal
   const allCostsTotal = nonVatCostsTotal + vatAmountKrw
-  const marginRatePct = t.margin_rate_pct ? Number(t.margin_rate_pct) : null
   const settledDays = t.lc_open_date && closing?.closing_date
     ? Math.round((new Date(closing.closing_date).getTime() - new Date(t.lc_open_date as string).getTime()) / (1000 * 60 * 60 * 24))
     : null
@@ -284,17 +260,13 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           }} />
 
           {/* IV. 포워딩 견적 */}
-          <ReportForwardingSection rows={(fwdRows ?? []).map(r => {
-            type FqItem = { item_type: string; amount_krw: number }
-            const items = (r.forwarding_quote_items as FqItem[]) ?? []
-            return {
-              forwarder_name: r.forwarder_name ?? null,
-              quote_date: r.quote_date ?? null,
-              notes: r.notes ?? null,
-              quote_amount_krw: items.filter(i => i.item_type === 'quote').reduce((s, i) => s + Number(i.amount_krw ?? 0), 0) || null,
-              actual_amount_krw: items.filter(i => i.item_type === 'invoice').reduce((s, i) => s + Number(i.amount_krw ?? 0), 0) || null,
-            }
-          })} />
+          <ReportForwardingSection rows={aggregateForwardingQuotes(fwdRows ?? []).map((q, i) => ({
+            forwarder_name: q.forwarderName || null,
+            quote_date: fwdRows?.[i]?.quote_date ?? null,
+            notes: fwdRows?.[i]?.notes ?? null,
+            quote_amount_krw: q.quoteAmountKrw || null,
+            actual_amount_krw: q.actualAmountKrw || null,
+          }))} />
         </>
       ) : (
         <ReportSection title="III. 중간정산 내역">

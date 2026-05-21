@@ -24,3 +24,15 @@ export function formatExchangeRate(rate: number | null | undefined): string {
   if (rate == null) return '-'
   return `${rate.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}원/$`
 }
+
+export function formatDiff(value: number): string {
+  const abs = Math.abs(value).toLocaleString('ko-KR')
+  return value >= 0 ? `+${abs}원` : `-${abs}원`
+}
+
+export function formatYearMonth(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  return `${y}-${m}`
+}

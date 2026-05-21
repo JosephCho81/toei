@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
+import { fetchInterimSettlement, fetchClosingSettlement } from '@/lib/data/queries'
 import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,14 +26,14 @@ export default async function TransactionDetailPage({ params }: { params: Promis
   const { id } = await params
   const supabase = await createClient()
 
-  const [
-    { data: t },
-    { data: interim },
-    { data: closing },
-  ] = await Promise.all([
-    supabase.from('v_transaction_status').select('*, manufacturers(name)').eq('id', id).single(),
-    supabase.from('interim_settlements').select('id, confirmed_amount_krw, customs_exchange_rate, rounding_policy, is_locked, is_paid, updated_at').eq('transaction_id', id).maybeSingle(),
-    supabase.from('closing_settlements').select('id, confirmed_amount_krw, bok_exchange_rate, is_locked, is_paid, closing_date').eq('transaction_id', id).maybeSingle(),
+  const { data: t } = await supabase
+    .from('v_transaction_status')
+    .select('*, manufacturers(name)')
+    .eq('id', id)
+    .single()
+  const [interim, closing] = await Promise.all([
+    fetchInterimSettlement(supabase, id),
+    fetchClosingSettlement(supabase, id),
   ])
 
   if (!t) notFound()

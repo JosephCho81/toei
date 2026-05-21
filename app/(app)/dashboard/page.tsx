@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { VerificationIssueCard } from '@/components/dashboard/VerificationIssueCard'
 import { YearFilterBar } from '@/components/dashboard/YearFilterBar'
-import type { VerRow } from '@/components/dashboard/VerificationIssueCard'
+import { loadDashboardData, type ContainerRow } from '@/lib/data/dashboard'
 
 export const metadata: Metadata = {
   title: '정산 현황',
@@ -33,173 +33,13 @@ export default async function DashboardPage({
   const year = (await searchParams).year ?? '2026'
   const supabase = await createClient()
 
-  const yearFrom = `${year}-01-01`
-  const yearTo = `${year}-12-31`
-
-  const buildAllTxQ = () =>
-    supabase.from('v_transaction_status').select('import_amount_usd, settlement_status')
-      .gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
-
-  const buildInterimPendingQ = () =>
-    supabase.from('transactions')
-      .select('id, round_label, import_amount_usd, interim_settlements(id, confirmed_amount_krw, is_locked)')
-      .eq('is_locked', false)
-      .gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
-
-  const buildClosingPendingQ = () =>
-    supabase.from('v_transaction_status')
-      .select('id, round_label, import_amount_usd')
-      .in('settlement_status', ['interim_done', 'closing_saved'])
-      .gte('lc_open_date', yearFrom).lte('lc_open_date', yearTo)
-
-  const containerCutoffDate = new Date()
-  containerCutoffDate.setDate(containerCutoffDate.getDate() - 7)
-  const containerCutoffStr = containerCutoffDate.toISOString().slice(0, 10)
-
-  const [
-    { data: allTx },
-    { data: ddayTx },
-    { data: rawInterimData },
-    { data: closingPending },
-    { data: containerData },
-    { data: recentTx },
-    { data: verificationIssues },
-  ] = await Promise.all([
-    buildAllTxQ(),
-    supabase.from('v_transaction_status')
-      .select('id, round_label, a1_payment_date, settlement_status')
-      .not('a1_payment_date', 'is', null)
-      .neq('settlement_status', 'closing_done')
-      .order('a1_payment_date'),
-    buildInterimPendingQ(),
-    buildClosingPendingQ(),
-    supabase.from('containers')
-      .select('id, container_no, etd, eta, actual_arrival, tracking_status, transactions(id, round_label, manufacturers(name), transaction_items(spec))')
-      .is('actual_arrival', null)
-      .gte('eta', containerCutoffStr)
-      .order('eta', { ascending: true, nullsFirst: false })
-      .limit(10),
-    supabase.from('v_transaction_status')
-      .select('id, round_label, round_no, import_amount_usd, settlement_status, manufacturers(name), containers(etd, eta)')
-      .order('round_no', { ascending: false })
-      .limit(5),
-    supabase.from('interim_settlements')
-      .select('id, notes, confirmed_amount_krw, customs_exchange_rate, transactions(id, round_no, round_label, import_amount_usd, margin_rate_pct), interim_cost_items(amount_krw)')
-      .like('notes', '%[검증]%')
-      .not('notes', 'like', '%[확인완료]%')
-      .order('created_at'),
-  ])
-
-  // interimPending: LEFT JOIN 필터 적용
-  type RawInterimTx = {
-    id: string; round_label: string; import_amount_usd: number | null
-    interim_settlements: { id: string; confirmed_amount_krw: number | null; is_locked: boolean | null }[] | null
-  }
-  const rawInterimAll = (rawInterimData ?? []) as unknown as RawInterimTx[]
-  const interimPending = rawInterimAll.filter((t) => {
-    // Supabase는 1:1 관계를 단일 객체로 반환하므로 배열로 정규화
-    const raw = t.interim_settlements
-    const settlements: { id: string; confirmed_amount_krw: number | null; is_locked: boolean | null }[] =
-      raw == null ? [] : Array.isArray(raw) ? raw : [raw]
-    if (settlements.length === 0) return true
-    return settlements.some((s) => s.confirmed_amount_krw == null || s.is_locked === false)
-  })
-
-  const totalCount = allTx?.length ?? 0
-  const totalUsd = allTx?.reduce((s, t) => s + Number(t.import_amount_usd ?? 0), 0) ?? 0
-  const closingDone = allTx?.filter((t) => t.settlement_status === 'closing_done').length ?? 0
-
-  const interimPendingUsd = interimPending.reduce((s, t) => s + Number(t.import_amount_usd ?? 0), 0)
-  const closingPendingUsd = (closingPending ?? []).reduce((s, t) => s + Number(t.import_amount_usd ?? 0), 0)
-  const totalPendingUsd = interimPendingUsd + closingPendingUsd
-  const pendingCount = interimPending.length + (closingPending?.length ?? 0)
-
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  const ddayList = (ddayTx ?? []).map((t) => {
-    const payDate = new Date(t.a1_payment_date!)
-    payDate.setHours(0, 0, 0, 0)
-    const elapsed = Math.floor((today.getTime() - payDate.getTime()) / 86400000)
-    return { ...t, dday: 55 - elapsed }
-  }).sort((a, b) => a.dday - b.dday)
-
-  // 컨테이너 데이터 처리
-  type ContainerRow = {
-    id: string
-    container_no: string | null
-    etd: string | null
-    eta: string | null
-    actual_arrival: string | null
-    tracking_status: string | null
-    transactions: {
-      id: string; round_label: string
-      manufacturers: { name: string } | { name: string }[] | null
-      transaction_items: { spec: string | null }[] | null
-    } | {
-      id: string; round_label: string
-      manufacturers: { name: string } | { name: string }[] | null
-      transaction_items: { spec: string | null }[] | null
-    }[] | null
-  }
-  const containers = (containerData ?? []) as unknown as ContainerRow[]
-  const inTransit = containers.length
-  const arrivingSoon = containers.filter((c) => {
-    if (!c.eta) return false
-    const eta = new Date(c.eta)
-    eta.setHours(0, 0, 0, 0)
-    return Math.floor((eta.getTime() - today.getTime()) / 86400000) <= 7
-  }).length
-
-  // 검증 이슈 처리
-  type RawVerRow = {
-    id: string
-    notes: string | null
-    confirmed_amount_krw: number | null
-    customs_exchange_rate: number | null
-    transactions: {
-      id: string; round_no: number; round_label: string
-      import_amount_usd: number | null; margin_rate_pct: number | null
-    } | {
-      id: string; round_no: number; round_label: string
-      import_amount_usd: number | null; margin_rate_pct: number | null
-    }[] | null
-    interim_cost_items: { amount_krw: number | null }[] | null
-  }
-
-  const rawVerRows = (verificationIssues ?? []) as unknown as RawVerRow[]
-  const verRows: VerRow[] = rawVerRows.map((row) => {
-    const tx = normalizeOne(row.transactions)
-    const costSum = (row.interim_cost_items ?? []).reduce(
-      (s, c) => s + Number(c.amount_krw || 0), 0,
-    )
-
-    let diff: number | null = null
-    if (
-      tx &&
-      row.confirmed_amount_krw != null &&
-      row.customs_exchange_rate != null &&
-      tx.import_amount_usd != null &&
-      tx.margin_rate_pct != null
-    ) {
-      const calcAmount =
-        Math.round(
-          Number(tx.import_amount_usd) * Number(row.customs_exchange_rate)
-          * (1 + Number(tx.margin_rate_pct) / 100)
-          + costSum,
-        ) * 1.10
-      diff = Number(row.confirmed_amount_krw) - calcAmount
-    }
-
-    return {
-      id: row.id,
-      notes: row.notes,
-      confirmed_amount_krw: row.confirmed_amount_krw,
-      round_label: tx?.round_label ?? '-',
-      transaction_id: tx?.id ?? '',
-      diff,
-    }
-  })
+  const {
+    totalCount, totalUsd, closingDone,
+    interimPending, interimPendingUsd,
+    closingPending, closingPendingUsd, totalPendingUsd, pendingCount,
+    ddayList, containers, inTransit, arrivingSoon,
+    verRows, recentTx,
+  } = await loadDashboardData(supabase, year)
 
   return (
     <div className="space-y-6">
@@ -399,16 +239,14 @@ export default async function DashboardPage({
                 </tr>
               </thead>
               <tbody>
-                {containers.map((c, i) => {
+                {(containers as ContainerRow[]).map((c, i) => {
                   const tx = normalizeOne(c.transactions)
                   const mfr = tx ? normalizeOne(tx.manufacturers) : null
                   const rawItems = tx?.transaction_items
                   const items: { spec: string | null }[] =
                     rawItems == null ? [] : Array.isArray(rawItems) ? rawItems : [rawItems]
                   const productSummary = [...new Set(items.map((it) => it.spec).filter(Boolean))].join(', ') || '-'
-                  const isArrivingSoon = c.eta
-                    ? Math.floor((new Date(c.eta).getTime() - today.getTime()) / 86400000) <= 7
-                    : false
+                  const isArrivingSoon = c.isArrivingSoon
                   return (
                     <tr
                       key={c.id}

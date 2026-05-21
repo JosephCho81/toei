@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer'
 import path from 'path'
+import { pdfStyles, GREEN, GREEN_LIGHT, GRAY_BG, BORDER, TEXT, MUTED, WHITE } from './pdfStyles'
 
 Font.register({
   family: 'NotoSansKR',
@@ -35,91 +36,8 @@ export interface InterimPdfData {
   forwardingQuotes: { itemName: string; quoteAmountKrw: number | null; actualAmountKrw: number | null }[]
 }
 
-const GREEN = '#2E7D32'
-const GREEN_LIGHT = '#388E3C'
-const GRAY_BG = '#f7f9fc'
-const BORDER = '#A5D6A7'
-const TEXT = '#333333'
-const MUTED = '#5a6778'
-const WHITE = '#ffffff'
-
-const s = StyleSheet.create({
-  page: {
-    fontFamily: 'NotoSansKR',
-    fontSize: 10,
-    color: TEXT,
-    paddingTop: 36,
-    paddingBottom: 60,
-    paddingLeft: 40,
-    paddingRight: 40,
-  },
-  header: {
-    backgroundColor: GREEN,
-    padding: 14,
-    marginBottom: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerLogo: {
-    height: 40,
-    width: 80,
-    objectFit: 'contain',
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  companyName: {
-    color: WHITE,
-    fontSize: 9,
-    fontWeight: 700,
-    marginBottom: 5,
-    textAlign: 'center',
-  },
-  docTitle: {
-    color: WHITE,
-    fontSize: 14,
-    fontWeight: 700,
-    textAlign: 'center',
-  },
-  sectionLabel: {
-    fontSize: 8.5,
-    color: GREEN_LIGHT,
-    fontWeight: 700,
-    marginTop: 12,
-    marginBottom: 3,
-  },
-  table: {
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  rowOdd: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    minHeight: 26,
-    alignItems: 'center',
-  },
-  rowEven: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    minHeight: 26,
-    alignItems: 'center',
-    backgroundColor: GRAY_BG,
-  },
-  lastRowOdd: {
-    flexDirection: 'row',
-    minHeight: 26,
-    alignItems: 'center',
-  },
-  lastRowEven: {
-    flexDirection: 'row',
-    minHeight: 26,
-    alignItems: 'center',
-    backgroundColor: GRAY_BG,
-  },
+const s = {
+  ...pdfStyles,
   cellLabel: {
     width: '38%',
     paddingLeft: 10,
@@ -129,7 +47,7 @@ const s = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: BORDER,
     color: MUTED,
-    fontWeight: 700,
+    fontWeight: 700 as const,
     fontSize: 9,
   },
   cellValue: {
@@ -139,67 +57,7 @@ const s = StyleSheet.create({
     paddingTop: 6,
     paddingBottom: 6,
   },
-  summaryBox: {
-    backgroundColor: '#E8F5E9',
-    borderWidth: 1.5,
-    borderColor: GREEN,
-    padding: 14,
-    marginTop: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: 11,
-    fontWeight: 700,
-    color: GREEN,
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: 700,
-    color: GREEN,
-  },
-  paidView: {
-    backgroundColor: '#16a34a',
-    paddingLeft: 8,
-    paddingRight: 8,
-    paddingTop: 3,
-    paddingBottom: 3,
-    alignSelf: 'flex-start',
-  },
-  unpaidView: {
-    backgroundColor: '#dc2626',
-    paddingLeft: 8,
-    paddingRight: 8,
-    paddingTop: 3,
-    paddingBottom: 3,
-    alignSelf: 'flex-start',
-  },
-  badgeText: {
-    color: WHITE,
-    fontSize: 9,
-    fontWeight: 700,
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 24,
-    left: 40,
-    right: 40,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: BORDER,
-    paddingTop: 6,
-    fontSize: 8,
-    color: '#9aa3b0',
-  },
-  disclaimer: {
-    fontSize: 8,
-    color: '#666666',
-    textAlign: 'right',
-    marginBottom: 10,
-  },
-})
+}
 
 function krw(n: number): string {
   return n.toLocaleString('ko-KR') + '원'

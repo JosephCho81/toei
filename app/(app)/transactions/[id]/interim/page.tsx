@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { fetchTransactionBase, fetchInterimSettlement, fetchInterimCostItems } from '@/lib/data/queries'
+import { toCostRow } from '@/lib/utils/costRows'
 import { calculateInterim, type RoundingPolicy, type CostItem } from '@/lib/calculations/interim'
 import { formatKrw } from '@/lib/utils/format'
 import { Button } from '@/components/ui/button'
@@ -15,15 +17,6 @@ import { CustomsCostItems, DEFAULT_CUSTOMS } from '@/components/settlements/Cust
 import { InterimResultsCard } from '@/components/settlements/InterimResultsCard'
 import { MemoField } from '@/components/ui/MemoField'
 
-function toRow(item: Record<string, unknown>): CostRow {
-  return {
-    id: item.id as string,
-    item_name: String(item.item_name ?? ''),
-    amount_krw: String(item.amount_krw ?? ''),
-    is_vat_taxable: Boolean(item.is_vat_taxable),
-    vat_amount_krw: String(item.vat_amount_krw ?? '0'),
-  }
-}
 
 export default function InterimSettlementPage() {
   const { id } = useParams<{ id: string }>()
@@ -44,23 +37,23 @@ export default function InterimSettlementPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: t } = await supabase.from('transactions').select('import_amount_usd,customs_exchange_rate,margin_rate_pct').eq('id', id).single()
+      const t = await fetchTransactionBase(supabase, id)
       setTx(t)
       if (t?.customs_exchange_rate) setCustomsRate(String(t.customs_exchange_rate))
 
-      const { data: interim } = await supabase.from('interim_settlements').select('*').eq('transaction_id', id).single()
+      const interim = await fetchInterimSettlement(supabase, id)
       let hasShippingItems = false
       if (interim) {
         setSid(interim.id); setIsLocked(interim.is_locked)
         setCustomsRate(String(interim.customs_exchange_rate))
         setRoundingPolicy(interim.rounding_policy as RoundingPolicy)
         setConfirmed(String(interim.confirmed_amount_krw ?? ''))
-        setNotes((interim as Record<string, unknown>).notes as string | null ?? null)
+        setNotes(interim.notes ?? null)
 
-        const { data: items } = await supabase.from('interim_cost_items').select('*').eq('interim_settlement_id', interim.id).order('sort_order')
+        const items = await fetchInterimCostItems(supabase, interim.id)
         if (items?.length) {
-          const ship = items.filter((i) => (i as Record<string, unknown>).group_type === 'shipping').map(toRow)
-          const cust = items.filter((i) => (i as Record<string, unknown>).group_type !== 'shipping').map(toRow)
+          const ship = items.filter((i) => (i as Record<string, unknown>).group_type === 'shipping').map(toCostRow)
+          const cust = items.filter((i) => (i as Record<string, unknown>).group_type !== 'shipping').map(toCostRow)
           if (ship.length) { setShippingRows(ship); hasShippingItems = true }
           if (cust.length) setCustomsRows(cust)
         }

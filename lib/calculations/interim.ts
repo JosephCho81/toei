@@ -1,3 +1,5 @@
+import { calcImportAmountKrw } from './helpers'
+
 export type RoundingPolicy = 'floor_100' | 'floor_10' | 'none'
 
 export interface CostItem {
@@ -24,7 +26,7 @@ export function calculateInterim(params: {
   roundingPolicy: RoundingPolicy
 }): InterimCalculation {
   const { importAmountUsd, customsExchangeRate, marginRatePct = 0, costItems, roundingPolicy } = params
-  const importAmountKrw = Math.round(importAmountUsd * customsExchangeRate * (1 + marginRatePct / 100))
+  const importAmountKrw = calcImportAmountKrw(importAmountUsd, customsExchangeRate, marginRatePct)
   const totalCostKrw = costItems.reduce((sum, item) => sum + item.amountKrw, 0)
   const confirmedKrw = importAmountKrw + totalCostKrw
   return {

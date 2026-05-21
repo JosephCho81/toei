@@ -1,4 +1,5 @@
 import { applyRounding } from './interim'
+import { calcImportAmountKrw } from './helpers'
 export type { RoundingPolicy } from './interim'
 import type { RoundingPolicy } from './interim'
 
@@ -37,7 +38,7 @@ export function calculateClosing(params: {
     interimConfirmedKrw,
   } = params
 
-  const importAmountKrw = Math.round(importAmountUsd * customsExchangeRate)
+  const importAmountKrw = calcImportAmountKrw(importAmountUsd, customsExchangeRate, 0)
 
   // 환차손익 = LC결제비용 - (수입금액USD × 통관환율)
   const fxGainLossKrw = lcPaymentTotalKrw - importAmountKrw

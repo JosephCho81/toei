@@ -5,6 +5,8 @@ import { createElement } from 'react'
 import { ClosingPdfDocument, type ClosingPdfData } from '@/lib/pdf/ClosingPdfTemplate'
 import { calculateClosing } from '@/lib/calculations/closing'
 import { normalizeOne } from '@/lib/utils/normalize'
+import { aggregateForwardingQuotes } from '@/lib/utils/forwarding'
+import { fetchInterimSettlement, fetchInterimCostItems, fetchForwardingQuotes } from '@/lib/data/queries'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -47,38 +49,24 @@ export async function GET(req: NextRequest) {
 
   const transactionId = closing.transaction_id as string
 
-  const [
-    { data: txItems },
-    { data: interimSettlement },
-    { data: fwdRows },
-  ] = await Promise.all([
+  const [{ data: txItems }, interimSettlement, fwdRows] = await Promise.all([
     supabase.from('transaction_items')
       .select('spec, color, size, unit_price_usd, quantity, unit, sort_order')
       .eq('transaction_id', transactionId)
       .order('sort_order'),
-    supabase.from('interim_settlements')
-      .select('id, customs_exchange_rate, confirmed_amount_krw')
-      .eq('transaction_id', transactionId)
-      .single(),
-    supabase.from('forwarding_quotes')
-      .select('forwarder_name,forwarding_quote_items(item_type,amount_krw)')
-      .eq('transaction_id', transactionId)
-      .order('sort_order'),
+    fetchInterimSettlement(supabase, transactionId),
+    fetchForwardingQuotes(supabase, transactionId),
   ])
 
-  let interimCostItems: { item_name: string; amount_krw: number; group_type: string }[] = []
-  if (interimSettlement?.id) {
-    const { data: costItems } = await supabase.from('interim_cost_items')
-      .select('item_name, amount_krw, vat_amount_krw, group_type, sort_order')
-      .eq('interim_settlement_id', interimSettlement.id)
-      .order('sort_order')
-    interimCostItems = (costItems ?? []).map((c) => ({
-      item_name: String(c.item_name ?? ''),
-      amount_krw: Number(c.amount_krw) || 0,
-      vat_amount_krw: Number((c as { vat_amount_krw?: unknown }).vat_amount_krw) || 0,
-      group_type: String(c.group_type ?? ''),
-    }))
-  }
+  const rawInterimCostItems = interimSettlement?.id
+    ? await fetchInterimCostItems(supabase, interimSettlement.id)
+    : []
+  const interimCostItems = rawInterimCostItems.map((c) => ({
+    item_name: String(c.item_name ?? ''),
+    amount_krw: Number(c.amount_krw) || 0,
+    vat_amount_krw: Number(c.vat_amount_krw) || 0,
+    group_type: String(c.group_type ?? ''),
+  }))
 
   const t = normalizeOne(closing.transactions as {
     round_label: string; import_amount_usd: number | null
@@ -194,15 +182,11 @@ export async function GET(req: NextRequest) {
     customsDetailItems: interimCostItems
       .filter((c) => c.group_type === 'customs')
       .map((c) => ({ itemName: c.item_name, amountKrw: c.amount_krw })),
-    forwardingQuotes: (fwdRows ?? []).map((r) => {
-      type FqItem = { item_type: string; amount_krw: number }
-      const items = (r.forwarding_quote_items as FqItem[] | null) ?? []
-      return {
-        itemName: r.forwarder_name ?? '',
-        quoteAmountKrw: items.filter(i => i.item_type === 'quote').reduce((s, i) => s + Number(i.amount_krw ?? 0), 0) || null,
-        actualAmountKrw: items.filter(i => i.item_type === 'invoice').reduce((s, i) => s + Number(i.amount_krw ?? 0), 0) || null,
-      }
-    }),
+    forwardingQuotes: aggregateForwardingQuotes(fwdRows).map(q => ({
+      itemName: q.forwarderName,
+      quoteAmountKrw: q.quoteAmountKrw || null,
+      actualAmountKrw: q.actualAmountKrw || null,
+    })),
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
