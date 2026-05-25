@@ -37,7 +37,7 @@ export function ContainerForm({ transactionId, onSaved, onCancel }: Props) {
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
 
-  const fetchTracking = useCallback(async (no: string) => {
+  const fetchTracking = useCallback(async (no: string, signal: AbortSignal) => {
     if (no.length < 4) return
     setTrackingLoading(true)
     try {
@@ -45,6 +45,7 @@ export function ContainerForm({ transactionId, onSaved, onCancel }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ containerNo: no }),
+        signal,
       })
       const data: TrackingData = await res.json()
       setTracking(data)
@@ -54,23 +55,34 @@ export function ContainerForm({ transactionId, onSaved, onCancel }: Props) {
         if (data.vesselName) setVesselName(data.vesselName)
         if (data.currentLocation) setLocation(data.currentLocation)
       }
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') throw e
     } finally {
       setTrackingLoading(false)
     }
   }, [])
 
   useEffect(() => {
+    const controller = new AbortController()
     const timer = setTimeout(() => {
       const normalized = containerNo.toUpperCase().replace(/\s/g, '')
-      if (normalized.length >= 4) fetchTracking(normalized)
+      if (normalized.length >= 4) fetchTracking(normalized, controller.signal)
     }, 500)
-    return () => clearTimeout(timer)
+    return () => { clearTimeout(timer); controller.abort() }
   }, [containerNo, fetchTracking])
 
   async function handleSave() {
     const normalized = containerNo.toUpperCase().replace(/\s/g, '')
     if (!normalized) return
     setSaving(true)
+    const { data: dup } = await supabase
+      .from('containers').select('id')
+      .eq('transaction_id', transactionId).eq('container_no', normalized).maybeSingle()
+    if (dup) {
+      setSaving(false)
+      alert('이미 등록된 컨테이너 번호입니다.')
+      return
+    }
     await supabase.from('containers').insert({
       transaction_id: transactionId,
       container_no: normalized,

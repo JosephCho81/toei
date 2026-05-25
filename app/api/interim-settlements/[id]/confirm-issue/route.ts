@@ -16,6 +16,10 @@ export async function PATCH(_req: NextRequest, { params }: { params: Promise<{ i
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
+    if ((existing.notes ?? '').includes('[확인완료]')) {
+      return NextResponse.json({ ok: true })
+    }
+
     const newNotes = (existing.notes ?? '') + ' [확인완료]'
 
     const { error } = await supabase

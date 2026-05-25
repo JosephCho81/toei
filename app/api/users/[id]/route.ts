@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // AUTH_RESTORE: enable role check when auth is re-enabled (see proxy.ts)
+  // const supabase = await createClient()
+  // const { data: { user } } = await supabase.auth.getUser()
+  // if (!user || user.user_metadata?.role !== 'admin') {
+  //   return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // }
   try {
     const { id } = await params
     const body = await req.json()

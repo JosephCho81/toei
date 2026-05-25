@@ -44,35 +44,51 @@ export function ContainerForm({ transactionId, open, onOpenChange, initialData, 
 
   useEffect(() => { if (open) { setForm(empty(initialData)); setTracking(null) } }, [open])
 
-  const fetchTracking = useCallback(async (no: string) => {
-    const res = await fetch('/api/tracking', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ containerNo: no }),
-    })
-    const data = await res.json()
-    setTracking({ apiSupported: data.apiSupported, carrier: data.carrier ?? null, trackingUrl: data.trackingUrl ?? null })
-    if (data.apiSupported) {
-      setForm(p => ({
-        ...p,
-        eta: data.eta ? data.eta.slice(0, 10) : p.eta,
-        etd: data.etd ? data.etd.slice(0, 10) : p.etd,
-        vessel_name: data.vesselName ?? p.vessel_name,
-        carrier: data.carrier ?? p.carrier,
-      }))
+  const fetchTracking = useCallback(async (no: string, signal: AbortSignal) => {
+    try {
+      const res = await fetch('/api/tracking', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ containerNo: no }),
+        signal,
+      })
+      const data = await res.json()
+      setTracking({ apiSupported: data.apiSupported, carrier: data.carrier ?? null, trackingUrl: data.trackingUrl ?? null })
+      if (data.apiSupported) {
+        setForm(p => ({
+          ...p,
+          eta: data.eta ? data.eta.slice(0, 10) : p.eta,
+          etd: data.etd ? data.etd.slice(0, 10) : p.etd,
+          vessel_name: data.vesselName ?? p.vessel_name,
+          carrier: data.carrier ?? p.carrier,
+        }))
+      }
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') throw e
     }
   }, [])
 
   useEffect(() => {
     const no = form.container_no.toUpperCase().replace(/\s/g, '')
     if (no.length < 4) return
-    const t = setTimeout(() => fetchTracking(no), 500)
-    return () => clearTimeout(t)
+    const controller = new AbortController()
+    const t = setTimeout(() => fetchTracking(no, controller.signal), 500)
+    return () => { clearTimeout(t); controller.abort() }
   }, [form.container_no, fetchTracking])
 
   async function handleSave() {
     const no = form.container_no.toUpperCase().replace(/\s/g, '')
     if (!no) return
     setSaving(true)
+    if (!isEdit) {
+      const { data: dup } = await supabase
+        .from('containers').select('id')
+        .eq('transaction_id', transactionId).eq('container_no', no).maybeSingle()
+      if (dup) {
+        setSaving(false)
+        alert('이미 등록된 컨테이너 번호입니다.')
+        return
+      }
+    }
     const payload = {
       transaction_id: transactionId, container_no: no,
       bl_no: form.bl_no || null, lc_number: form.lc_number || null,

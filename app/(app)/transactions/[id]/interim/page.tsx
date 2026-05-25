@@ -112,16 +112,18 @@ export default function InterimSettlementPage() {
       id2 = data?.id ?? null; setSid(id2)
     }
     if (id2) {
-      await supabase.from('interim_cost_items').delete().eq('interim_settlement_id', id2)
-      const mkRow = (r: CostRow, i: number, grp: string) => ({
-        interim_settlement_id: id2!, item_name: r.item_name, group_type: grp,
+      const mkItem = (r: CostRow, i: number, grp: string) => ({
+        item_name: r.item_name, group_type: grp,
         amount_krw: parseFloat(r.amount_krw) || 0, is_vat_taxable: r.is_vat_taxable,
         vat_amount_krw: parseFloat(r.vat_amount_krw) || 0, sort_order: i,
       })
-      await supabase.from('interim_cost_items').insert([
-        ...shippingRows.map((r, i) => mkRow(r, i, 'shipping')),
-        ...customsRows.map((r, i) => mkRow(r, shippingRows.length + i, 'customs')),
-      ])
+      await supabase.rpc('save_interim_cost_items', {
+        p_interim_settlement_id: id2,
+        p_items: [
+          ...shippingRows.map((r, i) => mkItem(r, i, 'shipping')),
+          ...customsRows.map((r, i) => mkItem(r, shippingRows.length + i, 'customs')),
+        ],
+      })
     }
     setSaving(false)
     if (lock) { setIsLocked(true); router.push(`/transactions/${id}`) }

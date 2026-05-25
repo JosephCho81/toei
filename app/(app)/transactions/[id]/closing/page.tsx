@@ -197,26 +197,20 @@ export default function ClosingSettlementPage() {
     }
 
     if (sid) {
-      await supabase.from('lc_fee_items').delete().eq('closing_settlement_id', sid)
-      await supabase.from('lc_fee_items').insert(
-        lcFeeRows.map((r, i) => ({
-          closing_settlement_id: sid!,
+      await supabase.rpc('save_closing_items', {
+        p_closing_settlement_id: sid,
+        p_lc_fees: lcFeeRows.map((r, i) => ({
           item_name: r.item_name,
           amount_krw: parseFloat(r.amount_krw) || 0,
           sort_order: i,
-        }))
-      )
-
-      await supabase.from('closing_cost_items').delete().eq('closing_settlement_id', sid)
-      await supabase.from('closing_cost_items').insert(
-        closingCostRows.map((r, i) => ({
-          closing_settlement_id: sid!,
+        })),
+        p_costs: closingCostRows.map((r, i) => ({
           item_name: r.item_name,
           amount_krw: parseFloat(r.amount_krw) || 0,
           includes_vat: r.includes_vat,
           sort_order: i,
-        }))
-      )
+        })),
+      })
     }
 
     setSaving(false)
