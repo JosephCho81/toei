@@ -49,11 +49,10 @@ function ItemRow({ item }: { item: CostItem }) {
 
 function GroupSubtotalRow({ label, items }: { label: string; items: CostItem[] }) {
   const total = items.reduce((s, r) => s + r.amount_krw, 0)
-  const formula = items.map((i) => i.amount_krw.toLocaleString('ko-KR')).join(' + ')
   return (
     <TableRow className="bg-muted/40 border-t border-dashed">
       <TableCell className="pl-6 text-sm font-semibold">{label}</TableCell>
-      <TableCell className="text-xs text-gray-400 font-mono">{formula} = {total.toLocaleString('ko-KR')}</TableCell>
+      <TableCell className="text-xs text-gray-400">위 {items.length}개 항목 합계</TableCell>
       <TableCell className="text-right font-mono text-sm font-semibold">{krw(total)}</TableCell>
     </TableRow>
   )
