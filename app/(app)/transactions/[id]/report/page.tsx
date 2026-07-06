@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { normalizeOne } from '@/lib/utils/normalize'
 import { notFound } from 'next/navigation'
 import { calculateClosing } from '@/lib/calculations/closing'
 import { calcImportAmountKrw } from '@/lib/calculations/helpers'
@@ -18,8 +17,6 @@ import { ReportClosingSection } from '@/components/report/ReportClosingSection'
 import { ReportKpiCards } from '@/components/report/ReportKpiCards'
 import { ReportTimeline } from '@/components/report/ReportTimeline'
 import { ReportFlowDiagram } from '@/components/report/ReportFlowDiagram'
-import { ReportBenchmark } from '@/components/report/ReportBenchmark'
-import { ReportRoundChart } from '@/components/report/ReportRoundChart'
 import { Separator } from '@/components/ui/separator'
 
 export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
@@ -38,19 +35,9 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
   if (!t) notFound()
 
-  const [interimCosts, closingCostData, { data: benchRaw }, { data: allRoundsRaw }] = await Promise.all([
+  const [interimCosts, closingCostData] = await Promise.all([
     interim?.id ? fetchInterimCostItems(supabase, interim.id) : Promise.resolve([]),
     closing?.id ? fetchClosingCostItems(supabase, closing.id) : Promise.resolve({ lcFees: [], closingCosts: [] }),
-    // 벤치마크: 확정된 클로징 정산 전체
-    supabase
-      .from('closing_settlements')
-      .select('lc_payment_total_krw, closing_date, transactions!transaction_id(import_amount_usd, lc_open_date, margin_rate_pct, customs_exchange_rate)')
-      .eq('is_locked', true),
-    // 차수별 중간정산 확정금액
-    supabase
-      .from('transactions')
-      .select('round_no, round_label, interim_settlements(confirmed_amount_krw)')
-      .order('round_no'),
   ])
   const lcFees = closingCostData.lcFees
   const closingCosts = closingCostData.closingCosts
@@ -97,49 +84,6 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const customsItemsTotal = customsItems.reduce((s, i) => s + i.amount_krw, 0)
   const shippingItemsTotal = shippingItems.reduce((s, i) => s + i.amount_krw, 0)
   const nonVatCostsTotal = customsItemsTotal + shippingItemsTotal
-  const allCostsTotal = nonVatCostsTotal + vatAmountKrw
-  const settledDays = t.lc_open_date && closing?.closing_date
-    ? Math.round((new Date(closing.closing_date).getTime() - new Date(t.lc_open_date as string).getTime()) / (1000 * 60 * 60 * 24))
-    : null
-  const lcFeeRatePct = interimImportKrw > 0 && closingCalc
-    ? closingCalc.lcFeeTotalKrw / interimImportKrw * 100
-    : null
-
-  // 벤치마크 집계
-  type BenchRow = {
-    lc_payment_total_krw: unknown
-    closing_date: string | null
-    transactions: { import_amount_usd: unknown; lc_open_date: string | null; margin_rate_pct: unknown; customs_exchange_rate: unknown } | { import_amount_usd: unknown; lc_open_date: string | null; margin_rate_pct: unknown; customs_exchange_rate: unknown }[] | null
-  }
-  const benchRows = (benchRaw ?? []) as BenchRow[]
-  let sumMargin = 0, countMargin = 0, sumFxAbs = 0, countFx = 0, sumDays = 0, countDays = 0
-  for (const row of benchRows) {
-    const tx = normalizeOne(row.transactions)
-    if (!tx) continue
-    const mp = tx.margin_rate_pct != null ? Number(tx.margin_rate_pct) : null
-    if (mp != null) { sumMargin += mp; countMargin++ }
-    const lp = row.lc_payment_total_krw != null ? Number(row.lc_payment_total_krw) : null
-    const iu = tx.import_amount_usd != null ? Number(tx.import_amount_usd) : null
-    const cr = tx.customs_exchange_rate != null ? Number(tx.customs_exchange_rate) : null
-    if (lp != null && iu != null && cr != null) { sumFxAbs += Math.abs(lp - iu * cr); countFx++ }
-    if (row.closing_date && tx.lc_open_date) {
-      const d = Math.round((new Date(row.closing_date).getTime() - new Date(tx.lc_open_date).getTime()) / (1000 * 60 * 60 * 24))
-      if (d > 0) { sumDays += d; countDays++ }
-    }
-  }
-  const avgMarginPct = countMargin > 0 ? sumMargin / countMargin : null
-  const avgFxAbsKrw = countFx > 0 ? sumFxAbs / countFx : null
-  const avgDays = countDays > 0 ? Math.round(sumDays / countDays) : null
-
-  // 차수별 라인차트 데이터
-  type RoundRow = { round_no: number; round_label: string; interim_settlements: { confirmed_amount_krw: unknown }[] | null }
-  const roundChartData = ((allRoundsRaw ?? []) as RoundRow[])
-    .map(r => {
-      const s = normalizeOne(r.interim_settlements)
-      if (!s?.confirmed_amount_krw) return null
-      return { roundNo: r.round_no, roundLabel: r.round_label, confirmedAmountKrw: Number(s.confirmed_amount_krw) }
-    })
-    .filter((x): x is { roundNo: number; roundLabel: string; confirmedAmountKrw: number } => x != null)
 
   // Section I 데이터
   const sectionIRows: [string, string, string, string][] = [
@@ -330,28 +274,6 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             <p className="text-sm text-muted-foreground">정산 데이터 없음</p>
           </ReportSection>
         )
-      )}
-
-      {/* 벤치마크 비교 */}
-      {closingCalc && (
-        <ReportBenchmark
-          currentMarginPct={marginRatePct}
-          currentFxAbsKrw={Math.abs(closingCalc.fxGainLossKrw)}
-          currentDays={settledDays}
-          currentLcFeeRatePct={lcFeeRatePct}
-          avgMarginPct={avgMarginPct}
-          avgFxAbsKrw={avgFxAbsKrw}
-          avgDays={avgDays}
-          benchCount={countDays}
-        />
-      )}
-
-      {/* 차수별 비교 라인차트 */}
-      {roundChartData.length > 1 && (
-        <ReportRoundChart
-          data={roundChartData}
-          currentRoundNo={Number(t.round_no)}
-        />
       )}
 
       {/* 푸터 */}
