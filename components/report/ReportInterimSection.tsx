@@ -23,11 +23,49 @@ export interface InterimCostData {
   interimDirection?: string | null
 }
 
+const krw = (n: number) => `${n.toLocaleString('ko-KR')}원`
+
+function GroupHeaderRow({ label }: { label: string }) {
+  return (
+    <TableRow className="bg-green-50/60">
+      <TableCell colSpan={3} className="text-xs font-semibold text-green-800 py-1.5">{label}</TableCell>
+    </TableRow>
+  )
+}
+
+function ItemRow({ item }: { item: CostItem }) {
+  return (
+    <TableRow className="bg-muted/20">
+      <TableCell className="pl-6 text-muted-foreground text-sm">{item.item_name}</TableCell>
+      <TableCell className="text-xs text-gray-400 font-mono">
+        {item.vat_amount_krw > 0
+          ? `공급가 ${item.amount_krw.toLocaleString('ko-KR')} (부가세 ${item.vat_amount_krw.toLocaleString('ko-KR')} 별도)`
+          : '실비 청구액'}
+      </TableCell>
+      <TableCell className="text-right font-mono text-sm">{krw(item.amount_krw)}</TableCell>
+    </TableRow>
+  )
+}
+
+function GroupSubtotalRow({ label, items }: { label: string; items: CostItem[] }) {
+  const total = items.reduce((s, r) => s + r.amount_krw, 0)
+  const formula = items.map((i) => i.amount_krw.toLocaleString('ko-KR')).join(' + ')
+  return (
+    <TableRow className="bg-muted/40 border-t border-dashed">
+      <TableCell className="pl-6 text-sm font-semibold">{label}</TableCell>
+      <TableCell className="text-xs text-gray-400 font-mono">{formula} = {total.toLocaleString('ko-KR')}</TableCell>
+      <TableCell className="text-right font-mono text-sm font-semibold">{krw(total)}</TableCell>
+    </TableRow>
+  )
+}
+
 export function ReportInterimSection({ data }: { data: InterimCostData }) {
-  const itemsTotal = [...data.shippingItems, ...data.customsItems].reduce((s, r) => s + r.amount_krw, 0)
-  const subTotal = data.importAmountKrw + itemsTotal + data.vatAmountKrw
+  const shippingTotal = data.shippingItems.reduce((s, r) => s + r.amount_krw, 0)
+  const customsTotal = data.customsItems.reduce((s, r) => s + r.amount_krw, 0)
+  const subTotal = data.importAmountKrw + shippingTotal + customsTotal + data.vatAmountKrw
   const showConfirmed = data.confirmedAmountKrw != null
   const confirmedDiff = showConfirmed ? data.confirmedAmountKrw! - subTotal : 0
+  const diffIsRounding = Math.abs(confirmedDiff) > 0 && Math.abs(confirmedDiff) < 100
 
   const marginSuffix = data.marginRatePct
     ? ` × ${(1 + data.marginRatePct / 100).toFixed(2)}(마진율 1+${data.marginRatePct}%)`
@@ -36,10 +74,13 @@ export function ReportInterimSection({ data }: { data: InterimCostData }) {
     ? `$${data.importAmountUsd.toLocaleString('en-US')}(수입금액USD) × ${data.customs_exchange_rate.toLocaleString('ko-KR')}원(통관환율)${marginSuffix}`
     : ''
 
-  const allItems = [...data.shippingItems, ...data.customsItems]
+  const vatItems = [...data.shippingItems, ...data.customsItems].filter((i) => i.vat_amount_krw > 0)
+  const vatFormula = vatItems.map((i) => i.vat_amount_krw.toLocaleString('ko-KR')).join(' + ')
+
   const subTotalFormula = [
     `수입금액 ${data.importAmountKrw.toLocaleString('ko-KR')}`,
-    ...allItems.map(i => `${i.item_name} ${i.amount_krw.toLocaleString('ko-KR')}`),
+    ...(shippingTotal !== 0 ? [`해상운임 ${shippingTotal.toLocaleString('ko-KR')}`] : []),
+    ...(customsTotal !== 0 ? [`통관비용 ${customsTotal.toLocaleString('ko-KR')}`] : []),
     ...(data.vatAmountKrw > 0 ? [`부가세 ${data.vatAmountKrw.toLocaleString('ko-KR')}`] : []),
   ].join(' + ')
 
@@ -48,9 +89,9 @@ export function ReportInterimSection({ data }: { data: InterimCostData }) {
       <Table>
         <TableHeader>
           <TableRow className="bg-green-50">
-            <TableHead className="text-green-800 font-bold w-[36%]">항목</TableHead>
+            <TableHead className="text-green-800 font-bold w-[30%]">항목</TableHead>
             <TableHead className="text-green-800 font-bold">계산식</TableHead>
-            <TableHead className="text-right text-green-800 font-bold w-[26%]">금액 (KRW)</TableHead>
+            <TableHead className="text-right text-green-800 font-bold w-[22%]">금액 (KRW)</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -59,31 +100,35 @@ export function ReportInterimSection({ data }: { data: InterimCostData }) {
             <TableCell className="text-muted-foreground text-xs font-mono leading-relaxed">
               {importFormula}
             </TableCell>
-            <TableCell className="text-right font-mono">
-              {data.importAmountKrw.toLocaleString('ko-KR')}원
-            </TableCell>
+            <TableCell className="text-right font-mono">{krw(data.importAmountKrw)}</TableCell>
           </TableRow>
-          {data.shippingItems.map((item, i) => (
-            <TableRow key={`sh-${i}`} className="bg-muted/20">
-              <TableCell className="pl-6 text-muted-foreground text-sm">{item.item_name}</TableCell>
-              <TableCell />
-              <TableCell className="text-right font-mono text-sm">{item.amount_krw.toLocaleString('ko-KR')}원</TableCell>
-            </TableRow>
-          ))}
-          {data.customsItems.map((item, i) => (
-            <TableRow key={`cu-${i}`} className="bg-muted/20">
-              <TableCell className="pl-6 text-muted-foreground text-sm">{item.item_name}</TableCell>
-              <TableCell />
-              <TableCell className="text-right font-mono text-sm">{item.amount_krw.toLocaleString('ko-KR')}원</TableCell>
-            </TableRow>
-          ))}
+
+          {data.shippingItems.length > 0 && (
+            <>
+              <GroupHeaderRow label="그룹 A: 해상운임 세부내역" />
+              {data.shippingItems.map((item, i) => <ItemRow key={`sh-${i}`} item={item} />)}
+              <GroupSubtotalRow label="해상운임 소계" items={data.shippingItems} />
+            </>
+          )}
+
+          {data.customsItems.length > 0 && (
+            <>
+              <GroupHeaderRow label="그룹 B: 통관 세부내역" />
+              {data.customsItems.map((item, i) => <ItemRow key={`cu-${i}`} item={item} />)}
+              <GroupSubtotalRow label="통관비용 소계" items={data.customsItems} />
+            </>
+          )}
+
           {data.vatAmountKrw > 0 && (
             <TableRow>
-              <TableCell className="font-medium">부가세</TableCell>
-              <TableCell className="text-muted-foreground text-xs">(원가합계) × 10%</TableCell>
-              <TableCell className="text-right font-mono">{data.vatAmountKrw.toLocaleString('ko-KR')}원</TableCell>
+              <TableCell className="font-medium">부가세 (운송·용역분)</TableCell>
+              <TableCell className="text-xs text-gray-400 font-mono">
+                {vatFormula} = {data.vatAmountKrw.toLocaleString('ko-KR')}
+              </TableCell>
+              <TableCell className="text-right font-mono">{krw(data.vatAmountKrw)}</TableCell>
             </TableRow>
           )}
+
           {showConfirmed ? (
             <>
               <TableRow className="bg-muted/10 border-t border-dashed">
@@ -91,22 +136,21 @@ export function ReportInterimSection({ data }: { data: InterimCostData }) {
                   소계 <span className="text-xs">(시스템 계산)</span>
                 </TableCell>
                 <TableCell className="text-xs text-gray-400 font-mono">{subTotalFormula}</TableCell>
-                <TableCell className="text-right font-mono text-sm text-muted-foreground">
-                  {subTotal.toLocaleString('ko-KR')}원
-                </TableCell>
+                <TableCell className="text-right font-mono text-sm text-muted-foreground">{krw(subTotal)}</TableCell>
               </TableRow>
               <TableRow className="bg-green-100 font-bold border-t-2 border-green-200">
                 <TableCell className="text-green-800 text-base">중간정산 확정금액</TableCell>
                 <TableCell className="text-xs">
-                  <span className="text-green-700">수기입력 (엑셀 기준)</span>
                   {Math.abs(confirmedDiff) > 0 && (
-                    <div className="text-orange-600 mt-0.5">
-                      ※ 시스템 대비 {confirmedDiff > 0 ? '+' : ''}{confirmedDiff.toLocaleString('ko-KR')}원 차이
+                    <div className={diffIsRounding ? 'text-muted-foreground' : 'text-orange-600'}>
+                      {diffIsRounding
+                        ? `※ 100원 단위 절사 (소계 대비 ${confirmedDiff.toLocaleString('ko-KR')}원)`
+                        : `※ 시스템 대비 ${confirmedDiff > 0 ? '+' : ''}${confirmedDiff.toLocaleString('ko-KR')}원 차이`}
                     </div>
                   )}
                 </TableCell>
                 <TableCell className="text-right font-mono text-green-800 text-base">
-                  {data.confirmedAmountKrw!.toLocaleString('ko-KR')}원
+                  {krw(data.confirmedAmountKrw!)}
                 </TableCell>
               </TableRow>
             </>
@@ -114,7 +158,7 @@ export function ReportInterimSection({ data }: { data: InterimCostData }) {
             <TableRow className="bg-green-50 font-semibold border-t-2 border-green-200">
               <TableCell className="text-green-800">소계</TableCell>
               <TableCell className="text-xs text-gray-400 font-mono">{subTotalFormula}</TableCell>
-              <TableCell className="text-right font-mono text-green-800">{subTotal.toLocaleString('ko-KR')}원</TableCell>
+              <TableCell className="text-right font-mono text-green-800">{krw(subTotal)}</TableCell>
             </TableRow>
           )}
         </TableBody>
