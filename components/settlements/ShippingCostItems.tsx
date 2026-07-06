@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plus, Trash2 } from 'lucide-react'
 import { computeVat } from '@/lib/calculations/interim'
+import { formatNumberForInput, parseNumberInput } from '@/lib/utils/format'
 
 export type { CostRow } from '@/types/settlement'
 import type { CostRow } from '@/types/settlement'
@@ -58,15 +59,15 @@ export function CostItemsGroup({ title, rows, onChange, isLocked, hint }: Props 
           <div key={i} className="grid grid-cols-12 gap-2 items-center mb-1">
             <Input className="col-span-4 h-7 text-xs" value={r.item_name}
               onChange={(e) => upd(i, 'item_name', e.target.value)} disabled={isLocked} />
-            <Input className="col-span-3 h-7 text-xs font-mono" type="number"
-              value={r.amount_krw} onChange={(e) => upd(i, 'amount_krw', e.target.value)} disabled={isLocked} />
+            <Input className="col-span-3 h-7 text-xs font-mono" inputMode="decimal"
+              value={formatNumberForInput(r.amount_krw)} onChange={(e) => upd(i, 'amount_krw', parseNumberInput(e.target.value))} disabled={isLocked} />
             <div className="col-span-2 flex justify-center">
               <input type="checkbox" checked={r.is_vat_taxable}
                 onChange={(e) => upd(i, 'is_vat_taxable', e.target.checked)} disabled={isLocked} className="h-4 w-4" />
             </div>
-            <Input className="col-span-2 h-7 text-xs font-mono" type="number"
-              value={r.is_vat_taxable ? computeVat(parseFloat(r.amount_krw) || 0) : (parseFloat(r.vat_amount_krw) || 0)}
-              readOnly={r.is_vat_taxable} onChange={(e) => upd(i, 'vat_amount_krw', e.target.value)} disabled={isLocked} />
+            <Input className="col-span-2 h-7 text-xs font-mono" inputMode="decimal"
+              value={r.is_vat_taxable ? formatNumberForInput(computeVat(parseFloat(r.amount_krw) || 0)) : formatNumberForInput(r.vat_amount_krw)}
+              readOnly={r.is_vat_taxable} onChange={(e) => upd(i, 'vat_amount_krw', parseNumberInput(e.target.value))} disabled={isLocked} />
             {!isLocked && (
               <Button variant="ghost" size="icon" className="col-span-1 h-7 w-7 text-destructive"
                 onClick={() => onChange(rows.filter((_, j) => j !== i))}>

@@ -30,6 +30,21 @@ export function formatDiff(value: number): string {
   return value >= 0 ? `+${abs}원` : `-${abs}원`
 }
 
+export function formatNumberForInput(value: string | number): string {
+  const s = String(value ?? '').replace(/,/g, '')
+  if (s === '' || s === '-') return s
+  const [intPart, decPart] = s.split('.')
+  if (intPart === '' || isNaN(Number(intPart))) return s
+  const sign = intPart.startsWith('-') ? '-' : ''
+  const digits = sign ? intPart.slice(1) : intPart
+  const formattedInt = digits === '' ? '' : Number(digits).toLocaleString('en-US')
+  return decPart !== undefined ? `${sign}${formattedInt}.${decPart}` : `${sign}${formattedInt}`
+}
+
+export function parseNumberInput(value: string): string {
+  return value.replace(/[^\d.-]/g, '')
+}
+
 export function formatYearMonth(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date
   const y = d.getFullYear()

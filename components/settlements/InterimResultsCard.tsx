@@ -8,7 +8,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { type RoundingPolicy, type InterimCalculation } from '@/lib/calculations/interim'
-import { formatKrw } from '@/lib/utils/format'
+import { formatKrw, formatNumberForInput, parseNumberInput } from '@/lib/utils/format'
+
+const ROUNDING_LABELS: Record<RoundingPolicy, string> = {
+  floor_100: '100원 단위 절사',
+  floor_10: '10원 단위 절사',
+  none: '절사 없음',
+}
 
 interface Props {
   calc: InterimCalculation | null
@@ -46,11 +52,11 @@ export function InterimResultsCard({
             <Select value={roundingPolicy}
               onValueChange={(v) => v && onRoundingChange(v as RoundingPolicy)}
               disabled={isLocked}>
-              <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-36"><SelectValue>{(v: RoundingPolicy) => ROUNDING_LABELS[v]}</SelectValue></SelectTrigger>
               <SelectContent>
-                <SelectItem value="floor_100">100원 미만 버림</SelectItem>
-                <SelectItem value="floor_10">10원 미만 버림</SelectItem>
-                <SelectItem value="none">버림 없음</SelectItem>
+                <SelectItem value="floor_100">{ROUNDING_LABELS.floor_100}</SelectItem>
+                <SelectItem value="floor_10">{ROUNDING_LABELS.floor_10}</SelectItem>
+                <SelectItem value="none">{ROUNDING_LABELS.none}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -63,8 +69,8 @@ export function InterimResultsCard({
         </div>
         <div className="space-y-1">
           <Label>확정 금액 (원)</Label>
-          <Input type="number" value={confirmedAmount}
-            onChange={(e) => onConfirmedChange(e.target.value)}
+          <Input inputMode="decimal" value={formatNumberForInput(confirmedAmount)}
+            onChange={(e) => onConfirmedChange(parseNumberInput(e.target.value))}
             disabled={isLocked} className="font-mono text-lg max-w-xs" />
         </div>
       </CardContent>

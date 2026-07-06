@@ -7,8 +7,14 @@ import { Separator } from '@/components/ui/separator'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { formatKrw } from '@/lib/utils/format'
+import { formatKrw, formatNumberForInput, parseNumberInput } from '@/lib/utils/format'
 import type { ClosingCalculation, RoundingPolicy } from '@/lib/calculations/closing'
+
+const ROUNDING_LABELS: Record<RoundingPolicy, string> = {
+  floor_100: '100원 단위 절사',
+  floor_10: '10원 단위 절사',
+  none: '절사 없음',
+}
 
 interface Props {
   calc: ClosingCalculation | null
@@ -32,11 +38,11 @@ export function ClosingSummaryCard({
             <div className="space-y-1">
               <Label>절사 정책</Label>
               <Select value={roundingPolicy} onValueChange={(v) => onRoundingChange(v as RoundingPolicy)} disabled={isLocked}>
-                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-36"><SelectValue>{(v: RoundingPolicy) => ROUNDING_LABELS[v]}</SelectValue></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="floor_100">100원 미만 버림</SelectItem>
-                  <SelectItem value="floor_10">10원 미만 버림</SelectItem>
-                  <SelectItem value="none">버림 없음</SelectItem>
+                  <SelectItem value="floor_100">{ROUNDING_LABELS.floor_100}</SelectItem>
+                  <SelectItem value="floor_10">{ROUNDING_LABELS.floor_10}</SelectItem>
+                  <SelectItem value="none">{ROUNDING_LABELS.none}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -52,9 +58,9 @@ export function ClosingSummaryCard({
           <div className="space-y-1">
             <Label>확정 금액 (원) — 음수: 토에이→에이원 환급</Label>
             <Input
-              type="number"
-              value={confirmedAmount}
-              onChange={(e) => onConfirmedChange(e.target.value)}
+              inputMode="decimal"
+              value={formatNumberForInput(confirmedAmount)}
+              onChange={(e) => onConfirmedChange(parseNumberInput(e.target.value))}
               disabled={isLocked}
               className="font-mono text-lg max-w-xs"
             />
