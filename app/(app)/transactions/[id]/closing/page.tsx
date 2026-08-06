@@ -71,7 +71,8 @@ export default function ClosingSettlementPage() {
   ])
   const [customsDetailItems, setCustomsDetailItems] = useState<{ item_name: string; amount_krw: number }[]>([])
   const [forwardingQuotes, setForwardingQuotes] = useState<{ forwarder_name: string; quote_amount_krw: number | null; actual_amount_krw: number | null }[]>([])
-  const [confirmedAmount, setConfirmedAmount] = useState('')
+  // null이면 시스템 계산값을 그대로 따라간다. 담당자가 직접 입력했거나 DB에 저장된 확정금액이 있을 때만 문자열.
+  const [confirmedOverride, setConfirmedOverride] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [notes, setNotes] = useState<string | null>(null)
 
@@ -114,7 +115,7 @@ export default function ClosingSettlementPage() {
         setLcPayment(String(closing.lc_payment_total_krw ?? ''))
         setFxBurdenA1Pct(closing.fx_burden_a1_pct ?? 50)
         setRoundingPolicy(closing.rounding_policy as RoundingPolicy)
-        setConfirmedAmount(String(closing.confirmed_amount_krw ?? ''))
+        setConfirmedOverride(closing.confirmed_amount_krw != null ? String(closing.confirmed_amount_krw) : null)
         setNotes((closing as Record<string, unknown>).notes as string | null ?? null)
 
         const { data: fees } = await supabase
@@ -166,12 +167,7 @@ export default function ClosingSettlementPage() {
     : null
 
   const systemAmount = calc?.roundedFinalKrw ?? 0
-
-  useEffect(() => {
-    if (systemAmount !== 0 && !confirmedAmount) {
-      setConfirmedAmount(String(systemAmount))
-    }
-  }, [systemAmount])
+  const confirmedAmount = confirmedOverride ?? (systemAmount !== 0 ? String(systemAmount) : '')
 
   async function handleSave(lock = false) {
     setSaving(true)
@@ -323,7 +319,7 @@ export default function ClosingSettlementPage() {
         roundingPolicy={roundingPolicy}
         onRoundingChange={setRoundingPolicy}
         confirmedAmount={confirmedAmount}
-        onConfirmedChange={setConfirmedAmount}
+        onConfirmedChange={setConfirmedOverride}
         isLocked={isLocked}
         interimIsLocked={interimSummary?.is_locked ?? false}
       />

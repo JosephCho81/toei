@@ -31,7 +31,8 @@ export default function InterimSettlementPage() {
   const [shippingRows, setShippingRows] = useState<CostRow[]>(DEFAULT_SHIPPING)
   const [customsRows, setCustomsRows] = useState<CostRow[]>(DEFAULT_CUSTOMS)
   const [prefilled, setPrefilled] = useState(false)
-  const [confirmed, setConfirmed] = useState('')
+  // null이면 시스템 계산값을 그대로 따라간다. 담당자가 직접 입력했거나 DB에 저장된 확정금액이 있을 때만 문자열.
+  const [confirmedOverride, setConfirmedOverride] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [notes, setNotes] = useState<string | null>(null)
 
@@ -47,7 +48,7 @@ export default function InterimSettlementPage() {
         setSid(interim.id); setIsLocked(interim.is_locked)
         setCustomsRate(String(interim.customs_exchange_rate))
         setRoundingPolicy(interim.rounding_policy as RoundingPolicy)
-        setConfirmed(String(interim.confirmed_amount_krw ?? ''))
+        setConfirmedOverride(interim.confirmed_amount_krw != null ? String(interim.confirmed_amount_krw) : null)
         setNotes(interim.notes ?? null)
 
         const items = await fetchInterimCostItems(supabase, interim.id)
@@ -96,8 +97,7 @@ export default function InterimSettlementPage() {
     ? calculateInterim({ importAmountUsd: Number(tx.import_amount_usd), customsExchangeRate: parseFloat(customsRate), marginRatePct: tx.margin_rate_pct ?? 0, costItems, roundingPolicy })
     : null
   const systemAmount = calc?.confirmedKrw ?? 0
-
-  useEffect(() => { if (systemAmount > 0 && !confirmed) setConfirmed(String(systemAmount)) }, [systemAmount])
+  const confirmed = confirmedOverride ?? (systemAmount > 0 ? String(systemAmount) : '')
 
   async function handleSave(lock = false) {
     setSaving(true)
@@ -163,7 +163,7 @@ export default function InterimSettlementPage() {
       <InterimResultsCard
         calc={calc} systemAmount={systemAmount} roundingPolicy={roundingPolicy}
         onRoundingChange={setRoundingPolicy} confirmedAmount={confirmed}
-        onConfirmedChange={setConfirmed} isLocked={isLocked}
+        onConfirmedChange={setConfirmedOverride} isLocked={isLocked}
         shippingSubtotal={shippingSubtotal} customsSubtotal={customsSubtotal}
       />
       {sid && (
