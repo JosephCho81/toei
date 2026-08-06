@@ -42,7 +42,12 @@ export function ContainerForm({ transactionId, open, onOpenChange, initialData, 
   const [saving, setSaving] = useState(false)
   function set(k: keyof FV, v: string) { setForm(p => ({ ...p, [k]: v })) }
 
-  useEffect(() => { if (open) { setForm(empty(initialData)); setTracking(null) } }, [open])
+  // 다이얼로그가 열릴 때마다 폼을 초기화한다. effect 대신 렌더 중 조정 패턴을 써서 추가 렌더 없이 반영.
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) { setForm(empty(initialData)); setTracking(null) }
+  }
 
   const fetchTracking = useCallback(async (no: string, signal: AbortSignal) => {
     try {

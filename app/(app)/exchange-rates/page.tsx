@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,16 +22,19 @@ export default function ExchangeRatesPage() {
   const [manualRate, setManualRate] = useState('')
   const [manualSaving, setManualSaving] = useState(false)
 
-  async function load() {
+  const load = useCallback(async () => {
     const since = new Date(); since.setDate(since.getDate() - 30)
     const { data } = await supabase.from('exchange_rate_cache')
       .select('date,rate_krw,source')
       .gte('date', since.toISOString().slice(0, 10))
       .order('date', { ascending: false })
     setRates(data ?? [])
-  }
+  }, [supabase])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    async function run() { await load() }
+    run()
+  }, [load])
 
   async function fetchBok() {
     if (!bokDate) return

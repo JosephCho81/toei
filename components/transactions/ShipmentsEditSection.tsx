@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -34,16 +34,19 @@ export function ShipmentsEditSection({ transactionId }: { transactionId: string 
   const [deleting, setDeleting] = useState(false)
   const supabase = createClient()
 
-  async function load() {
+  const load = useCallback(async () => {
     const { data } = await supabase
       .from('containers')
       .select('id,container_no,carrier,eta,etd,actual_arrival,vessel_name,tracking_status')
       .eq('transaction_id', transactionId)
       .order('created_at')
     setContainers(data ?? [])
-  }
+  }, [supabase, transactionId])
 
-  useEffect(() => { load() }, [transactionId])
+  useEffect(() => {
+    async function run() { await load() }
+    run()
+  }, [load])
 
   async function handleDelete() {
     if (!deleteId) return

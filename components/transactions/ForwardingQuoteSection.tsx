@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -61,15 +61,18 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  async function load() {
+  const load = useCallback(async () => {
     const { data } = await supabase.from('forwarding_quotes')
       .select(SELECT_QUERY)
       .eq('transaction_id', transactionId).order('sort_order')
     setRows(data?.length ? data.map(d => mapRow(d as Record<string, unknown>)) : [])
     setLoaded(true)
-  }
+  }, [supabase, transactionId])
 
-  useEffect(() => { load() }, [transactionId])
+  useEffect(() => {
+    async function run() { await load() }
+    run()
+  }, [load])
 
   function upd(key: string, field: keyof Omit<Row, '_key' | 'id'>, value: string) {
     setRows(p => p.map(r => r._key === key ? { ...r, [field]: value } : r))

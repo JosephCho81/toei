@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,12 +28,15 @@ export default function ManufacturersPage() {
   const [saving, setSaving] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
-  async function load() {
+  const load = useCallback(async () => {
     const { data } = await supabase.from('manufacturers').select('*').order('name')
     setManufacturers(data ?? [])
-  }
+  }, [supabase])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    async function run() { await load() }
+    run()
+  }, [load])
 
   function openNew() {
     setEditing(null)
