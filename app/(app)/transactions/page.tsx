@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { Plus, Download } from 'lucide-react'
 import { TransactionTable, type TxRow } from './transactions-table'
+import type { TxFlag } from '@/types/transaction'
 
 export default async function TransactionsPage() {
   const supabase = await createClient()
@@ -20,6 +21,12 @@ export default async function TransactionsPage() {
       delivery_dates
     `)
     .order('round_no', { ascending: false })
+
+  // transaction_flags 는 마이그레이션 024 적용 후부터 존재 — 없으면 오류 표시 없이 동작
+  const { data: flags } = await supabase
+    .from('transaction_flags')
+    .select('id, transaction_id, field, memo, status, resolved_memo, created_at')
+    .order('created_at')
 
   return (
     <div className="space-y-4">
@@ -38,7 +45,10 @@ export default async function TransactionsPage() {
           </Link>
         </div>
       </div>
-      <TransactionTable rows={(data ?? []) as unknown as TxRow[]} />
+      <TransactionTable
+        rows={(data ?? []) as unknown as TxRow[]}
+        initialFlags={(flags ?? []) as TxFlag[]}
+      />
     </div>
   )
 }

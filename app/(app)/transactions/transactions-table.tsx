@@ -2,10 +2,17 @@
 
 import { useState, Fragment } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDate } from '@/lib/utils/format'
+import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
+import { DEFAULT_UNIT } from '@/lib/constants/units'
+import { TransactionFlagPanel } from '@/components/transactions/TransactionFlagPanel'
+import type { TxFlag } from '@/types/transaction'
 
 type Item = {
   spec: string | null; size: string | null; quantity: number | null
@@ -29,7 +36,7 @@ function summarizeItems(items: Item[]): string {
   const label = [first.glove_type, first.color].filter(Boolean).join(' ')
   const sizes = [...new Set(sorted.map((i) => i.size).filter(Boolean as unknown as (v: string | null) => v is string))].join('/')
   const total = sorted.reduce((s, i) => s + (i.quantity ?? 0), 0)
-  const unit = first.unit ?? 'Cases'
+  const unit = first.unit ?? DEFAULT_UNIT
   const parts = [label || first.spec, sizes, total > 0 ? `${total.toLocaleString('ko-KR')} ${unit}` : '']
   return parts.filter(Boolean).join(' · ')
 }
@@ -50,15 +57,51 @@ function getEtaDisplay(eta: string | null, deliveryDates: Array<{ seq: number; d
   return '-'
 }
 
-export function TransactionTable({ rows }: { rows: TxRow[] }) {
+export function TransactionTable({ rows, initialFlags = [] }: { rows: TxRow[]; initialFlags?: TxFlag[] }) {
   const router = useRouter()
+  const supabase = createClient()
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [flags, setFlags] = useState<TxFlag[]>(initialFlags)
+
+  function flagsOf(txId: string) {
+    return flags.filter((f) => f.transaction_id === txId)
+  }
+
+  function replaceFlagsOf(txId: string, next: TxFlag[]) {
+    setFlags((p) => [...p.filter((f) => f.transaction_id !== txId), ...next])
+  }
+
+  /** 체크 = 오류 있음. 체크 해제 시 열려 있는 항목을 모두 '처리 완료'로 바꾼다(이력 보존). */
+  async function toggleError(txId: string, checked: boolean) {
+    const current = flagsOf(txId)
+    const openFlags = current.filter((f) => f.status === 'open')
+
+    if (checked) {
+      if (openFlags.length > 0) return
+      const { data, error } = await supabase.from('transaction_flags')
+        .insert({ transaction_id: txId, field: '기타' })
+        .select('id,transaction_id,field,memo,status,resolved_memo,created_at')
+        .single()
+      if (error || !data) { toast.error(`오류 표시 실패: ${error?.message ?? '알 수 없는 오류'}`); return }
+      replaceFlagsOf(txId, [...current, data as TxFlag])
+      setExpandedId(txId)
+      return
+    }
+
+    if (openFlags.length === 0) return
+    replaceFlagsOf(txId, current.map((f) => f.status === 'open' ? { ...f, status: 'resolved' } : f))
+    const { error } = await supabase.from('transaction_flags')
+      .update({ status: 'resolved', resolved_at: new Date().toISOString() })
+      .in('id', openFlags.map((f) => f.id))
+    if (error) toast.error(`처리 실패: ${error.message}`)
+  }
 
   return (
     <div className="border rounded-lg overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-12 text-center">오류</TableHead>
             <TableHead>회차</TableHead>
             <TableHead>P/O No.</TableHead>
             <TableHead>제조사</TableHead>
@@ -72,7 +115,7 @@ export function TransactionTable({ rows }: { rows: TxRow[] }) {
         <TableBody>
           {!rows.length && (
             <TableRow>
-              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                 등록된 거래가 없습니다.
               </TableCell>
             </TableRow>
@@ -83,13 +126,33 @@ export function TransactionTable({ rows }: { rows: TxRow[] }) {
             const eta = getEta(t.containers ?? [])
             const items = [...(t.transaction_items ?? [])].sort((a, b) => a.sort_order - b.sort_order)
             const isExpanded = expandedId === t.id
+            const txFlags = flagsOf(t.id)
+            const openFlags = txFlags.filter((f) => f.status === 'open')
+            const hasError = openFlags.length > 0
             return (
               <Fragment key={t.id}>
                 <TableRow
-                  className="cursor-pointer hover:bg-muted/50"
+                  className={cn(
+                    'cursor-pointer hover:bg-muted/50',
+                    hasError && 'border-l-4 border-l-red-500 bg-red-50/60 hover:bg-red-50 dark:bg-red-950/20'
+                  )}
                   onClick={() => router.push(`/transactions/${t.id}`)}
                 >
-                  <TableCell className="font-medium whitespace-nowrap">{t.round_label}</TableCell>
+                  <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={hasError}
+                      aria-label="오류 표시"
+                      onCheckedChange={(v) => toggleError(t.id, !!v)}
+                    />
+                  </TableCell>
+                  <TableCell className="font-medium whitespace-nowrap">
+                    {t.round_label}
+                    {hasError && (
+                      <span className="ml-1.5 text-xs text-red-600 font-normal">
+                        🔴 {openFlags.length}건
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-sm whitespace-nowrap">{t.order_no ?? '-'}</TableCell>
                   <TableCell className="text-sm whitespace-nowrap">{getMfr(t.manufacturers)}</TableCell>
                   <TableCell
@@ -117,8 +180,8 @@ export function TransactionTable({ rows }: { rows: TxRow[] }) {
                   </TableCell>
                 </TableRow>
                 {isExpanded && (
-                  <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableCell colSpan={8} className="pt-0 pb-3 px-6">
+                  <TableRow className="bg-muted/30 hover:bg-muted/30" onClick={(e) => e.stopPropagation()}>
+                    <TableCell colSpan={9} className="pt-0 pb-3 px-6">
                       {items.length === 0
                         ? <p className="text-xs text-muted-foreground py-2">품목 데이터가 없습니다.</p>
                         : (
@@ -152,6 +215,11 @@ export function TransactionTable({ rows }: { rows: TxRow[] }) {
                             </tbody>
                           </table>
                         )}
+                      <TransactionFlagPanel
+                        transactionId={t.id}
+                        flags={txFlags}
+                        onChange={(next) => replaceFlagsOf(t.id, next)}
+                      />
                     </TableCell>
                   </TableRow>
                 )}

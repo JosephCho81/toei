@@ -2,6 +2,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { ReportSection } from './ReportSection'
+import { DEFAULT_UNIT } from '@/lib/constants/units'
 
 interface Item {
   id: string
@@ -59,7 +60,7 @@ export function ReportItemsSection({ items, importAmountUsd, marginRatePct }: Pr
                     {r.unit_price_usd != null ? usd(r.unit_price_usd) : '-'}
                   </TableCell>
                   <TableCell className="text-right text-sm">{r.quantity?.toLocaleString('ko-KR') ?? '-'}</TableCell>
-                  <TableCell className="text-sm">{r.unit ?? 'DZ'}</TableCell>
+                  <TableCell className="text-sm">{r.unit ?? DEFAULT_UNIT}</TableCell>
                   <TableCell className="text-right text-sm font-medium">{usd(sub)}</TableCell>
                 </TableRow>
               )

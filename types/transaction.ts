@@ -13,6 +13,20 @@ export type TxRow = {
   delivery_dates: Array<{ seq: number; date: string }> | null
 }
 
+export const FLAG_FIELDS = ['금액', '품목', '수량', '기타'] as const
+export type FlagField = typeof FLAG_FIELDS[number]
+
+/** 거래 오류 검토 플래그 (transaction_flags) */
+export type TxFlag = {
+  id: string
+  transaction_id: string
+  field: FlagField
+  memo: string | null
+  status: 'open' | 'resolved'
+  resolved_memo: string | null
+  created_at: string
+}
+
 export interface ContainerRow {
   _key: string
   container_no: string

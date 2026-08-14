@@ -69,6 +69,11 @@ npm run dev
 | 5 | `supabase/migrations/005_containers_forwarding.sql` | 컨테이너·포워딩 구조 보완 |
 | 6 | `supabase/migrations/006_audit_logs_is_completed.sql` | 감사 로그, 완료 플래그 |
 | 7 | `supabase/seed/migration_1_41.sql` | 1~41차 초기 데이터 (시드) |
+| 8 | `supabase/migrations/007_*.sql` ~ `020_*.sql` | 파일 번호 순서대로 적용 |
+| 9 | `supabase/migrations/021_unit_carton.sql` | 기본 단위 Ct(카톤) 통일 |
+| 10 | `supabase/migrations/022_transaction_amount_checks.sql` | 토에이 자료 대조금액 입력행 |
+| 11 | `supabase/migrations/023_products.sql` | 품목 마스터 (선택 입력·자동 채움) |
+| 12 | `supabase/migrations/024_transaction_flags.sql` | 거래 오류 표시·메모 |
 
 ---
 

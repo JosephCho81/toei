@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import { ItemsInputSection, blankItem, type ItemRow } from '@/components/transactions/ItemsInputSection'
 import { Plus, Trash2 } from 'lucide-react'
+import { DEFAULT_UNIT } from '@/lib/constants/units'
 
 interface Manufacturer { id: string; name: string }
 
@@ -146,7 +147,7 @@ export default function NewTransactionPage() {
           color: r.color || null, size: r.size || null,
           unit_price_usd: r.unit_price_usd ? parseFloat(r.unit_price_usd) : null,
           quantity: r.quantity ? parseInt(r.quantity) : null,
-          unit: r.unit || 'DZ',
+          unit: r.unit || DEFAULT_UNIT,
           sort_order: i,
         }))
       )
