@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { fetchTransactionBase, fetchInterimSettlement, fetchInterimCostItems } from '@/lib/data/queries'
 import { toCostRow } from '@/lib/utils/costRows'
@@ -101,32 +102,43 @@ export default function InterimSettlementPage() {
 
   async function handleSave(lock = false) {
     setSaving(true)
-    const payload = {
-      transaction_id: id, customs_exchange_rate: parseFloat(customsRate), rounding_policy: roundingPolicy,
-      system_amount_krw: systemAmount, confirmed_amount_krw: parseFloat(confirmed) || systemAmount, is_locked: lock,
-    }
-    let id2 = sid
-    if (id2) { await supabase.from('interim_settlements').update(payload).eq('id', id2) }
-    else {
-      const { data } = await supabase.from('interim_settlements').insert(payload).select('id').single()
-      id2 = data?.id ?? null; setSid(id2)
-    }
-    if (id2) {
+    try {
+      const payload = {
+        transaction_id: id, customs_exchange_rate: parseFloat(customsRate), rounding_policy: roundingPolicy,
+        confirmed_amount_krw: parseFloat(confirmed) || systemAmount, is_locked: lock,
+      }
+      let id2 = sid
+      if (id2) {
+        const { error } = await supabase.from('interim_settlements').update(payload).eq('id', id2)
+        if (error) throw error
+      } else {
+        const { data, error } = await supabase.from('interim_settlements').insert(payload).select('id').single()
+        if (error) throw error
+        id2 = data?.id ?? null; setSid(id2)
+      }
+      if (!id2) throw new Error('중간정산 ID를 확인할 수 없습니다.')
+
       const mkItem = (r: CostRow, i: number, grp: string) => ({
         item_name: r.item_name, group_type: grp,
         amount_krw: parseFloat(r.amount_krw) || 0, is_vat_taxable: r.is_vat_taxable,
         vat_amount_krw: parseFloat(r.vat_amount_krw) || 0, sort_order: i,
       })
-      await supabase.rpc('save_interim_cost_items', {
+      const { error: itemsError } = await supabase.rpc('save_interim_cost_items', {
         p_interim_settlement_id: id2,
         p_items: [
           ...shippingRows.map((r, i) => mkItem(r, i, 'shipping')),
           ...customsRows.map((r, i) => mkItem(r, shippingRows.length + i, 'customs')),
         ],
       })
+      if (itemsError) throw itemsError
+
+      toast.success(lock ? '확정 및 잠금 완료' : '저장 완료')
+      if (lock) { setIsLocked(true); router.push(`/transactions/${id}`) }
+    } catch (e) {
+      toast.error(`저장 실패: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
-    if (lock) { setIsLocked(true); router.push(`/transactions/${id}`) }
   }
 
   const shippingSubtotal = shippingRows.reduce((s, r) => s + (parseFloat(r.amount_krw) || 0), 0)

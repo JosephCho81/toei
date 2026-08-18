@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { calculateClosing, type RoundingPolicy } from '@/lib/calculations/closing'
 import { Button } from '@/components/ui/button'
@@ -171,29 +172,31 @@ export default function ClosingSettlementPage() {
 
   async function handleSave(lock = false) {
     setSaving(true)
-    const upsertData = {
-      transaction_id: id,
-      closing_date: closingDate,
-      bok_exchange_rate: parseFloat(bokRate) || null,
-      lc_payment_total_krw: parseFloat(lcPayment) || null,
-      fx_burden_a1_pct: fxBurdenA1Pct,
-      rounding_policy: roundingPolicy,
-      system_amount_krw: systemAmount,
-      confirmed_amount_krw: parseFloat(confirmedAmount) || systemAmount,
-      is_locked: lock,
-    }
+    try {
+      const upsertData = {
+        transaction_id: id,
+        closing_date: closingDate,
+        bok_exchange_rate: parseFloat(bokRate) || null,
+        lc_payment_total_krw: parseFloat(lcPayment) || null,
+        fx_burden_a1_pct: fxBurdenA1Pct,
+        rounding_policy: roundingPolicy,
+        confirmed_amount_krw: parseFloat(confirmedAmount) || systemAmount,
+        is_locked: lock,
+      }
 
-    let sid = settlementId
-    if (sid) {
-      await supabase.from('closing_settlements').update(upsertData).eq('id', sid)
-    } else {
-      const { data } = await supabase.from('closing_settlements').insert(upsertData).select('id').single()
-      sid = data?.id ?? null
-      setSettlementId(sid)
-    }
+      let sid = settlementId
+      if (sid) {
+        const { error } = await supabase.from('closing_settlements').update(upsertData).eq('id', sid)
+        if (error) throw error
+      } else {
+        const { data, error } = await supabase.from('closing_settlements').insert(upsertData).select('id').single()
+        if (error) throw error
+        sid = data?.id ?? null
+        setSettlementId(sid)
+      }
+      if (!sid) throw new Error('클로징정산 ID를 확인할 수 없습니다.')
 
-    if (sid) {
-      await supabase.rpc('save_closing_items', {
+      const { error: itemsError } = await supabase.rpc('save_closing_items', {
         p_closing_settlement_id: sid,
         p_lc_fees: lcFeeRows.map((r, i) => ({
           item_name: r.item_name,
@@ -207,12 +210,17 @@ export default function ClosingSettlementPage() {
           sort_order: i,
         })),
       })
-    }
+      if (itemsError) throw itemsError
 
-    setSaving(false)
-    if (lock) {
-      setIsLocked(true)
-      router.push(`/transactions/${id}`)
+      toast.success(lock ? '확정 및 잠금 완료' : '저장 완료')
+      if (lock) {
+        setIsLocked(true)
+        router.push(`/transactions/${id}`)
+      }
+    } catch (e) {
+      toast.error(`저장 실패: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setSaving(false)
     }
   }
 
