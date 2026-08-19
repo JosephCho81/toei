@@ -222,8 +222,8 @@ function buildSensScenarios(bokRate: number, importAmountUsd: number, importAmou
   return SENS_DELTAS.map(delta => {
     const simRate = bokRate + delta
     const simLc = Math.round(importAmountUsd * simRate)
-    const simFx = simLc - importAmountKrw
-    const simA1 = Math.round((simFx + lcFeeTotal) * (burdenPct / 100))
+    const simFx = importAmountKrw - simLc
+    const simA1 = Math.round((lcFeeTotal - simFx) * (burdenPct / 100))
     const simFinal = Math.round(simA1 * 1.1) + extraCosts
     return { delta, simRate, simFx, simFinal, isActual: delta === 0 }
   })
@@ -234,7 +234,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
   const fxLabel = fxIsGain
     ? `환차익 (A1 유리, ${data.fxBurdenA1Pct}% 수령)`
     : `환차손 (A1 불리, ${data.fxBurdenA1Pct}% 부담)`
-  const additionalCost = data.fxGainLossKrw + data.lcFeeTotalKrw
+  const additionalCost = data.lcFeeTotalKrw - data.fxGainLossKrw
   const nonVatCostsTotal = [...data.shippingItems, ...data.customsItems].reduce((s, r) => s + r.amountKrw, 0)
   const sensScenarios = data.bokExchangeRate != null && data.importAmountUsd
     ? buildSensScenarios(data.bokExchangeRate, data.importAmountUsd, data.importAmountKrw, data.lcFeeTotalKrw, data.fxBurdenA1Pct, data.closingCostsTotalKrw)
@@ -368,7 +368,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
             <View style={s.cellValue}>
               <Text style={fxIsGain ? s.fxGainText : s.fxLossText}>{krwSigned(data.fxGainLossKrw)}</Text>
               <Text style={{ fontSize: 7, color: MUTED, marginTop: 1 }}>
-                {`LC결제 ${data.lcPaymentTotalKrw.toLocaleString('ko-KR')}원 - 원금×통관환율 ${data.importAmountKrw.toLocaleString('ko-KR')}원 = ${krwSigned(data.fxGainLossKrw)}`}
+                {`원금×통관환율 ${data.importAmountKrw.toLocaleString('ko-KR')}원 - LC결제 ${data.lcPaymentTotalKrw.toLocaleString('ko-KR')}원 = ${krwSigned(data.fxGainLossKrw)}`}
               </Text>
             </View>
           </View>
@@ -404,7 +404,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
             <View style={s.cellValue}>
               <Text>{krwSigned(data.additionalCostKrw)}</Text>
               <Text style={{ fontSize: 7, color: MUTED, marginTop: 1 }}>
-                {`환차${fxIsGain ? '익' : '손'} ${krwSigned(data.fxGainLossKrw)} + LC제비용 ${krwSigned(data.lcFeeTotalKrw)} = ${krwSigned(data.additionalCostKrw)}`}
+                {`LC제비용 ${krwSigned(data.lcFeeTotalKrw)} - 환차${fxIsGain ? '익' : '손'} ${krwSigned(data.fxGainLossKrw)} = ${krwSigned(data.additionalCostKrw)}`}
               </Text>
             </View>
           </View>
@@ -615,20 +615,20 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
                   <Text style={{ fontSize: 9, textAlign: 'right', color: WHITE, fontWeight: 700 }}>{krw(data.interimConfirmedKrw!)}</Text>
                 </View>
               </View>
-              <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center', backgroundColor: GRAY_BG }}>
-                <View style={{ flex: 1, paddingLeft: 20, paddingTop: 4, paddingBottom: 4 }}>
-                  <Text style={{ fontSize: 8, color: fxIsGain ? GREEN_GAIN : RED }}>{fxIsGain ? '+ 환차익' : '- 환차손'}</Text>
-                </View>
-                <View style={{ width: '40%', paddingRight: 10, paddingTop: 4, paddingBottom: 4 }}>
-                  <Text style={{ fontSize: 8, textAlign: 'right', color: fxIsGain ? GREEN_GAIN : RED }}>{krwSigned(data.fxGainLossKrw)}</Text>
-                </View>
-              </View>
               <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center' }}>
                 <View style={{ flex: 1, paddingLeft: 20, paddingTop: 4, paddingBottom: 4 }}>
-                  <Text style={{ fontSize: 8, color: MUTED }}>+ LC수수료</Text>
+                  <Text style={{ fontSize: 8, color: MUTED }}>LC수수료</Text>
                 </View>
                 <View style={{ width: '40%', paddingRight: 10, paddingTop: 4, paddingBottom: 4 }}>
                   <Text style={{ fontSize: 8, textAlign: 'right', color: MUTED }}>{krwSigned(data.lcFeeTotalKrw)}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center', backgroundColor: GRAY_BG }}>
+                <View style={{ flex: 1, paddingLeft: 20, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 8, color: fxIsGain ? GREEN_GAIN : RED }}>{`- 환차${fxIsGain ? '익' : '손'}`}</Text>
+                </View>
+                <View style={{ width: '40%', paddingRight: 10, paddingTop: 4, paddingBottom: 4 }}>
+                  <Text style={{ fontSize: 8, textAlign: 'right', color: fxIsGain ? GREEN_GAIN : RED }}>{krwSigned(data.fxGainLossKrw)}</Text>
                 </View>
               </View>
               <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center', backgroundColor: GRAY_BG }}>

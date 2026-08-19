@@ -88,7 +88,7 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
   const fxIsGain = data.fxGainLossKrw >= 0
   const confirmed = data.confirmed_amount_krw
   const hasGrandTotal = data.interimConfirmedKrw != null && data.grandTotalKrw != null
-  const additionalCost = data.fxGainLossKrw + data.lcFeeTotalKrw
+  const additionalCost = data.lcFeeTotalKrw - data.fxGainLossKrw
   const systemClosingConfirmed = data.a1BurdenWithVatKrw + data.closingCostsTotalKrw
   const closingDiff = confirmed != null ? confirmed - systemClosingConfirmed : 0
 
@@ -149,8 +149,8 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
             </div>
             <p className="text-xs text-gray-400 mt-0.5 font-mono">
               {data.lc_payment_total_krw != null
-                ? `LC결제비용 ${data.lc_payment_total_krw.toLocaleString('ko-KR')}원 - 원금×통관환율 ${data.importAmountKrw.toLocaleString('ko-KR')}원 = ${signed(data.fxGainLossKrw)}`
-                : `LC결제비용 - 원금×통관환율 = ${signed(data.fxGainLossKrw)}`}
+                ? `원금×통관환율 ${data.importAmountKrw.toLocaleString('ko-KR')}원 - LC결제비용 ${data.lc_payment_total_krw.toLocaleString('ko-KR')}원 = ${signed(data.fxGainLossKrw)}`
+                : `원금×통관환율 - LC결제비용 = ${signed(data.fxGainLossKrw)}`}
             </p>
           </div>
         </div>
@@ -173,7 +173,7 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
               </span>
             </div>
             <p className="text-xs text-gray-400 mt-0.5 font-mono">
-              환차{fxIsGain ? '익' : '손'} {signed(data.fxGainLossKrw)} + LC제비용 {signed(data.lcFeeTotalKrw)} = {signed(additionalCost)}
+              LC제비용 {signed(data.lcFeeTotalKrw)} - 환차{fxIsGain ? '익' : '손'} {signed(data.fxGainLossKrw)} = {signed(additionalCost)}
             </p>
           </div>
           <div className="flex text-sm py-1.5 px-3 border-b">

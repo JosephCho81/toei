@@ -40,14 +40,15 @@ export function calculateClosing(params: {
 
   const importAmountKrw = calcImportAmountKrw(importAmountUsd, customsExchangeRate, 0)
 
-  // 환차손익 = LC결제비용 - (수입금액USD × 통관환율)
-  const fxGainLossKrw = lcPaymentTotalKrw - importAmountKrw
+  // 환차손익 = (수입금액USD × 통관환율) - LC결제비용
+  // 실제 결제비용이 통관환율 기준액보다 크면 환차손(음수)
+  const fxGainLossKrw = importAmountKrw - lcPaymentTotalKrw
 
   // LC 수수료 합계
   const lcFeeTotalKrw = lcFeeItems.reduce((sum, item) => sum + item.amountKrw, 0)
 
-  // 추가비용 = 환차손익 + LC수수료
-  const additionalCostKrw = fxGainLossKrw + lcFeeTotalKrw
+  // 추가비용 = LC수수료 - 환차손익 (환차손이면 부담 증가, 환차익이면 부담 감소)
+  const additionalCostKrw = lcFeeTotalKrw - fxGainLossKrw
 
   // 에이원 부담분 (분담비율 적용)
   const a1BurdenKrw = Math.round(additionalCostKrw * (fxBurdenA1Pct / 100))

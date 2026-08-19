@@ -53,7 +53,7 @@ export function ReportFlowDiagram(props: Props) {
   } = props
 
   const fxIsGain = fxGainLossKrw >= 0
-  const additionalCostKrw = fxGainLossKrw + lcFeeTotalKrw
+  const additionalCostKrw = lcFeeTotalKrw - fxGainLossKrw
 
   return (
     <div className="mb-4 break-inside-avoid">
@@ -72,12 +72,13 @@ export function ReportFlowDiagram(props: Props) {
         <Arrow />
 
         {/* 클로징 계산 */}
+        <FlowRow label="LC 제비용" value={`${fmt(lcFeeTotalKrw)}원`} />
         <FlowRow
-          label={`환율차액 (환차${fxIsGain ? '익' : '손'})`}
+          label={`- 환율차액 (환차${fxIsGain ? '익' : '손'})`}
           value={signed(fxGainLossKrw) + '원'}
           color={fxIsGain ? 'text-blue-600' : 'text-red-600'}
+          indent
         />
-        <FlowRow label="+ LC 제비용" value={`+${fmt(lcFeeTotalKrw)}원`} indent />
         <FlowRow
           label="= 추가비용 합계"
           value={signed(additionalCostKrw) + '원'}
