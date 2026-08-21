@@ -18,6 +18,7 @@ import { ClosingFxCard } from '@/components/settlements/ClosingFxCard'
 import { ClosingLcFeeCard } from '@/components/settlements/ClosingLcFeeCard'
 import { ClosingCostCard } from '@/components/settlements/ClosingCostCard'
 import { ClosingSummaryCard } from '@/components/settlements/ClosingSummaryCard'
+import { UnlockButton } from '@/components/settlements/UnlockButton'
 
 interface FeeRow {
   id?: string
@@ -230,7 +231,12 @@ export default function ClosingSettlementPage() {
     <div className="max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">클로징정산</h2>
-        {isLocked && <Badge variant="outline">🔒 확정</Badge>}
+        {isLocked && (
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">🔒 확정</Badge>
+            {settlementId && <UnlockButton table="closing_settlements" settlementId={settlementId} onUnlocked={() => setIsLocked(false)} />}
+          </div>
+        )}
       </div>
 
       <Card>
