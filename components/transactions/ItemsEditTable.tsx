@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/NumberInput'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -15,10 +16,11 @@ import {
   itemsTotalUsd, itemSubtotalUsd, compareAmount, formatDiffUsd,
   type AmountDiffStatus,
 } from '@/lib/calculations/itemTotals'
+import { parseIntegerStrict } from '@/lib/utils/number'
 import { useProducts } from '@/lib/products/useProducts'
 import { applyProduct, nextRowValues } from '@/lib/products/rowFill'
 import { useGridNav } from '@/lib/hooks/useGridNav'
-import { ItemDatalists, ITEM_DATALIST } from './ItemDatalists'
+import { ItemDatalists, ITEM_DATALIST, listIdsForSpec } from './ItemDatalists'
 
 type Row = {
   _key: string
@@ -137,6 +139,12 @@ export function ItemsEditTable({ transactionId, isLocked }: {
   }
 
   async function save() {
+    // 수량이 소수/음수면 parseInt 가 조용히 잘라 저장한다 — 저장 전에 막는다
+    const badQty = rows.find((r) => r.quantity.trim() !== '' && parseIntegerStrict(r.quantity) == null)
+    if (badQty) {
+      toast.error(`수량은 0 이상 정수만 입력할 수 있습니다: '${badQty.spec || '품목'}' 의 '${badQty.quantity}'`)
+      return
+    }
     setSaving(true)
     const errors: string[] = []
     const check = (err: { message: string } | null) => { if (err) errors.push(err.message) }
@@ -158,7 +166,7 @@ export function ItemsEditTable({ transactionId, isLocked }: {
         spec: r.spec || null, glove_type: r.glove_type || null,
         color: r.color || null, size: r.size || null,
         unit_price_usd: r.unit_price_usd ? parseFloat(r.unit_price_usd) : null,
-        quantity: r.quantity ? parseInt(r.quantity) : null,
+        quantity: r.quantity.trim() ? parseIntegerStrict(r.quantity) : null,
         unit: r.unit || DEFAULT_UNIT,
         sort_order: i,
       }
@@ -223,11 +231,15 @@ export function ItemsEditTable({ transactionId, isLocked }: {
 
   const TEXT_COLS: (keyof Pick<Row, 'spec' | 'glove_type' | 'color' | 'size'>)[] = ['spec', 'glove_type', 'color', 'size']
   const COL_LABELS = ['품목', '종류', '색상', '사이즈']
-  const TEXT_COL_DATALIST: Record<typeof TEXT_COLS[number], string> = {
-    spec: ITEM_DATALIST.spec,
-    glove_type: ITEM_DATALIST.gloveType,
-    color: ITEM_DATALIST.color,
-    size: ITEM_DATALIST.size,
+  /** 품목을 고르면 그 품목에 등록된 사이즈·색상만 목록에 뜬다 */
+  const datalistFor = (spec: string): Record<typeof TEXT_COLS[number], string> => {
+    const lists = listIdsForSpec(products, spec)
+    return {
+      spec: ITEM_DATALIST.spec,
+      glove_type: ITEM_DATALIST.gloveType,
+      color: lists.color,
+      size: lists.size,
+    }
   }
   const totalCols = isLocked ? 8 : 9
 
@@ -277,7 +289,7 @@ export function ItemsEditTable({ transactionId, isLocked }: {
                       <TableCell key={f} className="p-1">
                         {isLocked
                           ? <span className="text-sm px-2">{r[f] || '-'}</span>
-                          : <Input className="h-7 text-xs" value={r[f]} list={TEXT_COL_DATALIST[f]}
+                          : <Input className="h-7 text-xs" value={r[f]} list={datalistFor(r.spec)[f]}
                               onChange={(e) => upd(r._key, f, e.target.value)}
                               {...cellProps(rowIndex, colIndex)} />}
                       </TableCell>
@@ -286,8 +298,8 @@ export function ItemsEditTable({ transactionId, isLocked }: {
                       <TableCell key={f} className="p-1">
                         {isLocked
                           ? <span className="text-sm px-2 block text-right">{r[f] || '-'}</span>
-                          : <Input className="h-7 text-xs text-right w-24" type="number" step={f === 'unit_price_usd' ? '0.01' : '1'} value={r[f]}
-                              onChange={(e) => upd(r._key, f, e.target.value)}
+                          : <NumberInput className="h-7 text-xs text-right w-24" value={r[f]}
+                              onValueChange={(v) => upd(r._key, f, v)}
                               {...cellProps(rowIndex, 4 + i)} />}
                       </TableCell>
                     ))}
@@ -336,9 +348,9 @@ export function ItemsEditTable({ transactionId, isLocked }: {
                     <TableCell className="p-1" colSpan={2}>
                       {isLocked
                         ? <span className="text-sm px-2 block text-right">{check.amount_usd ? usd(parseFloat(check.amount_usd)) : '-'}</span>
-                        : <Input className="h-7 text-xs text-right" type="number" step="0.01"
+                        : <NumberInput className="h-7 text-xs text-right font-mono"
                             value={check.amount_usd} placeholder="금액 입력(USD)"
-                            onChange={(e) => updCheck(check._key, 'amount_usd', e.target.value)} />}
+                            onValueChange={(v) => updCheck(check._key, 'amount_usd', v)} />}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">USD</TableCell>
                     <TableCell className={cn('text-right text-sm pr-3 whitespace-nowrap', style.text)}>

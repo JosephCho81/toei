@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { Plus, Download } from 'lucide-react'
 import { TransactionTable, type TxRow } from './transactions-table'
-import type { TxFlag } from '@/types/transaction'
+import type { TxFlag, TxAmountCheck } from '@/types/transaction'
 
 export default async function TransactionsPage() {
   const supabase = await createClient()
@@ -28,6 +28,12 @@ export default async function TransactionsPage() {
     .select('id, transaction_id, field, memo, status, resolved_memo, created_at')
     .order('created_at')
 
+  // 대조금액·차액 사유가 있는 차수를 목록에서 바로 알아볼 수 있게 함께 읽는다
+  const { data: amountChecks } = await supabase
+    .from('transaction_amount_checks')
+    .select('id, transaction_id, label, amount_usd, note')
+    .order('sort_order')
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -48,6 +54,7 @@ export default async function TransactionsPage() {
       <TransactionTable
         rows={(data ?? []) as unknown as TxRow[]}
         initialFlags={(flags ?? []) as TxFlag[]}
+        amountChecks={(amountChecks ?? []) as TxAmountCheck[]}
       />
     </div>
   )

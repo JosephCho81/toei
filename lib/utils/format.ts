@@ -41,8 +41,17 @@ export function formatNumberForInput(value: string | number): string {
   return decPart !== undefined ? `${sign}${formattedInt}.${decPart}` : `${sign}${formattedInt}`
 }
 
+/**
+ * 화면 입력값 → 저장/계산용 원시 숫자 문자열.
+ * 쉼표·공백 등 표시용 문자를 걷어내고, 부호는 맨 앞 하나, 소수점도 하나만 남긴다.
+ * (금액 입력이므로 '1.2.3' 같은 값이 parseFloat 로 조용히 잘리는 일이 없어야 한다)
+ */
 export function parseNumberInput(value: string): string {
-  return value.replace(/[^\d.-]/g, '')
+  const cleaned = String(value ?? '').replace(/[^\d.-]/g, '')
+  const negative = cleaned.startsWith('-')
+  const [intPart, ...rest] = cleaned.replace(/-/g, '').split('.')
+  const decPart = rest.length > 0 ? `.${rest.join('')}` : ''
+  return `${negative ? '-' : ''}${intPart}${decPart}`
 }
 
 export function formatYearMonth(date: Date | string): string {

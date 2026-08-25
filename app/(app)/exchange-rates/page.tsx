@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/NumberInput'
 import { Label } from '@/components/ui/label'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -15,9 +16,6 @@ interface RateRow { date: string; rate_krw: number; source: string }
 export default function ExchangeRatesPage() {
   const supabase = createClient()
   const [rates, setRates] = useState<RateRow[]>([])
-  const [bokDate, setBokDate] = useState('')
-  const [bokLoading, setBokLoading] = useState(false)
-  const [bokMsg, setBokMsg] = useState<string | null>(null)
   const [manualDate, setManualDate] = useState('')
   const [manualRate, setManualRate] = useState('')
   const [manualSaving, setManualSaving] = useState(false)
@@ -36,18 +34,6 @@ export default function ExchangeRatesPage() {
     run()
   }, [load])
 
-  async function fetchBok() {
-    if (!bokDate) return
-    setBokLoading(true); setBokMsg(null)
-    const dateStr = bokDate.replace(/-/g, '')
-    const res = await fetch(`/api/exchange-rate?date=${dateStr}`)
-    const data = await res.json()
-    setBokLoading(false)
-    if (data.error) { setBokMsg(`오류: ${data.error}`); return }
-    setBokMsg(`${bokDate}: ${data.rate}원/USD (${data.source})`)
-    load()
-  }
-
   async function saveManual() {
     if (!manualDate || !manualRate) return
     setManualSaving(true)
@@ -63,23 +49,9 @@ export default function ExchangeRatesPage() {
     <div className="space-y-6 max-w-2xl">
       <h2 className="text-2xl font-bold">환율 관리</h2>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <Card>
-          <CardHeader><CardTitle className="text-base">한국은행 자동 조회</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-1">
-              <Label className="text-sm">날짜</Label>
-              <Input type="date" value={bokDate} onChange={e => setBokDate(e.target.value)} />
-            </div>
-            <Button size="sm" onClick={fetchBok} disabled={bokLoading || !bokDate}>
-              {bokLoading ? '조회 중...' : '조회 및 저장'}
-            </Button>
-            {bokMsg && <p className={`text-xs ${bokMsg.startsWith('오류') ? 'text-destructive' : 'text-green-700'}`}>{bokMsg}</p>}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle className="text-base">수동 입력</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">환율 입력</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
@@ -88,7 +60,7 @@ export default function ExchangeRatesPage() {
               </div>
               <div className="space-y-1">
                 <Label className="text-sm">환율 (원/USD)</Label>
-                <Input type="number" step="0.01" value={manualRate} onChange={e => setManualRate(e.target.value)} placeholder="1350.00" />
+                <NumberInput className="font-mono text-right" value={manualRate} onValueChange={setManualRate} placeholder="1,350.00" />
               </div>
             </div>
             <Button size="sm" onClick={saveManual} disabled={manualSaving || !manualDate || !manualRate}>

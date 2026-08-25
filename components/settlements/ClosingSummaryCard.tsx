@@ -40,9 +40,9 @@ export function ClosingSummaryCard({
               <Select value={roundingPolicy} onValueChange={(v) => onRoundingChange(v as RoundingPolicy)} disabled={isLocked}>
                 <SelectTrigger className="w-36"><SelectValue>{(v: RoundingPolicy) => ROUNDING_LABELS[v]}</SelectValue></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">{ROUNDING_LABELS.none}</SelectItem>
                   <SelectItem value="floor_100">{ROUNDING_LABELS.floor_100}</SelectItem>
                   <SelectItem value="floor_10">{ROUNDING_LABELS.floor_10}</SelectItem>
-                  <SelectItem value="none">{ROUNDING_LABELS.none}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -7,9 +7,10 @@ import { createClient } from '@/lib/supabase/client'
 import { fetchTransactionBase, fetchInterimSettlement, fetchInterimCostItems } from '@/lib/data/queries'
 import { toCostRow } from '@/lib/utils/costRows'
 import { calculateInterim, type RoundingPolicy, type CostItem } from '@/lib/calculations/interim'
-import { formatKrw } from '@/lib/utils/format'
+import { formatKrw, formatUsd } from '@/lib/utils/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/NumberInput'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -163,11 +164,11 @@ export default function InterimSettlementPage() {
         <CardContent className="grid grid-cols-3 gap-4">
           <div className="space-y-1">
             <Label>수입금액 (USD)</Label>
-            <Input value={tx.import_amount_usd ? String(tx.import_amount_usd) : '-'} readOnly className="bg-muted font-mono" />
+            <Input value={tx.import_amount_usd ? formatUsd(Number(tx.import_amount_usd)) : '-'} readOnly className="bg-muted font-mono text-right" />
           </div>
           <div className="space-y-1">
             <Label>통관환율 (원/$)</Label>
-            <Input type="number" step="0.0001" value={customsRate} onChange={(e) => setCustomsRate(e.target.value)} disabled={isLocked} className="font-mono" />
+            <NumberInput value={customsRate} onValueChange={setCustomsRate} disabled={isLocked} className="font-mono text-right" />
           </div>
           <div className="space-y-1">
             <Label>원화 환산</Label>

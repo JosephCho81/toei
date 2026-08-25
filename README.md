@@ -27,7 +27,6 @@
 NEXT_PUBLIC_SUPABASE_URL=       # Supabase 프로젝트 URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY=  # Supabase anon key
 SUPABASE_SERVICE_ROLE_KEY=      # Supabase service_role JWT
-BOK_API_KEY=                    # 한국은행 API 키 (환율 조회)
 MAERSK_CLIENT_ID=               # Maersk API Client ID
 MAERSK_CLIENT_SECRET=           # Maersk API Client Secret
 HAPAG_API_KEY=                  # Hapag-Lloyd API Key

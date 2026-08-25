@@ -2,12 +2,13 @@
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/NumberInput'
 import { Plus, Trash2 } from 'lucide-react'
 import { DEFAULT_UNIT } from '@/lib/constants/units'
 import { useProducts } from '@/lib/products/useProducts'
 import { applyProduct, nextRowValues } from '@/lib/products/rowFill'
 import { useGridNav } from '@/lib/hooks/useGridNav'
-import { ItemDatalists, ITEM_DATALIST } from './ItemDatalists'
+import { ItemDatalists, ITEM_DATALIST, listIdsForSpec } from './ItemDatalists'
 import { itemSubtotalUsd } from '@/lib/calculations/itemTotals'
 
 export type ItemRow = {
@@ -61,6 +62,8 @@ export function ItemsInputSection({ items, onChange }: Props) {
           <tbody>
             {items.map((r, rowIndex) => {
               const sub = itemSubtotalUsd(r)
+              // 품목을 고르면 그 품목에 등록된 사이즈·색상만 목록에 뜬다
+              const lists = listIdsForSpec(products, r.spec)
               return (
                 <tr key={r._key} className="border-b border-dashed">
                   <td className="py-1 pr-1">
@@ -75,23 +78,23 @@ export function ItemsInputSection({ items, onChange }: Props) {
                       {...cellProps(rowIndex, 1)} />
                   </td>
                   <td className="py-1 pr-1">
-                    <Input className="h-7 text-xs w-24" list={ITEM_DATALIST.color}
+                    <Input className="h-7 text-xs w-24" list={lists.color}
                       value={r.color} onChange={(e) => upd(r._key, 'color', e.target.value)}
                       {...cellProps(rowIndex, 2)} />
                   </td>
                   <td className="py-1 pr-1">
-                    <Input className="h-7 text-xs w-16" list={ITEM_DATALIST.size}
+                    <Input className="h-7 text-xs w-16" list={lists.size}
                       value={r.size} onChange={(e) => upd(r._key, 'size', e.target.value)}
                       {...cellProps(rowIndex, 3)} />
                   </td>
                   <td className="py-1 pr-1">
-                    <Input className="h-7 text-xs text-right w-20" type="number" step="0.01" value={r.unit_price_usd}
-                      onChange={(e) => upd(r._key, 'unit_price_usd', e.target.value)}
+                    <NumberInput className="h-7 text-xs text-right w-24" value={r.unit_price_usd}
+                      onValueChange={(v) => upd(r._key, 'unit_price_usd', v)}
                       {...cellProps(rowIndex, 4)} />
                   </td>
                   <td className="py-1 pr-1">
-                    <Input className="h-7 text-xs text-right w-20" type="number" value={r.quantity}
-                      onChange={(e) => upd(r._key, 'quantity', e.target.value)}
+                    <NumberInput className="h-7 text-xs text-right w-24" value={r.quantity}
+                      onValueChange={(v) => upd(r._key, 'quantity', v)}
                       {...cellProps(rowIndex, 5)} />
                   </td>
                   <td className="py-1 pr-1">

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/NumberInput'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -395,8 +396,8 @@ export function ForwardingQuoteSection({ transactionId, isLocked }: { transactio
                           )}
                         </td>
                         <td className="py-1 px-2">
-                          <Input type="number" className="h-7 text-sm text-right" value={it.amount_krw}
-                            onChange={e => updItem(r._key, it._key, 'amount_krw', e.target.value)} />
+                          <NumberInput className="h-7 text-sm text-right font-mono" value={it.amount_krw}
+                            onValueChange={v => updItem(r._key, it._key, 'amount_krw', v)} />
                         </td>
                         <td className="py-1 px-2 text-center">
                           <Checkbox checked={it.is_vat_taxable}

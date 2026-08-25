@@ -79,6 +79,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
           <CardContent className="space-y-2 text-sm">
             <Row label="제조사" value={mfr?.name ?? '-'} />
             <Row label="수입금액(USD)" value={t.import_amount_usd ? formatUsd(Number(t.import_amount_usd)) : '-'} />
+            <Row label="LC 번호" value={t.lc_no ?? '-'} />
             <Row label="LC개설일" value={formatDate(t.lc_open_date)} />
             <Row label="통관일" value={formatDate(t.customs_date)} />
             <Row label="통관환율" value={displayCustomsRate != null ? `${formatExchangeRate(displayCustomsRate)} (입고시 세관 신고 환율)` : '-'} />
@@ -125,7 +126,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
 
       <ItemsEditTable transactionId={id} isLocked={t.is_locked} />
 
-      <ContainerList transactionId={id} isLocked={t.is_locked} />
+      <ContainerList transactionId={id} isLocked={t.is_locked} defaultLcNumber={t.lc_no} />
 
       <ForwardingQuoteSection transactionId={id} isLocked={t.is_locked} />
 

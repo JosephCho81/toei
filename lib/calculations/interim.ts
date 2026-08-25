@@ -15,7 +15,9 @@ export interface InterimCalculation {
 export function applyRounding(amount: number, policy: RoundingPolicy): number {
   if (policy === 'floor_100') return Math.floor(amount / 100) * 100
   if (policy === 'floor_10') return Math.floor(amount / 10) * 10
-  return amount
+  // '절사 없음'이어도 원 단위 소수점은 남기지 않는다.
+  // 정산금액 컬럼이 numeric(15,0) 이라 DB 가 어차피 반올림하므로 화면과 저장값을 맞춘다.
+  return Math.round(amount)
 }
 
 export function calculateInterim(params: {

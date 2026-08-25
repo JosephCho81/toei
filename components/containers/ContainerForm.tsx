@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { validateContainerNo } from '@/lib/tracking/detector'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/NumberInput'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -18,10 +19,11 @@ type C = {
 }
 type FV = Record<'container_no'|'bl_no'|'lc_number'|'container_size'|'carrier'|'vessel_name'|'voyage_no'|'carton_count'|'etd'|'eta'|'actual_departure'|'actual_arrival'|'manual_notes', string>
 
-function empty(d?: C | null): FV {
+function empty(d?: C | null, defaultLcNumber?: string | null): FV {
   return {
     container_no: d?.container_no ?? '', bl_no: d?.bl_no ?? '',
-    lc_number: d?.lc_number ?? '', container_size: d?.container_size ?? '',
+    // 새 컨테이너는 거래 기본정보의 LC 번호를 기본값으로 채운다 (수정 가능)
+    lc_number: d?.lc_number ?? defaultLcNumber ?? '', container_size: d?.container_size ?? '',
     carrier: d?.carrier ?? '', vessel_name: d?.vessel_name ?? '',
     voyage_no: d?.voyage_no ?? '', carton_count: d?.carton_count?.toString() ?? '',
     etd: d?.etd ?? '', eta: d?.eta ?? '',
@@ -32,12 +34,20 @@ function empty(d?: C | null): FV {
 function F({ l, c }: { l: string; c: React.ReactNode }) {
   return <div className="space-y-1"><Label className="text-xs">{l}</Label>{c}</div>
 }
-interface Props { transactionId:string; open:boolean; onOpenChange:(v:boolean)=>void; initialData?:C|null; onSaved:()=>void }
+interface Props {
+  transactionId: string
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  initialData?: C | null
+  onSaved: () => void
+  /** 거래 기본정보의 LC 번호 — 신규 등록 시 자동 입력 */
+  defaultLcNumber?: string | null
+}
 
-export function ContainerForm({ transactionId, open, onOpenChange, initialData, onSaved }: Props) {
+export function ContainerForm({ transactionId, open, onOpenChange, initialData, onSaved, defaultLcNumber }: Props) {
   const supabase = createClient()
   const isEdit = !!initialData?.id
-  const [form, setForm] = useState<FV>(() => empty(initialData))
+  const [form, setForm] = useState<FV>(() => empty(initialData, defaultLcNumber))
   const [tracking, setTracking] = useState<{apiSupported:boolean;carrier:string|null;trackingUrl:string|null}|null>(null)
   const [saving, setSaving] = useState(false)
   function set(k: keyof FV, v: string) { setForm(p => ({ ...p, [k]: v })) }
@@ -46,7 +56,7 @@ export function ContainerForm({ transactionId, open, onOpenChange, initialData, 
   const [wasOpen, setWasOpen] = useState(open)
   if (open !== wasOpen) {
     setWasOpen(open)
-    if (open) { setForm(empty(initialData)); setTracking(null) }
+    if (open) { setForm(empty(initialData, defaultLcNumber)); setTracking(null) }
   }
 
   const fetchTracking = useCallback(async (no: string, signal: AbortSignal) => {
@@ -147,7 +157,7 @@ export function ContainerForm({ transactionId, open, onOpenChange, initialData, 
           <F l="선사" c={<Input value={form.carrier} onChange={e => set('carrier', e.target.value)} />} />
           <F l="선박명" c={<Input value={form.vessel_name} onChange={e => set('vessel_name', e.target.value)} />} />
           <F l="항차" c={<Input value={form.voyage_no} onChange={e => set('voyage_no', e.target.value)} />} />
-          <F l="카톤수" c={<Input type="number" value={form.carton_count} onChange={e => set('carton_count', e.target.value)} />} />
+          <F l="카톤수" c={<NumberInput className="text-right font-mono" value={form.carton_count} onValueChange={v => set('carton_count', v)} />} />
           <F l="ETD" c={<Input type="date" value={form.etd} onChange={e => set('etd', e.target.value)} />} />
           <F l="ETA" c={<Input type="date" value={form.eta} onChange={e => set('eta', e.target.value)} />} />
           <F l="실제 출발일" c={<Input type="date" value={form.actual_departure} onChange={e => set('actual_departure', e.target.value)} />} />

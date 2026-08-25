@@ -17,7 +17,12 @@ interface Container {
   tracking_status: string | null
 }
 
-export function ContainerList({ transactionId, isLocked }: { transactionId: string; isLocked: boolean }) {
+export function ContainerList({ transactionId, isLocked, defaultLcNumber }: {
+  transactionId: string
+  isLocked: boolean
+  /** 거래 기본정보의 LC 번호 — 신규 컨테이너에 자동 입력 */
+  defaultLcNumber?: string | null
+}) {
   const supabase = createClient()
   const [containers, setContainers] = useState<Container[]>([])
   const [dialog, setDialog] = useState<{ open: boolean; editing: Container | null }>({ open: false, editing: null })
@@ -107,6 +112,7 @@ export function ContainerList({ transactionId, isLocked }: { transactionId: stri
           open={dialog.open}
           onOpenChange={(v) => setDialog(d => ({ ...d, open: v }))}
           initialData={dialog.editing}
+          defaultLcNumber={defaultLcNumber}
           onSaved={() => { setDialog({ open: false, editing: null }); load() }}
         />
       </CardContent>

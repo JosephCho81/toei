@@ -49,3 +49,6 @@ next-env.d.ts
 scripts/_insert_only.sql
 
 _source_docs/
+
+# supabase CLI 캐시
+supabase/.temp/

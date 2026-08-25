@@ -12,7 +12,65 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { DEFAULT_UNIT } from '@/lib/constants/units'
 import { TransactionFlagPanel } from '@/components/transactions/TransactionFlagPanel'
-import type { TxFlag } from '@/types/transaction'
+import { summarizeAmountChecks, type AmountCheckLevel, type AmountCheckSummary } from '@/lib/calculations/amountCheckSummary'
+import { formatDiffUsd } from '@/lib/calculations/itemTotals'
+import type { TxFlag, TxAmountCheck } from '@/types/transaction'
+
+/** 대조금액 차이 단계별 표시 */
+const CHECK_STYLES: Record<Exclude<AmountCheckLevel, 'none'>, { row: string; badge: string; icon: string; label: string }> = {
+  mismatch: {
+    row: 'bg-red-50/60 hover:bg-red-50 dark:bg-red-950/20',
+    badge: 'text-red-600',
+    icon: '🔴',
+    label: '금액 불일치',
+  },
+  minor: {
+    row: 'bg-amber-50/60 hover:bg-amber-50 dark:bg-amber-950/20',
+    badge: 'text-amber-600',
+    icon: '⚠️',
+    label: '금액 차이',
+  },
+  note: {
+    row: '',
+    badge: 'text-amber-600',
+    icon: '📝',
+    label: '검토 메모',
+  },
+}
+
+const usd = (v: number) => `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+/** 확장 행에 펼쳐지는 '어디가 어떻게 다른지' 상세 */
+function AmountCheckDetail({ summary }: { summary: AmountCheckSummary }) {
+  if (summary.level === 'none') return null
+  const style = CHECK_STYLES[summary.level]
+  return (
+    <div className={cn('mt-3 rounded-md border px-3 py-2 text-xs',
+      summary.level === 'mismatch'
+        ? 'border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/30'
+        : 'border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/30')}>
+      <p className="font-semibold mb-1">
+        {style.icon} 토에이 자료 대조 — 품목 합계 {usd(summary.itemsTotalUsd)}
+      </p>
+      <ul className="space-y-1">
+        {summary.entries.map((e, i) => (
+          <li key={i} className="flex flex-wrap gap-x-3">
+            <span className="font-medium">{e.label}</span>
+            <span className="font-mono">{e.amountUsd != null ? usd(e.amountUsd) : '금액 미입력'}</span>
+            {e.diff.status !== 'empty' && e.diff.status !== 'match' && (
+              <span className={cn('font-mono', e.diff.status === 'mismatch' ? 'text-red-600 font-semibold' : 'text-amber-600')}>
+                차액 {formatDiffUsd(e.diff.diffUsd)}
+                {e.diff.diffPct != null && ` (${e.diff.diffPct.toFixed(2)}%)`}
+              </span>
+            )}
+            {e.note && <span className="text-muted-foreground">사유: {e.note}</span>}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1 text-muted-foreground">상세 수정은 해당 차수 상세보기 → 품목 명세에서.</p>
+    </div>
+  )
+}
 
 type Item = {
   spec: string | null; size: string | null; quantity: number | null
@@ -57,7 +115,11 @@ function getEtaDisplay(eta: string | null, deliveryDates: Array<{ seq: number; d
   return '-'
 }
 
-export function TransactionTable({ rows, initialFlags = [] }: { rows: TxRow[]; initialFlags?: TxFlag[] }) {
+export function TransactionTable({ rows, initialFlags = [], amountChecks = [] }: {
+  rows: TxRow[]
+  initialFlags?: TxFlag[]
+  amountChecks?: TxAmountCheck[]
+}) {
   const router = useRouter()
   const supabase = createClient()
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -127,6 +189,11 @@ export function TransactionTable({ rows, initialFlags = [] }: { rows: TxRow[]; i
             const items = [...(t.transaction_items ?? [])].sort((a, b) => a.sort_order - b.sort_order)
             const isExpanded = expandedId === t.id
             const txFlags = flagsOf(t.id)
+            const checkSummary = summarizeAmountChecks(
+              items,
+              amountChecks.filter((c) => c.transaction_id === t.id)
+            )
+            const checkStyle = checkSummary.level === 'none' ? null : CHECK_STYLES[checkSummary.level]
             const openFlags = txFlags.filter((f) => f.status === 'open')
             const hasError = openFlags.length > 0
             return (
@@ -134,6 +201,7 @@ export function TransactionTable({ rows, initialFlags = [] }: { rows: TxRow[]; i
                 <TableRow
                   className={cn(
                     'cursor-pointer hover:bg-muted/50',
+                    !hasError && checkStyle?.row,
                     hasError && 'border-l-4 border-l-red-500 bg-red-50/60 hover:bg-red-50 dark:bg-red-950/20'
                   )}
                   onClick={() => router.push(`/transactions/${t.id}`)}
@@ -150,6 +218,14 @@ export function TransactionTable({ rows, initialFlags = [] }: { rows: TxRow[]; i
                     {hasError && (
                       <span className="ml-1.5 text-xs text-red-600 font-normal">
                         🔴 {openFlags.length}건
+                      </span>
+                    )}
+                    {checkStyle && (
+                      <span
+                        className={cn('ml-1.5 text-xs font-normal', checkStyle.badge)}
+                        title="품목을 눌러 펼치면 어디가 다른지 볼 수 있습니다"
+                      >
+                        {checkStyle.icon} {checkStyle.label} {checkSummary.entries.length}건
                       </span>
                     )}
                   </TableCell>
@@ -215,6 +291,7 @@ export function TransactionTable({ rows, initialFlags = [] }: { rows: TxRow[]; i
                             </tbody>
                           </table>
                         )}
+                      <AmountCheckDetail summary={checkSummary} />
                       <TransactionFlagPanel
                         transactionId={t.id}
                         flags={txFlags}

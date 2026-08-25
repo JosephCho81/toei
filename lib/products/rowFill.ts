@@ -18,7 +18,7 @@ export interface FillableRow {
 export function applyProduct(row: FillableRow, products: Product[]): FillableRow {
   const product = findProduct(products, row.spec)
   if (!product) return row
-  const sequence = sizeSequenceFor(product.size_sequence, product.glove_type)
+  const sequence = sizeSequenceFor(product.size_sequence, product.name)
   return {
     ...row,
     glove_type: product.glove_type ?? row.glove_type,
@@ -42,7 +42,7 @@ export function nextRowValues(
     return { spec: '', glove_type: '', color: '', size: '', unit: DEFAULT_UNIT }
   }
   const product = findProduct(products, prev.spec)
-  const sequence = sizeSequenceFor(product?.size_sequence, prev.glove_type || product?.glove_type)
+  const sequence = sizeSequenceFor(product?.size_sequence, product?.name ?? prev.spec)
   const usedSizes = rows
     .filter((r) => r.spec.trim().toLowerCase() === prev.spec.trim().toLowerCase())
     .map((r) => r.size)

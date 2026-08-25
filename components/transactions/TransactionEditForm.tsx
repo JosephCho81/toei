@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/NumberInput'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusFields } from './StatusFields'
@@ -87,6 +88,14 @@ export default function TransactionEditForm({
 
   const [ls, lgs, ds] = watch(['lc_status', 'logistics_status', 'document_status'])
 
+  /** 천단위 쉼표가 보이는 숫자 칸. RHF 에는 쉼표 없는 원시 문자열만 넣는다. */
+  function numberField(name: 'import_amount_usd' | 'customs_exchange_rate' | 'margin_rate_pct') {
+    return {
+      value: watch(name),
+      onValueChange: (v: string) => setValue(name, v, { shouldDirty: true }),
+    }
+  }
+
   async function onSubmit(v: FV) {
     setSubmitError(null)
     const { error } = await supabase.from('transactions').update({
@@ -125,14 +134,14 @@ export default function TransactionEditForm({
             {errors.round_label && <p className="text-xs text-destructive">{errors.round_label.message}</p>}
           </F>
           <F label="발주번호"><Input {...register('order_no')} /></F>
-          <F label="수입금액 (USD)"><Input type="number" step="0.0001" {...register('import_amount_usd')} /></F>
+          <F label="수입금액 (USD)"><NumberInput className="font-mono text-right" {...numberField('import_amount_usd')} /></F>
           <F label="LC 번호"><Input {...register('lc_no')} /></F>
           <F label="LC 개설일"><Input type="date" {...register('lc_open_date')} /></F>
           <F label="A1 지불일"><Input type="date" {...register('a1_payment_date')} /></F>
           <F label="LC 만기일"><Input type="date" {...register('lc_expiry_date')} /></F>
           <F label="통관일"><Input type="date" {...register('customs_date')} /></F>
-          <F label="통관환율 (원/$)"><Input type="number" step="0.0001" {...register('customs_exchange_rate')} /></F>
-          <F label="마진율 (%)"><Input type="number" step="0.01" {...register('margin_rate_pct')} /></F>
+          <F label="통관환율 (원/$)"><NumberInput className="font-mono text-right" {...numberField('customs_exchange_rate')} /></F>
+          <F label="마진율 (%)"><NumberInput className="font-mono text-right" {...numberField('margin_rate_pct')} /></F>
           <StatusFields
             values={{ lc_status: ls, logistics_status: lgs, document_status: ds }}
             onChange={(k, v) => setValue(k, v, { shouldDirty: true })}

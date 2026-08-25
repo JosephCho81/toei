@@ -95,7 +95,7 @@ export default function ProductsPage() {
         default_unit: r.default_unit.trim() || DEFAULT_UNIT,
         size_sequence: parseSizes(r.size_sequence).length
           ? parseSizes(r.size_sequence)
-          : sizeSequenceFor(null, r.glove_type),
+          : sizeSequenceFor(null, r.name),
         is_active: r.is_active,
         sort_order: i,
       }
@@ -152,7 +152,7 @@ export default function ProductsPage() {
         glove_type,
         color: mostCommon(entry.colors),
         default_unit: mostCommon(entry.units) || DEFAULT_UNIT,
-        size_sequence: sizeSequenceFor(null, glove_type).join(', '),
+        size_sequence: sizeSequenceFor(null, name).join(', '),
       })
     }
 
@@ -184,6 +184,15 @@ export default function ProductsPage() {
             {saved ? '저장됨' : saving ? '저장 중...' : '저장'}
           </Button>
         </div>
+      </div>
+
+      <div className="rounded-md border bg-muted/40 px-4 py-3 text-xs text-muted-foreground space-y-1">
+        <p className="font-medium text-foreground">품목 마스터 쓰는 법</p>
+        <p>1. 여기에 자주 쓰는 품목을 등록해 둡니다 (품목명·재질·색상·단위·사이즈 순서).</p>
+        <p>2. 거래 등록/수정의 품목 명세에서 <b>품목명 칸을 클릭</b>하면 등록한 목록이 뜨고, 고르면 재질·색상·단위가 자동으로 채워집니다.</p>
+        <p>3. <b>행 추가</b>를 누르면 여기 적어둔 <b>사이즈 순서</b>대로 다음 사이즈가 자동 입력됩니다. XS 가 있는 품목만 순서에 &lsquo;XS&rsquo;를 넣어 주세요 (예: A1 라텍스 → <code>XS, S, M, L</code>).</p>
+        <p>4. 사이즈·색상 드롭다운도 선택한 품목에 등록된 값만 보입니다. 목록에 없는 값도 직접 타이핑해 넣을 수 있습니다.</p>
+        <p>5. 처음이라면 <b>거래 데이터에서 가져오기</b>로 기존 거래에 쓰인 품목을 한 번에 불러온 뒤 다듬으세요.</p>
       </div>
 
       {error && (

@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/NumberInput'
 import { formatKrw } from '@/lib/utils/format'
 import type { ClosingCalculation } from '@/lib/calculations/closing'
 
@@ -33,11 +34,10 @@ export function ClosingCostCard({ closingCostRows, onCostChange, isLocked, calc 
               onChange={(e) => onCostChange(closingCostRows.map((r, j) => j === i ? { ...r, item_name: e.target.value } : r))}
               disabled={isLocked}
             />
-            <Input
-              className="w-36 font-mono text-sm"
-              type="number"
+            <NumberInput
+              className="w-36 font-mono text-sm text-right"
               value={row.amount_krw}
-              onChange={(e) => onCostChange(closingCostRows.map((r, j) => j === i ? { ...r, amount_krw: e.target.value } : r))}
+              onValueChange={(v) => onCostChange(closingCostRows.map((r, j) => j === i ? { ...r, amount_krw: v } : r))}
               disabled={isLocked}
             />
             <label className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/NumberInput'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -12,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { ItemsInputSection, blankItem, type ItemRow } from '@/components/transactions/ItemsInputSection'
 import { Plus, Trash2 } from 'lucide-react'
 import { DEFAULT_UNIT } from '@/lib/constants/units'
+import { parseIntegerStrict, parseKrwAmount } from '@/lib/utils/number'
 
 interface Manufacturer { id: string; name: string }
 
@@ -119,6 +121,12 @@ export default function NewTransactionPage() {
     e.preventDefault()
     setError(null)
     if (!form.round_no || !form.round_label) { setError('차수 번호와 라벨은 필수입니다.'); return }
+    // 수량이 소수/음수면 저장 시 조용히 잘리거나 비어버린다 — 등록 전에 막는다
+    const badQty = items.find((r) => r.quantity.trim() !== '' && parseIntegerStrict(r.quantity) == null)
+    if (badQty) {
+      setError(`수량은 0 이상 정수만 입력할 수 있습니다: '${badQty.spec || '품목'}' 의 '${badQty.quantity}'`)
+      return
+    }
     setSaving(true)
     const { data, error: err } = await supabase.from('transactions').insert({
       round_no: parseInt(form.round_no),
@@ -146,7 +154,7 @@ export default function NewTransactionPage() {
           spec: r.spec || null, glove_type: r.glove_type || null,
           color: r.color || null, size: r.size || null,
           unit_price_usd: r.unit_price_usd ? parseFloat(r.unit_price_usd) : null,
-          quantity: r.quantity ? parseInt(r.quantity) : null,
+          quantity: r.quantity.trim() ? parseIntegerStrict(r.quantity) : null,
           unit: r.unit || DEFAULT_UNIT,
           sort_order: i,
         }))
@@ -177,8 +185,8 @@ export default function NewTransactionPage() {
       }).select('id').single()
       if (fq?.id) {
         const itemRows = r.details.filter(d => d.item_name).flatMap((d, j) => {
-          const quoteAmt = parseInt(d.quote_amount_krw) || 0
-          const actualAmt = parseInt(d.actual_amount_krw) || 0
+          const quoteAmt = parseKrwAmount(d.quote_amount_krw)
+          const actualAmt = parseKrwAmount(d.actual_amount_krw)
           const rows = []
           if (quoteAmt) rows.push({ forwarding_quote_id: fq.id, item_type: 'quote', item_name: d.item_name, amount_krw: quoteAmt, is_vat_taxable: false, sort_order: j * 2 })
           if (actualAmt) rows.push({ forwarding_quote_id: fq.id, item_type: 'invoice', item_name: d.item_name, amount_krw: actualAmt, is_vat_taxable: d.is_vat_taxable, sort_order: j * 2 + 1 })
@@ -217,7 +225,7 @@ export default function NewTransactionPage() {
               </Select>
             </Field>
             <Field label="수입금액 (USD)">
-              <Input type="number" step="0.0001" value={form.import_amount_usd} onChange={(e) => set('import_amount_usd', e.target.value)} />
+              <NumberInput className="font-mono text-right" value={form.import_amount_usd} onValueChange={(v) => set('import_amount_usd', v)} />
             </Field>
             <Field label="LC 번호">
               <Input value={form.lc_no} onChange={(e) => set('lc_no', e.target.value)} />
@@ -229,7 +237,7 @@ export default function NewTransactionPage() {
               <Input type="date" value={form.customs_date} onChange={(e) => set('customs_date', e.target.value)} />
             </Field>
             <Field label="통관환율 (원/$)">
-              <Input type="number" step="0.0001" value={form.customs_exchange_rate} onChange={(e) => set('customs_exchange_rate', e.target.value)} />
+              <NumberInput className="font-mono text-right" value={form.customs_exchange_rate} onValueChange={(v) => set('customs_exchange_rate', v)} />
             </Field>
             <div className="col-span-2">
               <Field label="메모">
@@ -324,8 +332,8 @@ export default function NewTransactionPage() {
               <p className="text-sm text-muted-foreground py-2">포워딩 견적이 없습니다. 견적 추가 버튼을 눌러 추가하세요.</p>
             )}
             {forwardings.map((r) => {
-              const quoteTotal = r.details.reduce((s, d) => s + (parseInt(d.quote_amount_krw) || 0), 0)
-              const actualTotal = r.details.reduce((s, d) => s + (parseInt(d.actual_amount_krw) || 0), 0)
+              const quoteTotal = r.details.reduce((s, d) => s + parseKrwAmount(d.quote_amount_krw), 0)
+              const actualTotal = r.details.reduce((s, d) => s + parseKrwAmount(d.actual_amount_krw), 0)
               return (
                 <div key={r._key} className="border rounded-md p-3 space-y-3">
                   <div className="flex gap-2 items-end">
@@ -365,18 +373,16 @@ export default function NewTransactionPage() {
                             />
                           </td>
                           <td className="py-1 px-2">
-                            <Input
-                              type="number"
+                            <NumberInput
                               value={d.quote_amount_krw}
-                              onChange={(e) => setForwardingDetail(r._key, d._key, 'quote_amount_krw', e.target.value)}
+                              onValueChange={(v) => setForwardingDetail(r._key, d._key, 'quote_amount_krw', v)}
                               className="h-7 text-sm text-right"
                             />
                           </td>
                           <td className="py-1 px-2">
-                            <Input
-                              type="number"
+                            <NumberInput
                               value={d.actual_amount_krw}
-                              onChange={(e) => setForwardingDetail(r._key, d._key, 'actual_amount_krw', e.target.value)}
+                              onValueChange={(v) => setForwardingDetail(r._key, d._key, 'actual_amount_krw', v)}
                               className="h-7 text-sm text-right"
                             />
                           </td>

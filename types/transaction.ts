@@ -34,3 +34,12 @@ export interface ContainerRow {
   etd: string
   eta: string
 }
+
+/** 토에이 측 자료 금액 대조행 (transaction_amount_checks) */
+export type TxAmountCheck = {
+  id: string
+  transaction_id: string
+  label: string
+  amount_usd: number | string | null
+  note: string | null
+}
