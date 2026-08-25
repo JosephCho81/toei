@@ -21,6 +21,7 @@ import { ClosingLcFeeCard } from '@/components/settlements/ClosingLcFeeCard'
 import { ClosingCostCard } from '@/components/settlements/ClosingCostCard'
 import { ClosingSummaryCard } from '@/components/settlements/ClosingSummaryCard'
 import { UnlockButton } from '@/components/settlements/UnlockButton'
+import { DeleteSettlementButton } from '@/components/settlements/DeleteSettlementButton'
 import { DEFAULT_LC_FEE_ROWS, type FeeRow } from '@/components/settlements/lcFeeDefaults'
 import { formatKrw } from '@/lib/utils/format'
 
@@ -264,12 +265,16 @@ export default function ClosingSettlementPage() {
     <div className="max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">클로징정산</h2>
-        {isLocked && (
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">🔒 확정</Badge>
-            {settlementId && <UnlockButton table="closing_settlements" settlementId={settlementId} onUnlocked={() => setIsLocked(false)} />}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {isLocked && <Badge variant="outline">🔒 확정</Badge>}
+          {isLocked && settlementId && <UnlockButton table="closing_settlements" settlementId={settlementId} onUnlocked={() => setIsLocked(false)} />}
+          {settlementId && (
+            <DeleteSettlementButton
+              table="closing_settlements" settlementId={settlementId} isLocked={isLocked}
+              onDeleted={() => router.push(`/transactions/${id}`)}
+            />
+          )}
+        </div>
       </div>
 
       <Card>

@@ -19,6 +19,7 @@ import { CustomsCostItems, DEFAULT_CUSTOMS } from '@/components/settlements/Cust
 import { InterimResultsCard } from '@/components/settlements/InterimResultsCard'
 import { MemoField } from '@/components/ui/MemoField'
 import { UnlockButton } from '@/components/settlements/UnlockButton'
+import { DeleteSettlementButton } from '@/components/settlements/DeleteSettlementButton'
 
 
 export default function InterimSettlementPage() {
@@ -152,12 +153,16 @@ export default function InterimSettlementPage() {
     <div className="max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">중간정산</h2>
-        {isLocked && (
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">🔒 확정</Badge>
-            {sid && <UnlockButton table="interim_settlements" settlementId={sid} onUnlocked={() => setIsLocked(false)} />}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {isLocked && <Badge variant="outline">🔒 확정</Badge>}
+          {isLocked && sid && <UnlockButton table="interim_settlements" settlementId={sid} onUnlocked={() => setIsLocked(false)} />}
+          {sid && (
+            <DeleteSettlementButton
+              table="interim_settlements" settlementId={sid} isLocked={isLocked}
+              onDeleted={() => router.push(`/transactions/${id}`)}
+            />
+          )}
+        </div>
       </div>
       <Card>
         <CardHeader><CardTitle className="text-base">기본 정보</CardTitle></CardHeader>

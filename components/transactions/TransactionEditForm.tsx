@@ -10,11 +10,14 @@ import { Input } from '@/components/ui/input'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { StatusFields } from './StatusFields'
 import { Plus, Trash2 } from 'lucide-react'
 
 const schema = z.object({
+  round_no: z.string().regex(/^\d+$/, '숫자만'),
   round_label: z.string().min(1, '필수'),
+  manufacturer_id: z.string(),
   order_no: z.string(), import_amount_usd: z.string(),
   lc_no: z.string(), lc_open_date: z.string(),
   a1_payment_date: z.string(), lc_expiry_date: z.string(),
@@ -26,7 +29,8 @@ const schema = z.object({
 type FV = z.infer<typeof schema>
 
 interface InitData {
-  round_label: string; order_no: string | null
+  round_no: number; round_label: string
+  manufacturer_id: string | null; order_no: string | null
   import_amount_usd: string | number | null; lc_no: string | null
   lc_open_date: string | null; a1_payment_date: string | null
   lc_expiry_date: string | null; customs_date: string | null
@@ -39,10 +43,10 @@ interface InitData {
 function s(v: unknown): string { return v == null ? '' : String(v) }
 
 export default function TransactionEditForm({
-  transactionId, manufacturerName, initialData,
+  transactionId, manufacturers, initialData,
 }: {
   transactionId: string
-  manufacturerName: string | null
+  manufacturers: { id: string; name: string }[]
   initialData: InitData
 }) {
   const router = useRouter()
@@ -67,7 +71,9 @@ export default function TransactionEditForm({
   }
 
   const defaults: FV = {
+    round_no: String(initialData.round_no),
     round_label: initialData.round_label,
+    manufacturer_id: initialData.manufacturer_id ?? '',
     order_no: initialData.order_no ?? '',
     import_amount_usd: s(initialData.import_amount_usd),
     lc_no: initialData.lc_no ?? '',
@@ -99,7 +105,9 @@ export default function TransactionEditForm({
   async function onSubmit(v: FV) {
     setSubmitError(null)
     const { error } = await supabase.from('transactions').update({
+      round_no: parseInt(v.round_no, 10),
       round_label: v.round_label,
+      manufacturer_id: v.manufacturer_id || null,
       order_no: v.order_no || null,
       import_amount_usd: v.import_amount_usd ? parseFloat(v.import_amount_usd) : null,
       lc_no: v.lc_no || null,
@@ -117,7 +125,12 @@ export default function TransactionEditForm({
         ? deliveryDates.map((d, i) => ({ seq: i + 1, date: d.date }))
         : null,
     }).eq('id', transactionId)
-    if (error) { setSubmitError(error.message); return }
+    if (error) {
+      setSubmitError(error.code === '23505'
+        ? `차수 번호 ${v.round_no}은(는) 이미 다른 거래가 쓰고 있습니다.`
+        : error.message)
+      return
+    }
     router.push(`/transactions/${transactionId}`)
   }
 
@@ -126,13 +139,24 @@ export default function TransactionEditForm({
       <Card>
         <CardHeader><CardTitle className="text-base">기본 정보</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-2 gap-4">
-          <F label="제조사 (변경 불가)">
-            <div className="h-9 px-3 py-2 text-sm border rounded-md bg-muted">{manufacturerName ?? '-'}</div>
+          <F label="제조사">
+            <Select value={watch('manufacturer_id')} onValueChange={(v) => setValue('manufacturer_id', v ?? '', { shouldDirty: true })}>
+              <SelectTrigger><SelectValue placeholder="선택" /></SelectTrigger>
+              <SelectContent>
+                {manufacturers.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </F>
-          <F label="차수 라벨 *">
-            <Input {...register('round_label')} />
-            {errors.round_label && <p className="text-xs text-destructive">{errors.round_label.message}</p>}
+          <F label="차수 번호 *">
+            <Input className="font-mono text-right" inputMode="numeric" {...register('round_no')} />
+            {errors.round_no && <p className="text-xs text-destructive">{errors.round_no.message}</p>}
           </F>
+          <div className="col-span-2">
+            <F label="차수 라벨 *">
+              <Input {...register('round_label')} />
+              {errors.round_label && <p className="text-xs text-destructive">{errors.round_label.message}</p>}
+            </F>
+          </div>
           <F label="발주번호"><Input {...register('order_no')} /></F>
           <F label="수입금액 (USD)"><NumberInput className="font-mono text-right" {...numberField('import_amount_usd')} /></F>
           <F label="LC 번호"><Input {...register('lc_no')} /></F>

@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import TransactionEditForm from '@/components/transactions/TransactionEditForm'
 import { ShipmentsEditSection } from '@/components/transactions/ShipmentsEditSection'
+import { DeleteTransactionButton } from '@/components/transactions/DeleteTransactionButton'
 
 export default async function TransactionEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -16,8 +17,6 @@ export default async function TransactionEditPage({ params }: { params: Promise<
   if (!t) notFound()
   if (t.is_locked) redirect(`/transactions/${id}`)
 
-  const manufacturerName = manufacturers?.find((m) => m.id === t.manufacturer_id)?.name ?? null
-
   return (
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center gap-3">
@@ -26,10 +25,11 @@ export default async function TransactionEditPage({ params }: { params: Promise<
       </div>
       <TransactionEditForm
         transactionId={id}
-        manufacturerName={manufacturerName}
+        manufacturers={manufacturers ?? []}
         initialData={t}
       />
       <ShipmentsEditSection transactionId={id} />
+      <DeleteTransactionButton transactionId={id} roundLabel={t.round_label} />
     </div>
   )
 }
