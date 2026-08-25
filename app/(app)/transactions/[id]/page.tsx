@@ -31,14 +31,20 @@ export default async function TransactionDetailPage({ params }: { params: Promis
     .select('*, manufacturers(name)')
     .eq('id', id)
     .single()
-  const [interim, closing] = await Promise.all([
+  const [interim, closing, { data: containerRows }] = await Promise.all([
     fetchInterimSettlement(supabase, id),
     fetchClosingSettlement(supabase, id),
+    supabase.from('containers').select('lc_number').eq('transaction_id', id),
   ])
 
   if (!t) notFound()
 
   const mfr = t.manufacturers as { name: string } | null
+  // 한 차수에 LC가 여러 건인 경우가 있어(예: 37차) 컨테이너에 기록된 LC 번호를 우선 표시한다.
+  const containerLcNumbers = [...new Set(
+    (containerRows ?? []).map((c) => String(c.lc_number ?? '').trim()).filter(Boolean)
+  )]
+  const lcNoDisplay = containerLcNumbers.length > 0 ? containerLcNumbers.join(', ') : (t.lc_no ?? '-')
   const displayCustomsRate = interim?.customs_exchange_rate
     ? Number(interim.customs_exchange_rate)
     : (t.customs_exchange_rate ? Number(t.customs_exchange_rate) : null)
@@ -79,7 +85,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
           <CardContent className="space-y-2 text-sm">
             <Row label="제조사" value={mfr?.name ?? '-'} />
             <Row label="수입금액(USD)" value={t.import_amount_usd ? formatUsd(Number(t.import_amount_usd)) : '-'} />
-            <Row label="LC 번호" value={t.lc_no ?? '-'} />
+            <Row label={containerLcNumbers.length > 1 ? `LC 번호 (${containerLcNumbers.length}건)` : 'LC 번호'} value={lcNoDisplay} />
             <Row label="LC개설일" value={formatDate(t.lc_open_date)} />
             <Row label="통관일" value={formatDate(t.customs_date)} />
             <Row label="통관환율" value={displayCustomsRate != null ? `${formatExchangeRate(displayCustomsRate)} (입고시 세관 신고 환율)` : '-'} />
