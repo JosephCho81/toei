@@ -1,7 +1,7 @@
-import { applyRounding } from './interim'
-import { calcImportAmountKrw } from './helpers'
-export type { RoundingPolicy } from './interim'
-import type { RoundingPolicy } from './interim'
+import { applyRounding } from './interim.ts'
+import { calcImportAmountKrw } from './helpers.ts'
+export type { RoundingPolicy } from './interim.ts'
+import type { RoundingPolicy } from './interim.ts'
 
 export interface ClosingCalculation {
   importAmountKrw: number
@@ -76,4 +76,28 @@ export function calculateClosing(params: {
     interimConfirmedKrw,
     grandTotalKrw,
   }
+}
+
+/**
+ * LC 수수료 1행에서 환산에 필요한 부분만. UI 입력이라 금액·환율이 전부 문자열이다.
+ */
+export interface LcFeeRateInput {
+  currency: 'KRW' | 'USD'
+  use_custom_rate: boolean
+  exchange_rate: string
+}
+
+/**
+ * 이 행의 환산에 실제로 쓸 환율.
+ * 고시환율이 아닌 은행 자체 매도환율로 결제 후 청구되는 건이 있어 행마다 환율을 덮어쓸 수 있다.
+ */
+export function feeExchangeRate(row: LcFeeRateInput, bokRate: number): number {
+  if (!row.use_custom_rate) return bokRate
+  const rate = parseFloat(row.exchange_rate)
+  return Number.isFinite(rate) && rate > 0 ? rate : 0
+}
+
+/** 별도 환율을 켜놓고 환율을 비워둔 행 — 0원으로 굳어버리므로 저장을 막아야 한다. */
+export function feeRateMissing(row: LcFeeRateInput): boolean {
+  return row.currency === 'USD' && row.use_custom_rate && feeExchangeRate(row, 0) <= 0
 }

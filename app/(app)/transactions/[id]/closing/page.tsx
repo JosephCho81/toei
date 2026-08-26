@@ -22,7 +22,7 @@ import { ClosingCostCard } from '@/components/settlements/ClosingCostCard'
 import { ClosingSummaryCard } from '@/components/settlements/ClosingSummaryCard'
 import { UnlockButton } from '@/components/settlements/UnlockButton'
 import { DeleteSettlementButton } from '@/components/settlements/DeleteSettlementButton'
-import { DEFAULT_LC_FEE_ROWS, type FeeRow } from '@/components/settlements/lcFeeDefaults'
+import { DEFAULT_LC_FEE_ROWS, feeExchangeRate, feeRateMissing, type FeeRow } from '@/components/settlements/lcFeeDefaults'
 import { formatKrw } from '@/lib/utils/format'
 
 interface CostRow {
@@ -147,6 +147,8 @@ export default function ClosingSettlementPage() {
             amount_krw: String(f.amount_krw ?? ''),
             currency: f.currency === 'USD' ? 'USD' : 'KRW',
             amount_usd: f.amount_usd != null ? String(f.amount_usd) : '',
+            use_custom_rate: f.exchange_rate != null,
+            exchange_rate: f.exchange_rate != null ? String(f.exchange_rate) : '',
           })))
         }
 
@@ -170,10 +172,10 @@ export default function ClosingSettlementPage() {
     ? legacyLcPaymentKrw
     : usdToKrw(lcPaymentUsdNum, bokRateNum)
 
-  /** LC 수수료 1행의 원화 금액 (달러 항목은 클로징환율로 반올림 환산) */
+  /** LC 수수료 1행의 원화 금액 (달러 항목은 별도 환율 또는 클로징환율로 반올림 환산) */
   function feeAmountKrw(r: FeeRow): number {
     return r.currency === 'USD'
-      ? usdToKrw(parseFloat(r.amount_usd) || 0, bokRateNum)
+      ? usdToKrw(parseFloat(r.amount_usd) || 0, feeExchangeRate(r, bokRateNum))
       : (parseFloat(r.amount_krw) || 0)
   }
 
@@ -198,9 +200,16 @@ export default function ClosingSettlementPage() {
 
   async function handleSave(lock = false) {
     // 달러 입력을 원화로 환산하지 못한 채 저장하면 정산금액이 0원으로 굳어버린다
-    const needsRate = lcPaymentUsdNum != null || lcFeeRows.some((r) => r.currency === 'USD' && parseFloat(r.amount_usd))
+    const needsRate = lcPaymentUsdNum != null
+      || lcFeeRows.some((r) => r.currency === 'USD' && parseFloat(r.amount_usd) && !r.use_custom_rate)
     if (needsRate && bokRateNum <= 0 && legacyLcPaymentKrw == null) {
       toast.error('달러 금액을 원화로 환산하려면 한국은행 고시 환율을 먼저 입력하세요.')
+      return
+    }
+    // 별도 환율을 켜놓고 비워두면 그 항목이 0원으로 굳는다
+    const missingRateRow = lcFeeRows.find(feeRateMissing)
+    if (missingRateRow) {
+      toast.error(`'${missingRateRow.item_name || 'LC 수수료'}' 항목에 별도 환율을 입력하세요.`)
       return
     }
     setSaving(true)
@@ -236,6 +245,7 @@ export default function ClosingSettlementPage() {
           amount_krw: feeAmountKrw(r),
           currency: r.currency,
           amount_usd: r.currency === 'USD' ? (parseFloat(r.amount_usd) || 0) : null,
+          exchange_rate: r.currency === 'USD' && r.use_custom_rate ? (parseFloat(r.exchange_rate) || null) : null,
           sort_order: i,
         })),
         p_costs: closingCostRows.map((r, i) => ({

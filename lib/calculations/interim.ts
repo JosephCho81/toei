@@ -1,4 +1,4 @@
-import { calcImportAmountKrw } from './helpers'
+import { calcImportAmountKrw } from './helpers.ts'
 
 export type RoundingPolicy = 'floor_100' | 'floor_10' | 'none'
 

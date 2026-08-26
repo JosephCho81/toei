@@ -8,7 +8,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { formatKrw } from '@/lib/utils/format'
 import { usdToKrw } from '@/lib/calculations/helpers'
 import type { ClosingCalculation } from '@/lib/calculations/closing'
-import { DEFAULT_LC_FEE_ROWS, type FeeRow } from './lcFeeDefaults'
+import { DEFAULT_LC_FEE_ROWS, EMPTY_FEE_ROW, feeExchangeRate, feeRateMissing, type FeeRow } from './lcFeeDefaults'
 
 function CalcRow({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
@@ -37,7 +37,14 @@ export function ClosingLcFeeCard({
     onLcFeeChange(lcFeeRows.map((r, j) => (j === i ? { ...r, ...next } : r)))
   }
 
-  const usdRowsNeedRate = bokRate <= 0 && lcFeeRows.some((r) => r.currency === 'USD' && r.amount_usd !== '')
+  /** 원화로 되돌리면 별도 환율은 의미가 없으므로 같이 지운다. */
+  function patchCurrency(i: number, currency: FeeRow['currency']) {
+    patch(i, currency === 'KRW' ? { currency, use_custom_rate: false, exchange_rate: '' } : { currency })
+  }
+
+  const usdRowsNeedRate = bokRate <= 0 && lcFeeRows.some(
+    (r) => r.currency === 'USD' && r.amount_usd !== '' && !r.use_custom_rate
+  )
 
   return (
     <>
@@ -48,7 +55,7 @@ export function ClosingLcFeeCard({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => onLcFeeChange([...lcFeeRows, { item_name: '', amount_krw: '0', currency: 'KRW', amount_usd: '' }])}
+              onClick={() => onLcFeeChange([...lcFeeRows, { ...EMPTY_FEE_ROW }])}
             >
               <Plus className="h-4 w-4 mr-1" />항목 추가
             </Button>
@@ -62,9 +69,12 @@ export function ClosingLcFeeCard({
           )}
           {lcFeeRows.map((row, i) => {
             const isUsd = row.currency === 'USD'
-            const convertedKrw = isUsd ? usdToKrw(parseFloat(row.amount_usd) || 0, bokRate) : null
+            const rowRate = feeExchangeRate(row, bokRate)
+            const rateMissing = feeRateMissing(row)
+            const convertedKrw = isUsd ? usdToKrw(parseFloat(row.amount_usd) || 0, rowRate) : null
             return (
-              <div key={i} className="flex gap-2 items-center">
+              <div key={i} className="space-y-1">
+              <div className="flex gap-2 items-center">
                 <Input
                   className="flex-1 text-sm"
                   value={row.item_name}
@@ -74,7 +84,7 @@ export function ClosingLcFeeCard({
                 <select
                   className="h-9 rounded-md border bg-transparent px-2 text-xs disabled:opacity-50"
                   value={row.currency}
-                  onChange={(e) => patch(i, { currency: e.target.value as FeeRow['currency'] })}
+                  onChange={(e) => patchCurrency(i, e.target.value as FeeRow['currency'])}
                   disabled={isLocked}
                   aria-label="통화"
                 >
@@ -99,13 +109,47 @@ export function ClosingLcFeeCard({
                   />
                 )}
                 <span className="w-32 shrink-0 text-right font-mono text-xs text-muted-foreground">
-                  {isUsd ? (bokRate > 0 ? formatKrw(convertedKrw ?? 0) : '환율 필요') : ''}
+                  {isUsd ? (rowRate > 0 ? formatKrw(convertedKrw ?? 0) : '환율 필요') : ''}
                 </span>
                 {!isLocked && i >= DEFAULT_LC_FEE_ROWS.length && (
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onLcFeeChange(lcFeeRows.filter((_, j) => j !== i))}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 )}
+              </div>
+              {isUsd && (
+                <div className="flex items-center gap-2 pl-2 text-xs">
+                  <label className="flex items-center gap-1.5 text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5"
+                      checked={row.use_custom_rate}
+                      onChange={(e) => patch(i, { use_custom_rate: e.target.checked, exchange_rate: e.target.checked ? row.exchange_rate : '' })}
+                      disabled={isLocked}
+                    />
+                    별도 환율 적용
+                  </label>
+                  {row.use_custom_rate ? (
+                    <>
+                      <NumberInput
+                        className="h-7 w-28 font-mono text-xs text-right"
+                        value={row.exchange_rate}
+                        onValueChange={(v) => patch(i, { exchange_rate: v })}
+                        disabled={isLocked}
+                        placeholder="0.00"
+                        aria-label="별도 환율"
+                      />
+                      <span className={rateMissing ? 'text-destructive' : 'text-muted-foreground'}>
+                        {rateMissing ? '원/$ — 환율을 입력해야 저장됩니다' : '원/$ 적용 (은행 매도환율 등)'}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      클로징 환율 {bokRate > 0 ? `${bokRate.toLocaleString('ko-KR')}원/$` : '(미입력)'} 적용
+                    </span>
+                  )}
+                </div>
+              )}
               </div>
             )
           })}
