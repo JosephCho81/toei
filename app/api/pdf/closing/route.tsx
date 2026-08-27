@@ -104,12 +104,14 @@ export async function GET(req: NextRequest) {
     importAmountUsd: Number(t?.import_amount_usd) || 0,
     customsExchangeRate: Number(t?.customs_exchange_rate) || 0,
     lcFeeItems: lcFeeItemsCalc,
-    fxBurdenA1Pct: (closing.fx_burden_a1_pct as number) ?? 50,
+    fxBurdenA1Pct: (closing.fx_burden_a1_pct as number) ?? 100,
     closingCostItems: closingCostItemsCalc,
     roundingPolicy: (closing.rounding_policy as 'floor_100' | 'floor_10' | 'none') ?? 'floor_100',
     interimConfirmedKrw: interimSettlement?.confirmed_amount_krw
       ? Number(interimSettlement.confirmed_amount_krw)
       : 0,
+    // 확정된 정산은 저장된 방식대로 발행한다
+    vatMode: closing.vat_mode === 'inclusive' ? 'inclusive' : 'exclusive',
   })
 
   const now = new Date()
@@ -144,9 +146,12 @@ export async function GET(req: NextRequest) {
     })),
     lcFeeTotalKrw: calc.lcFeeTotalKrw,
     additionalCostKrw: calc.additionalCostKrw,
-    fxBurdenA1Pct: (closing.fx_burden_a1_pct as number) ?? 50,
+    fxBurdenA1Pct: (closing.fx_burden_a1_pct as number) ?? 100,
     a1BurdenKrw: calc.a1BurdenKrw,
     a1BurdenWithVatKrw: calc.a1BurdenWithVatKrw,
+    vatMode: calc.vatMode,
+    supplyAmountKrw: calc.supplyAmountKrw,
+    outputVatKrw: calc.vatKrw,
     closingCostItems: sortedCostItems.map((c) => ({
       itemName: (c as { item_name: string }).item_name,
       amountKrw: Number((c as { amount_krw: number }).amount_krw) || 0,

@@ -36,6 +36,10 @@ export interface ClosingPdfData {
   fxBurdenA1Pct: number
   a1BurdenKrw: number
   a1BurdenWithVatKrw: number
+  /** 'exclusive' = 공급가(부담분+추가비용) + 부가세 10%. 'inclusive' = 구방식 */
+  vatMode: 'inclusive' | 'exclusive'
+  supplyAmountKrw: number
+  outputVatKrw: number
   closingCostItems: { itemName: string; amountKrw: number }[]
   closingCostsTotalKrw: number
   confirmedAmountKrw: number
@@ -235,6 +239,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
     ? `환차익 (A1 유리, ${data.fxBurdenA1Pct}% 수령)`
     : `환차손 (A1 불리, ${data.fxBurdenA1Pct}% 부담)`
   const additionalCost = data.lcFeeTotalKrw - data.fxGainLossKrw
+  const exclusive = data.vatMode !== 'inclusive'
   const nonVatCostsTotal = [...data.shippingItems, ...data.customsItems].reduce((s, r) => s + r.amountKrw, 0)
   const sensScenarios = data.bokExchangeRate != null && data.importAmountUsd
     ? buildSensScenarios(data.bokExchangeRate, data.importAmountUsd, data.importAmountKrw, data.lcFeeTotalKrw, data.fxBurdenA1Pct, data.closingCostsTotalKrw)
@@ -422,15 +427,35 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
               </Text>
             </View>
           </View>
-          <View style={s.lastRowEven}>
-            <View style={s.cellLabel}><Text>에이원 부담분 + VAT (VAT 포함)</Text></View>
-            <View style={s.cellValue}>
-              <Text>{krwSigned(data.a1BurdenWithVatKrw)}</Text>
-              <Text style={{ fontSize: 7, color: MUTED, marginTop: 1 }}>
-                {`VAT별도 ${krwSigned(data.a1BurdenKrw)} × 1.1(VAT 10%) = ${krwSigned(data.a1BurdenWithVatKrw)}`}
-              </Text>
+          {exclusive ? (
+            <>
+              <View style={s.rowEven}>
+                <View style={s.cellLabel}><Text>공급가 (부가세 별도)</Text></View>
+                <View style={s.cellValue}>
+                  <Text>{krwSigned(data.supplyAmountKrw)}</Text>
+                  <Text style={{ fontSize: 7, color: MUTED, marginTop: 1 }}>
+                    {`에이원 부담분 ${krwSigned(data.a1BurdenKrw)}${data.closingCostsTotalKrw !== 0 ? ` + 기타 미정산 ${krwSigned(data.closingCostsTotalKrw)}` : ''}`}
+                  </Text>
+                </View>
+              </View>
+              <View style={s.lastRowOdd}>
+                <View style={s.cellLabel}><Text>부가세 (공급가 x 10%)</Text></View>
+                <View style={s.cellValue}>
+                  <Text>{krwSigned(data.outputVatKrw)}</Text>
+                </View>
+              </View>
+            </>
+          ) : (
+            <View style={s.lastRowEven}>
+              <View style={s.cellLabel}><Text>에이원 부담분 + VAT (VAT 포함)</Text></View>
+              <View style={s.cellValue}>
+                <Text>{krwSigned(data.a1BurdenWithVatKrw)}</Text>
+                <Text style={{ fontSize: 7, color: MUTED, marginTop: 1 }}>
+                  {`VAT별도 ${krwSigned(data.a1BurdenKrw)} × 1.1(VAT 10%) = ${krwSigned(data.a1BurdenWithVatKrw)}`}
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
         </View>
 
         <Text style={s.sectionLabel}>섹션 5 — 기타 미정산 비용 (A+B+C)</Text>
@@ -512,8 +537,12 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
         {/* 최종정산 계산 breakdown */}
         <View style={{ borderWidth: 1, borderColor: BORDER, marginBottom: 8 }}>
           <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center', backgroundColor: GRAY_BG }}>
-            <Text style={{ flex: 1, paddingLeft: 10, fontSize: 8.5, color: MUTED }}>에이원 부담 (VAT 포함)</Text>
-            <Text style={{ width: '40%', textAlign: 'right', paddingRight: 10, fontSize: 8.5 }}>{krwSigned(data.a1BurdenWithVatKrw)}</Text>
+            <Text style={{ flex: 1, paddingLeft: 10, fontSize: 8.5, color: MUTED }}>
+              {exclusive ? '에이원 부담 (VAT 별도)' : '에이원 부담 (VAT 포함)'}
+            </Text>
+            <Text style={{ width: '40%', textAlign: 'right', paddingRight: 10, fontSize: 8.5 }}>
+              {krwSigned(exclusive ? data.a1BurdenKrw : data.a1BurdenWithVatKrw)}
+            </Text>
           </View>
           {data.closingCostItems.map((item, i) => (
             <View key={i} style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 20, alignItems: 'center' }}>

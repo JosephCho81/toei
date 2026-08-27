@@ -26,6 +26,15 @@ interface Props {
   interimIsLocked: boolean
 }
 
+function SummaryRow({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+  return (
+    <div className={`flex justify-between ${bold ? 'font-semibold' : ''}`}>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono">{value}</span>
+    </div>
+  )
+}
+
 export function ClosingSummaryCard({
   calc, roundingPolicy, onRoundingChange, confirmedAmount, onConfirmedChange, isLocked, interimIsLocked,
 }: Props) {
@@ -36,7 +45,7 @@ export function ClosingSummaryCard({
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
             <div className="space-y-1">
-              <Label>절사 정책</Label>
+              <Label>절사 정책 — 공급가에 적용</Label>
               <Select value={roundingPolicy} onValueChange={(v) => onRoundingChange(v as RoundingPolicy)} disabled={isLocked}>
                 <SelectTrigger className="w-36"><SelectValue>{(v: RoundingPolicy) => ROUNDING_LABELS[v]}</SelectValue></SelectTrigger>
                 <SelectContent>
@@ -55,6 +64,18 @@ export function ClosingSummaryCard({
               </div>
             )}
           </div>
+          {calc && calc.vatMode === 'exclusive' && (
+            <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm space-y-1">
+              <SummaryRow label="에이원 부담분" value={formatKrw(calc.a1BurdenKrw)} />
+              {calc.closingCostsTotalKrw !== 0 && (
+                <SummaryRow label="클로징 추가비용 (A+B+C)" value={formatKrw(calc.closingCostsTotalKrw)} />
+              )}
+              <SummaryRow label="공급가 (절사 후)" value={formatKrw(calc.supplyAmountKrw)} bold />
+              <SummaryRow label="부가세 (공급가 × 10%)" value={formatKrw(calc.vatKrw)} />
+              <Separator />
+              <SummaryRow label="합계" value={formatKrw(calc.roundedFinalKrw)} bold />
+            </div>
+          )}
           <div className="space-y-1">
             <Label>확정 금액 (원) — 음수: 토에이→에이원 환급</Label>
             <Input

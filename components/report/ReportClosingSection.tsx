@@ -19,6 +19,10 @@ export interface ClosingData {
   fx_burden_a1_pct: number
   a1BurdenKrw: number
   a1BurdenWithVatKrw: number
+  /** 'exclusive' = 공급가(부담분+추가비용) + 부가세 10%. 'inclusive' = 구방식 */
+  vatMode?: 'inclusive' | 'exclusive'
+  supplyAmountKrw?: number
+  outputVatKrw?: number
   closingCostItems: FeeItem[]
   closingCostsTotalKrw: number
   confirmed_amount_krw: number | null
@@ -88,8 +92,13 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
   const fxIsGain = data.fxGainLossKrw >= 0
   const confirmed = data.confirmed_amount_krw
   const hasGrandTotal = data.interimConfirmedKrw != null && data.grandTotalKrw != null
+  const exclusive = data.vatMode !== 'inclusive'
   const additionalCost = data.lcFeeTotalKrw - data.fxGainLossKrw
-  const systemClosingConfirmed = data.a1BurdenWithVatKrw + data.closingCostsTotalKrw
+  const supplyKrw = data.supplyAmountKrw ?? (data.a1BurdenKrw + data.closingCostsTotalKrw)
+  const outputVatKrw = data.outputVatKrw ?? Math.round(supplyKrw * 0.1)
+  const systemClosingConfirmed = exclusive
+    ? supplyKrw + outputVatKrw
+    : data.a1BurdenWithVatKrw + data.closingCostsTotalKrw
   const closingDiff = confirmed != null ? confirmed - systemClosingConfirmed : 0
 
   const closingDirection = confirmed != null && confirmed !== 0
@@ -189,15 +198,23 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
               추가비용 {signed(additionalCost)} × {data.fx_burden_a1_pct}%(에이원분담) = {signed(data.a1BurdenKrw)}
             </p>
           </div>
-          <div className="px-3 py-1.5">
-            <div className="flex text-sm">
-              <span className="w-56 text-muted-foreground shrink-0">에이원 부담 (VAT 포함)</span>
-              <span className="font-mono font-semibold">{signed(data.a1BurdenWithVatKrw)}</span>
+          {exclusive ? (
+            <div className="px-3 py-1.5">
+              <p className="text-xs text-gray-400 font-mono">
+                부가세는 기타 미정산 비용까지 더한 공급가에 한 번에 적용된다 (V-4 참조)
+              </p>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5 font-mono">
-              VAT별도 {signed(data.a1BurdenKrw)} × 1.1(VAT 10%) = {signed(data.a1BurdenWithVatKrw)}
-            </p>
-          </div>
+          ) : (
+            <div className="px-3 py-1.5">
+              <div className="flex text-sm">
+                <span className="w-56 text-muted-foreground shrink-0">에이원 부담 (VAT 포함)</span>
+                <span className="font-mono font-semibold">{signed(data.a1BurdenWithVatKrw)}</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5 font-mono">
+                VAT별도 {signed(data.a1BurdenKrw)} × 1.1(VAT 10%) = {signed(data.a1BurdenWithVatKrw)}
+              </p>
+            </div>
+          )}
         </div>
       </ReportSection>
 
@@ -222,8 +239,10 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
           {/* 계산 breakdown */}
           <div className="border border-border rounded-lg overflow-hidden mb-3 text-sm">
             <div className="flex justify-between px-4 py-2 border-b bg-muted/10">
-              <span className="text-muted-foreground">에이원 부담 (VAT 포함)</span>
-              <span className="font-mono">{signed(data.a1BurdenWithVatKrw)}</span>
+              <span className="text-muted-foreground">
+                {exclusive ? '에이원 부담 (VAT 별도)' : '에이원 부담 (VAT 포함)'}
+              </span>
+              <span className="font-mono">{signed(exclusive ? data.a1BurdenKrw : data.a1BurdenWithVatKrw)}</span>
             </div>
             {data.closingCostItems.map((item, i) => (
               <div key={i} className="flex justify-between px-4 py-1.5 border-b bg-muted/5">

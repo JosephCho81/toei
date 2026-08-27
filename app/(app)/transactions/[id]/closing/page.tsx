@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
-import { calculateClosing, type RoundingPolicy } from '@/lib/calculations/closing'
+import { calculateClosing, type RoundingPolicy, type VatMode } from '@/lib/calculations/closing'
 import { usdToKrw, krwToUsd } from '@/lib/calculations/helpers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,8 +58,11 @@ export default function ClosingSettlementPage() {
   const [lcPaymentUsd, setLcPaymentUsd] = useState('')
   // 달러 없이 원화만 저장된 과거 정산은 저장값을 그대로 계산 기준으로 쓴다(환산 오차 방지).
   const [legacyLcPaymentKrw, setLegacyLcPaymentKrw] = useState<number | null>(null)
-  const [fxBurdenA1Pct, setFxBurdenA1Pct] = useState(50)
-  const [roundingPolicy, setRoundingPolicy] = useState<RoundingPolicy>('none')
+  // 초기엔 각 사 50% 였으나 이후 한국에이원 전액 부담으로 바뀌었다 (담당자 확인)
+  const [fxBurdenA1Pct, setFxBurdenA1Pct] = useState(100)
+  const [roundingPolicy, setRoundingPolicy] = useState<RoundingPolicy>('floor_100')
+  // 확정된 과거 정산은 저장된 방식대로 계속 보여준다
+  const [vatMode, setVatMode] = useState<VatMode>('exclusive')
 
   const [lcFeeRows, setLcFeeRows] = useState<FeeRow[]>(DEFAULT_LC_FEE_ROWS)
   const [closingCostRows, setClosingCostRows] = useState<CostRow[]>([
@@ -130,8 +133,9 @@ export default function ClosingSettlementPage() {
           setLcPaymentUsd(derived != null ? String(derived) : '')
           setLegacyLcPaymentKrw(Number(storedKrw))
         }
-        setFxBurdenA1Pct(closing.fx_burden_a1_pct ?? 50)
+        setFxBurdenA1Pct(closing.fx_burden_a1_pct ?? 100)
         setRoundingPolicy(closing.rounding_policy as RoundingPolicy)
+        setVatMode((closing as Record<string, unknown>).vat_mode === 'inclusive' ? 'inclusive' : 'exclusive')
         setConfirmedOverride(closing.confirmed_amount_krw != null ? String(closing.confirmed_amount_krw) : null)
         setNotes((closing as Record<string, unknown>).notes as string | null ?? null)
 
@@ -192,6 +196,7 @@ export default function ClosingSettlementPage() {
         })),
         roundingPolicy,
         interimConfirmedKrw: interimSummary?.confirmed_amount_krw ?? 0,
+        vatMode,
       })
     : null
 
@@ -222,6 +227,9 @@ export default function ClosingSettlementPage() {
         lc_payment_total_krw: lcPaymentKrw || null,
         fx_burden_a1_pct: fxBurdenA1Pct,
         rounding_policy: roundingPolicy,
+        vat_mode: vatMode,
+        supply_amount_krw: vatMode === 'exclusive' ? (calc?.supplyAmountKrw ?? null) : null,
+        vat_amount_krw: vatMode === 'exclusive' ? (calc?.vatKrw ?? null) : null,
         confirmed_amount_krw: parseFloat(confirmedAmount) || systemAmount,
         is_locked: lock,
       }

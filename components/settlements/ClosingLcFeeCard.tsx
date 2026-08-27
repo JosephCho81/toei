@@ -180,9 +180,15 @@ export function ClosingLcFeeCard({
           />
           {calc && (
             <div className="space-y-1 text-sm">
-              <CalcRow label="추가비용 합계" value={`${calc.additionalCostKrw >= 0 ? '+' : ''}${formatKrw(calc.additionalCostKrw)}`} />
-              <CalcRow label="에이원 부담분" value={`${calc.a1BurdenKrw >= 0 ? '+' : ''}${formatKrw(calc.a1BurdenKrw)}`} />
-              <CalcRow label="에이원 부담분 + VAT" value={`${calc.a1BurdenWithVatKrw >= 0 ? '+' : ''}${formatKrw(calc.a1BurdenWithVatKrw)}`} bold />
+              <CalcRow label="추가비용 합계 (LC부대비용 − 환차익)" value={`${calc.additionalCostKrw >= 0 ? '+' : ''}${formatKrw(calc.additionalCostKrw)}`} />
+              <CalcRow
+                label={`에이원 부담분 (${fxBurdenA1Pct}%)`}
+                value={`${calc.a1BurdenKrw >= 0 ? '+' : ''}${formatKrw(calc.a1BurdenKrw)}`}
+                bold={calc.vatMode === 'exclusive'}
+              />
+              {calc.vatMode === 'exclusive'
+                ? <p className="pt-1 text-xs text-muted-foreground">부가세는 클로징 추가비용까지 더한 공급가에 한 번에 적용된다</p>
+                : <CalcRow label="에이원 부담분 + VAT" value={`${calc.a1BurdenWithVatKrw >= 0 ? '+' : ''}${formatKrw(calc.a1BurdenWithVatKrw)}`} bold />}
             </div>
           )}
         </CardContent>

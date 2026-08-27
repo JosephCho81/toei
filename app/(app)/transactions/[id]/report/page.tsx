@@ -75,8 +75,10 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         lcFeeItems: lcFeesParsed.map((f) => ({ amountKrw: f.amount_krw })),
         fxBurdenA1Pct,
         closingCostItems: closingCostsParsed.map((c) => ({ amountKrw: c.amount_krw, includesVat: false })),
-        roundingPolicy: 'none',
+        roundingPolicy: (closing.rounding_policy as 'floor_100' | 'floor_10' | 'none') ?? 'none',
         interimConfirmedKrw: interim?.confirmed_amount_krw ? Number(interim.confirmed_amount_krw) : 0,
+        // 확정된 정산은 저장된 방식대로 보여준다
+        vatMode: closing.vat_mode === 'inclusive' ? 'inclusive' : 'exclusive',
       })
     : null
 
@@ -265,6 +267,9 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             fx_burden_a1_pct: fxBurdenA1Pct,
             a1BurdenKrw: closingCalc.a1BurdenKrw,
             a1BurdenWithVatKrw: closingCalc.a1BurdenWithVatKrw,
+            vatMode: closingCalc.vatMode,
+            supplyAmountKrw: closingCalc.supplyAmountKrw,
+            outputVatKrw: closingCalc.vatKrw,
             closingCostItems: closingCostsParsed,
             closingCostsTotalKrw: closingCalc.closingCostsTotalKrw,
             confirmed_amount_krw: closing.confirmed_amount_krw ? Number(closing.confirmed_amount_krw) : null,

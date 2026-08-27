@@ -1,16 +1,22 @@
-import { applyRounding } from './interim.ts'
+import { applyRounding, computeVat } from './interim.ts'
 import { calcImportAmountKrw } from './helpers.ts'
-export type { RoundingPolicy } from './interim.ts'
-import type { RoundingPolicy } from './interim.ts'
+export type { RoundingPolicy, VatMode } from './interim.ts'
+import type { RoundingPolicy, VatMode } from './interim.ts'
 
 export interface ClosingCalculation {
+  vatMode: VatMode
   importAmountKrw: number
   fxGainLossKrw: number
   lcFeeTotalKrw: number
   additionalCostKrw: number
   a1BurdenKrw: number
+  /** 구방식 표시용 — 에이원 부담분에 부가세를 곱해 뭉친 값 */
   a1BurdenWithVatKrw: number
   closingCostsTotalKrw: number
+  /** 절사 후 공급가. exclusive = 에이원 부담분 + 클로징 추가비용 */
+  supplyAmountKrw: number
+  /** 매출부가세 = 공급가 × 10%. inclusive 모드는 0 */
+  vatKrw: number
   finalSettlementKrw: number
   roundedFinalKrw: number
   interimConfirmedKrw: number
@@ -26,6 +32,7 @@ export function calculateClosing(params: {
   closingCostItems: { amountKrw: number; includesVat: boolean }[]
   roundingPolicy: RoundingPolicy
   interimConfirmedKrw: number
+  vatMode?: VatMode
 }): ClosingCalculation {
   const {
     lcPaymentTotalKrw,
@@ -36,6 +43,7 @@ export function calculateClosing(params: {
     closingCostItems,
     roundingPolicy,
     interimConfirmedKrw,
+    vatMode = 'exclusive',
   } = params
 
   const importAmountKrw = calcImportAmountKrw(importAmountUsd, customsExchangeRate, 0)
@@ -44,26 +52,43 @@ export function calculateClosing(params: {
   // 실제 결제비용이 통관환율 기준액보다 크면 환차손(음수)
   const fxGainLossKrw = importAmountKrw - lcPaymentTotalKrw
 
-  // LC 수수료 합계
+  // LC 부대비용 합계 (개설·기한연장·조건변경·인수·이자·기타·환급)
   const lcFeeTotalKrw = lcFeeItems.reduce((sum, item) => sum + item.amountKrw, 0)
 
   // 추가비용 = LC수수료 - 환차손익 (환차손이면 부담 증가, 환차익이면 부담 감소)
   const additionalCostKrw = lcFeeTotalKrw - fxGainLossKrw
 
-  // 에이원 부담분 (분담비율 적용)
+  // 에이원 부담분 (분담비율 적용). 초기엔 각 사 50%, 이후 에이원 전액 부담으로 바뀌었다.
   const a1BurdenKrw = Math.round(additionalCostKrw * (fxBurdenA1Pct / 100))
   const a1BurdenWithVatKrw = Math.round(a1BurdenKrw * 1.1)
 
-  // 클로징 추가비용 (A+B+C) - VAT 포함 항목은 그대로 사용
+  // 클로징 추가비용 (A+B+C) — 중간정산 이후 뒤늦게 청구된 통관·운송 실비
   const closingCostsTotalKrw = closingCostItems.reduce((sum, item) => sum + item.amountKrw, 0)
 
-  // 최종 정산액 = 에이원 부담분(VAT포함) + 클로징 추가비용
-  const finalSettlementKrw = a1BurdenWithVatKrw + closingCostsTotalKrw
+  let supplyAmountKrw: number
+  let vatKrw: number
+  let finalSettlementKrw: number
+  let roundedFinalKrw: number
 
-  const roundedFinalKrw = applyRounding(finalSettlementKrw, roundingPolicy)
+  if (vatMode === 'exclusive') {
+    // 공급가 = 에이원 부담분 + 클로징 추가비용. 절사는 여기에 건다 —
+    // 합계를 절사하면 공급가 + 부가세와 어긋나 세금계산서가 맞지 않는다.
+    supplyAmountKrw = applyRounding(a1BurdenKrw + closingCostsTotalKrw, roundingPolicy)
+    vatKrw = computeVat(supplyAmountKrw)
+    roundedFinalKrw = supplyAmountKrw + vatKrw
+    finalSettlementKrw = roundedFinalKrw
+  } else {
+    // 구방식: 부담분에 부가세를 곱해 뭉치고 클로징 추가비용은 부가세 밖에 더했다
+    finalSettlementKrw = a1BurdenWithVatKrw + closingCostsTotalKrw
+    roundedFinalKrw = applyRounding(finalSettlementKrw, roundingPolicy)
+    supplyAmountKrw = roundedFinalKrw
+    vatKrw = 0
+  }
+
   const grandTotalKrw = interimConfirmedKrw + roundedFinalKrw
 
   return {
+    vatMode,
     importAmountKrw,
     fxGainLossKrw,
     lcFeeTotalKrw,
@@ -71,6 +96,8 @@ export function calculateClosing(params: {
     a1BurdenKrw,
     a1BurdenWithVatKrw,
     closingCostsTotalKrw,
+    supplyAmountKrw,
+    vatKrw,
     finalSettlementKrw,
     roundedFinalKrw,
     interimConfirmedKrw,
