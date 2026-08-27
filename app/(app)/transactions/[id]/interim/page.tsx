@@ -105,6 +105,8 @@ export default function InterimSettlementPage() {
   const costItems: CostItem[] = [...shippingRows, ...customsRows].map((r) => ({
     amountKrw: parseFloat(r.amount_krw) || 0,
     isImportVat: r.is_import_vat,
+    isVatTaxable: r.is_vat_taxable,
+    vatAmountKrw: parseFloat(r.vat_amount_krw) || 0,
   }))
 
   const calc = tx?.import_amount_usd && customsRate

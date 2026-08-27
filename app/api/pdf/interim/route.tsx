@@ -67,10 +67,15 @@ export async function GET(req: NextRequest) {
   const rawItems = Array.isArray(interim.interim_cost_items) ? interim.interim_cost_items : []
   const sortedItems = [...rawItems].sort((a, b) => ((a as { sort_order?: number }).sort_order ?? 0) - ((b as { sort_order?: number }).sort_order ?? 0))
 
-  const costItems: CostItem[] = sortedItems.map((item) => ({
-    amountKrw: Number((item as { amount_krw: number }).amount_krw) || 0,
-    isImportVat: Boolean((item as { is_import_vat?: boolean }).is_import_vat),
-  }))
+  const costItems: CostItem[] = sortedItems.map((item) => {
+    const i = item as { amount_krw: number; is_import_vat?: boolean; is_vat_taxable?: boolean; vat_amount_krw?: number }
+    return {
+      amountKrw: Number(i.amount_krw) || 0,
+      isImportVat: Boolean(i.is_import_vat),
+      isVatTaxable: Boolean(i.is_vat_taxable),
+      vatAmountKrw: Number(i.vat_amount_krw) || 0,
+    }
+  })
 
   // 확정된 정산은 저장된 방식대로 발행한다 — 로직이 바뀌어도 과거 청구서가 흔들리면 안 된다
   const vatMode: VatMode = interim.vat_mode === 'inclusive' ? 'inclusive' : 'exclusive'

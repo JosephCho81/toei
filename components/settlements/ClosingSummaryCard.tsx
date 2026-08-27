@@ -8,6 +8,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { formatKrw, formatNumberForInput, parseNumberInput } from '@/lib/utils/format'
+import { OverrideMismatchNotice } from './OverrideMismatchNotice'
 import type { ClosingCalculation, RoundingPolicy } from '@/lib/calculations/closing'
 
 const ROUNDING_LABELS: Record<RoundingPolicy, string> = {
@@ -21,7 +22,7 @@ interface Props {
   roundingPolicy: RoundingPolicy
   onRoundingChange: (v: RoundingPolicy) => void
   confirmedAmount: string
-  onConfirmedChange: (v: string) => void
+  onConfirmedChange: (v: string | null) => void
   isLocked: boolean
   interimIsLocked: boolean
 }
@@ -86,6 +87,15 @@ export function ClosingSummaryCard({
               className="font-mono text-lg max-w-xs"
             />
           </div>
+          {calc && (
+            <OverrideMismatchNotice
+              systemValue={calc.roundedFinalKrw}
+              currentValue={confirmedAmount}
+              onReset={() => onConfirmedChange(null)}
+              isLocked={isLocked}
+              label="확정 금액"
+            />
+          )}
         </CardContent>
       </Card>
 
