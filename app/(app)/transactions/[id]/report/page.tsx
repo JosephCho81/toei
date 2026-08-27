@@ -52,6 +52,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const shippingItems = interimCosts.filter(i => i.group_type === 'shipping')
   const customsItems = interimCosts.filter(i => i.group_type !== 'shipping')
   const vatAmountKrw = interimCosts.reduce((s, i) => s + i.vat_amount_krw, 0)
+  // 확정된 정산은 저장된 방식대로 보여준다 — 로직이 바뀌어도 과거 청구서가 흔들리면 안 된다
+  const interimVatMode = interim?.vat_mode === 'inclusive' ? 'inclusive' as const : 'exclusive' as const
   const marginRatePct = t.margin_rate_pct ? Number(t.margin_rate_pct) : null
   const interimImportKrw = customsRate ? calcImportAmountKrw(importUsd, customsRate, marginRatePct ?? 0) : 0
   const interimConfirmedKrw = interim?.confirmed_amount_krw ? Number(interim.confirmed_amount_krw) : null
@@ -199,6 +201,9 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             shippingItems,
             customsItems,
             vatAmountKrw,
+            vatMode: interimVatMode,
+            supplyAmountKrw: interim?.supply_amount_krw ?? null,
+            outputVatKrw: interim?.vat_amount_krw ?? null,
             confirmedAmountKrw: interimConfirmedKrw,
             interimDirection,
           }} />

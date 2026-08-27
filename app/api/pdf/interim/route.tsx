@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createElement } from 'react'
 import { InterimPdfDocument, type InterimPdfData } from '@/lib/pdf/InterimPdfTemplate'
-import { calculateInterim, type CostItem } from '@/lib/calculations/interim'
+import { calculateInterim, type CostItem, type VatMode } from '@/lib/calculations/interim'
 import { normalizeOne } from '@/lib/utils/normalize'
 import { aggregateForwardingQuotes } from '@/lib/utils/forwarding'
 import { fetchForwardingQuotes } from '@/lib/data/queries'
@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
         amount_krw,
         is_vat_taxable,
         vat_amount_krw,
+        is_import_vat,
         group_type,
         sort_order
       )
@@ -68,7 +69,11 @@ export async function GET(req: NextRequest) {
 
   const costItems: CostItem[] = sortedItems.map((item) => ({
     amountKrw: Number((item as { amount_krw: number }).amount_krw) || 0,
+    isImportVat: Boolean((item as { is_import_vat?: boolean }).is_import_vat),
   }))
+
+  // 확정된 정산은 저장된 방식대로 발행한다 — 로직이 바뀌어도 과거 청구서가 흔들리면 안 된다
+  const vatMode: VatMode = interim.vat_mode === 'inclusive' ? 'inclusive' : 'exclusive'
 
   const calc = calculateInterim({
     importAmountUsd: Number(t?.import_amount_usd) || 0,
@@ -76,6 +81,7 @@ export async function GET(req: NextRequest) {
     marginRatePct: t?.margin_rate_pct ?? 0,
     costItems,
     roundingPolicy: (interim.rounding_policy as 'floor_100' | 'floor_10' | 'none') ?? 'floor_100',
+    vatMode,
   })
 
   const now = new Date()
@@ -92,14 +98,19 @@ export async function GET(req: NextRequest) {
     importAmountKrw: calc.importAmountKrw,
     totalCostKrw: calc.totalCostKrw,
     confirmedAmountKrw: Number(interim.confirmed_amount_krw) || 0,
+    vatMode,
+    // 확정값이 있으면 그대로, 없으면 시스템 계산값
+    supplyAmountKrw: Number(interim.supply_amount_krw) || calc.supplyAmountKrw,
+    outputVatKrw: Number(interim.vat_amount_krw) || calc.vatKrw,
     isPaid: (interim.is_paid as boolean) ?? false,
     issuedAt,
     costItems: sortedItems.map((item) => {
-      const i = item as { item_name: string; amount_krw: number; group_type: string }
+      const i = item as { item_name: string; amount_krw: number; group_type: string; is_import_vat?: boolean }
       return {
         itemName: String(i.item_name ?? ''),
         amountKrw: Number(i.amount_krw) || 0,
         groupType: String(i.group_type ?? 'customs'),
+        isImportVat: Boolean(i.is_import_vat),
       }
     }),
     forwardingQuotes: aggregateForwardingQuotes(fwdRows).map(q => ({

@@ -2,14 +2,33 @@ import { calcImportAmountKrw } from './helpers.ts'
 
 export type RoundingPolicy = 'floor_100' | 'floor_10' | 'none'
 
+/**
+ * inclusive = 구방식. 수입부가세를 비용 한 줄로 합산한 부가세 포함가.
+ * exclusive = 신방식. 수입부가세를 빼고 공급가를 만든 뒤 매출부가세 10%를 따로 더한다.
+ *
+ * 확정된 정산의 금액이 로직 변경으로 조용히 바뀌면 안 되므로 정산마다 스냅샷으로 보관한다.
+ */
+export type VatMode = 'inclusive' | 'exclusive'
+
+export const VAT_RATE = 0.1
+
 export interface CostItem {
   amountKrw: number
+  /** 통관 시 세관에 납부한 수입부가세 — 매입세액공제 대상이라 공급가에서 뺀다 */
+  isImportVat?: boolean
 }
 
 export interface InterimCalculation {
+  vatMode: VatMode
   importAmountKrw: number   // USD × 환율 × (1 + margin/100)
-  totalCostKrw: number      // 운송비 + 관세 + 기타 합계
-  confirmedKrw: number      // importAmountKrw + totalCostKrw
+  totalCostKrw: number      // 운송비 + 통관비 전체 (수입부가세 포함)
+  importVatKrw: number      // 그중 수입부가세
+  /** 절사 후 공급가. inclusive 모드에서는 절사 후 청구액 전체를 가리킨다. */
+  supplyAmountKrw: number
+  /** 매출부가세. inclusive 모드는 0 (청구액에 이미 섞여 있어 분리할 수 없다). */
+  vatKrw: number
+  /** 청구 합계 = supplyAmountKrw + vatKrw */
+  confirmedKrw: number
 }
 
 export function applyRounding(amount: number, policy: RoundingPolicy): number {
@@ -26,18 +45,35 @@ export function calculateInterim(params: {
   marginRatePct?: number
   costItems: CostItem[]
   roundingPolicy: RoundingPolicy
+  vatMode?: VatMode
 }): InterimCalculation {
-  const { importAmountUsd, customsExchangeRate, marginRatePct = 0, costItems, roundingPolicy } = params
+  const {
+    importAmountUsd, customsExchangeRate, marginRatePct = 0,
+    costItems, roundingPolicy, vatMode = 'exclusive',
+  } = params
+
   const importAmountKrw = calcImportAmountKrw(importAmountUsd, customsExchangeRate, marginRatePct)
   const totalCostKrw = costItems.reduce((sum, item) => sum + item.amountKrw, 0)
-  const confirmedKrw = importAmountKrw + totalCostKrw
+  const importVatKrw = costItems.reduce((sum, item) => sum + (item.isImportVat ? item.amountKrw : 0), 0)
+
+  // 절사는 공급가에 건다. 합계를 절사하면 공급가 + 부가세 ≠ 합계 가 되어 세금계산서가 맞지 않는다.
+  const rawSupply = vatMode === 'exclusive'
+    ? importAmountKrw + totalCostKrw - importVatKrw
+    : importAmountKrw + totalCostKrw
+  const supplyAmountKrw = applyRounding(rawSupply, roundingPolicy)
+  const vatKrw = vatMode === 'exclusive' ? computeVat(supplyAmountKrw) : 0
+
   return {
+    vatMode,
     importAmountKrw,
     totalCostKrw,
-    confirmedKrw: applyRounding(confirmedKrw, roundingPolicy),
+    importVatKrw,
+    supplyAmountKrw,
+    vatKrw,
+    confirmedKrw: supplyAmountKrw + vatKrw,
   }
 }
 
 export function computeVat(amountKrw: number): number {
-  return Math.round(amountKrw * 0.1)
+  return Math.round(amountKrw * VAT_RATE)
 }

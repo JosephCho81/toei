@@ -6,6 +6,8 @@ export interface CostRow {
   amount_krw: string
   is_vat_taxable: boolean
   vat_amount_krw: string
+  /** 통관 시 세관에 납부한 수입부가세 — 공급가에서 제외한다 */
+  is_import_vat: boolean
 }
 
 export interface FeeRow {

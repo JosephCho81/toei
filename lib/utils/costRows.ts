@@ -7,5 +7,6 @@ export function toCostRow(item: Record<string, unknown>): CostRow {
     amount_krw: String(item.amount_krw ?? ''),
     is_vat_taxable: Boolean(item.is_vat_taxable),
     vat_amount_krw: String(item.vat_amount_krw ?? '0'),
+    is_import_vat: Boolean(item.is_import_vat),
   }
 }

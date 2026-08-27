@@ -30,9 +30,13 @@ export interface InterimPdfData {
   importAmountKrw: number
   totalCostKrw: number
   confirmedAmountKrw: number
+  /** exclusive = 수입부가세를 뺀 공급가 + 매출부가세 10%. inclusive = 구방식 */
+  vatMode: 'inclusive' | 'exclusive'
+  supplyAmountKrw: number
+  outputVatKrw: number
   isPaid: boolean
   issuedAt: string
-  costItems: { itemName: string; amountKrw: number; groupType: string }[]
+  costItems: { itemName: string; amountKrw: number; groupType: string; isImportVat: boolean }[]
   forwardingQuotes: { itemName: string; quoteAmountKrw: number | null; actualAmountKrw: number | null }[]
 }
 
@@ -127,6 +131,8 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
   const shippingItems = data.costItems.filter((c) => c.groupType === 'shipping')
   const customsItems = data.costItems.filter((c) => c.groupType !== 'shipping')
   const itemsTotal = data.costItems.reduce((s, c) => s + c.amountKrw, 0)
+  const exclusive = data.vatMode !== 'inclusive'
+  const importVatKrw = data.costItems.reduce((s, c) => s + (c.isImportVat ? c.amountKrw : 0), 0)
   const subTotal = data.importAmountKrw + itemsTotal
 
   const direction = data.confirmedAmountKrw >= 0
@@ -141,10 +147,24 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
   const allCostRows = [
     { itemName: '수입금액 (원화환산)', formula: importFormula, amountKrw: data.importAmountKrw, indent: false },
     ...shippingItems.map((c) => ({ itemName: c.itemName, formula: '', amountKrw: c.amountKrw, indent: true })),
-    ...customsItems.map((c) => ({ itemName: c.itemName, formula: '', amountKrw: c.amountKrw, indent: true })),
+    ...customsItems.map((c) => ({
+      itemName: c.itemName,
+      formula: exclusive && c.isImportVat ? '수입부가세 — 매입세액공제분이라 공급가에서 제외' : '',
+      amountKrw: c.amountKrw,
+      indent: true,
+    })),
+    ...(exclusive
+      ? [
+          { itemName: '수입부가세 차감', formula: '공급가 계산에서 제외', amountKrw: -importVatKrw, indent: false },
+          { itemName: '공급가 (부가세 별도)', formula: '', amountKrw: data.supplyAmountKrw, indent: false },
+          { itemName: '부가세', formula: '공급가 x 10%', amountKrw: data.outputVatKrw, indent: false },
+        ]
+      : []),
   ]
 
-  const systemSubTotal = data.importAmountKrw + itemsTotal
+  const systemSubTotal = exclusive
+    ? data.supplyAmountKrw + data.outputVatKrw
+    : data.importAmountKrw + itemsTotal
   const confirmedDiff = data.confirmedAmountKrw - systemSubTotal
 
   return (
@@ -159,7 +179,7 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
           <Image src={CI_TOEI} style={s.headerLogo} />
         </View>
 
-        <Text style={s.disclaimer}>※ 모든 금액은 부가세 별도 기준입니다.</Text>
+        <Text style={s.disclaimer}>{exclusive ? '※ 공급가는 부가세 별도이며, 합계 = 공급가 + 부가세(10%) 입니다. 통관 시 납부한 수입부가세는 청구 대상이 아닙니다.' : '※ 모든 금액은 부가세 별도 기준입니다.'}</Text>
 
         <Text style={s.sectionLabel}>섹션 1 — 거래 기본 정보</Text>
         <View style={s.table}>

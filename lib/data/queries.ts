@@ -24,6 +24,10 @@ export interface InterimSettlementRow {
   transaction_id: string
   customs_exchange_rate: number | null
   confirmed_amount_krw: number | null
+  /** 신방식(exclusive)에서만 채워진다 — confirmed = supply + vat */
+  supply_amount_krw: number | null
+  vat_amount_krw: number | null
+  vat_mode: string
   rounding_policy: string
   is_locked: boolean
   is_paid: boolean
@@ -64,6 +68,7 @@ export interface CostItemRow {
   amount_krw: number
   is_vat_taxable: boolean
   vat_amount_krw: number
+  is_import_vat: boolean
   group_type: string
   sort_order: number
   [key: string]: unknown

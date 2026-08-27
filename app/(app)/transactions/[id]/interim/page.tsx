@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { fetchTransactionBase, fetchInterimSettlement, fetchInterimCostItems } from '@/lib/data/queries'
 import { toCostRow } from '@/lib/utils/costRows'
-import { calculateInterim, type RoundingPolicy, type CostItem } from '@/lib/calculations/interim'
+import { calculateInterim, computeVat, type RoundingPolicy, type CostItem, type VatMode } from '@/lib/calculations/interim'
 import { formatKrw, formatUsd } from '@/lib/utils/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,11 +32,14 @@ export default function InterimSettlementPage() {
   const [isLocked, setIsLocked] = useState(false)
   const [customsRate, setCustomsRate] = useState('')
   const [roundingPolicy, setRoundingPolicy] = useState<RoundingPolicy>('floor_100')
+  // 확정된 과거 정산은 저장된 방식대로 계속 보여준다 (로직 변경으로 금액이 조용히 바뀌면 안 된다)
+  const [vatMode, setVatMode] = useState<VatMode>('exclusive')
   const [shippingRows, setShippingRows] = useState<CostRow[]>(DEFAULT_SHIPPING)
   const [customsRows, setCustomsRows] = useState<CostRow[]>(DEFAULT_CUSTOMS)
   const [prefilled, setPrefilled] = useState(false)
-  // null이면 시스템 계산값을 그대로 따라간다. 담당자가 직접 입력했거나 DB에 저장된 확정금액이 있을 때만 문자열.
-  const [confirmedOverride, setConfirmedOverride] = useState<string | null>(null)
+  // null이면 시스템 계산값을 그대로 따라간다. 담당자가 직접 입력했거나 DB에 저장된 확정값이 있을 때만 문자열.
+  // 확정 대상은 공급가다 — 부가세·합계를 여기서 파생시켜야 세금계산서가 항상 맞는다.
+  const [supplyOverride, setSupplyOverride] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [notes, setNotes] = useState<string | null>(null)
 
@@ -52,7 +55,12 @@ export default function InterimSettlementPage() {
         setSid(interim.id); setIsLocked(interim.is_locked)
         setCustomsRate(String(interim.customs_exchange_rate))
         setRoundingPolicy(interim.rounding_policy as RoundingPolicy)
-        setConfirmedOverride(interim.confirmed_amount_krw != null ? String(interim.confirmed_amount_krw) : null)
+        const mode: VatMode = (interim as Record<string, unknown>).vat_mode === 'inclusive' ? 'inclusive' : 'exclusive'
+        setVatMode(mode)
+        const storedSupply = (interim as Record<string, unknown>).supply_amount_krw
+        // inclusive(구방식) 정산은 공급가 컬럼이 없으니 확정금액을 그대로 쓴다
+        const stored = mode === 'exclusive' && storedSupply != null ? storedSupply : interim.confirmed_amount_krw
+        setSupplyOverride(stored != null ? String(stored) : null)
         setNotes(interim.notes ?? null)
 
         const items = await fetchInterimCostItems(supabase, interim.id)
@@ -84,6 +92,7 @@ export default function InterimSettlementPage() {
               amount_krw: String(item.amount_krw ?? '0'),
               is_vat_taxable: item.is_vat_taxable ?? false,
               vat_amount_krw: String(item.vat_amount_krw ?? '0'),
+              is_import_vat: false,
             })))
             setPrefilled(true)
           }
@@ -95,20 +104,32 @@ export default function InterimSettlementPage() {
 
   const costItems: CostItem[] = [...shippingRows, ...customsRows].map((r) => ({
     amountKrw: parseFloat(r.amount_krw) || 0,
+    isImportVat: r.is_import_vat,
   }))
 
   const calc = tx?.import_amount_usd && customsRate
-    ? calculateInterim({ importAmountUsd: Number(tx.import_amount_usd), customsExchangeRate: parseFloat(customsRate), marginRatePct: tx.margin_rate_pct ?? 0, costItems, roundingPolicy })
+    ? calculateInterim({
+        importAmountUsd: Number(tx.import_amount_usd),
+        customsExchangeRate: parseFloat(customsRate),
+        marginRatePct: tx.margin_rate_pct ?? 0,
+        costItems, roundingPolicy, vatMode,
+      })
     : null
-  const systemAmount = calc?.confirmedKrw ?? 0
-  const confirmed = confirmedOverride ?? (systemAmount > 0 ? String(systemAmount) : '')
+  const systemSupply = calc?.supplyAmountKrw ?? 0
+  const supply = supplyOverride ?? (systemSupply > 0 ? String(systemSupply) : '')
+  const supplyNum = parseFloat(supply) || systemSupply
+  const confirmedVat = vatMode === 'exclusive' ? computeVat(supplyNum) : 0
+  const confirmedTotal = supplyNum + confirmedVat
 
   async function handleSave(lock = false) {
     setSaving(true)
     try {
       const payload = {
         transaction_id: id, customs_exchange_rate: parseFloat(customsRate), rounding_policy: roundingPolicy,
-        confirmed_amount_krw: parseFloat(confirmed) || systemAmount, is_locked: lock,
+        vat_mode: vatMode,
+        supply_amount_krw: vatMode === 'exclusive' ? supplyNum : null,
+        vat_amount_krw: vatMode === 'exclusive' ? confirmedVat : null,
+        confirmed_amount_krw: confirmedTotal, is_locked: lock,
       }
       let id2 = sid
       if (id2) {
@@ -124,7 +145,8 @@ export default function InterimSettlementPage() {
       const mkItem = (r: CostRow, i: number, grp: string) => ({
         item_name: r.item_name, group_type: grp,
         amount_krw: parseFloat(r.amount_krw) || 0, is_vat_taxable: r.is_vat_taxable,
-        vat_amount_krw: parseFloat(r.vat_amount_krw) || 0, sort_order: i,
+        vat_amount_krw: parseFloat(r.vat_amount_krw) || 0, is_import_vat: r.is_import_vat,
+        sort_order: i,
       })
       const { error: itemsError } = await supabase.rpc('save_interim_cost_items', {
         p_interim_settlement_id: id2,
@@ -181,13 +203,14 @@ export default function InterimSettlementPage() {
           </div>
         </CardContent>
       </Card>
-      <ShippingCostItems rows={shippingRows} onChange={setShippingRows} isLocked={isLocked}
+      <ShippingCostItems rows={shippingRows} onChange={setShippingRows} isLocked={isLocked} vatMode={vatMode}
         hint={prefilled ? '포워딩 견적 실청구액에서 자동 입력됐습니다. 수정 가능합니다.' : undefined} />
-      <CustomsCostItems rows={customsRows} onChange={setCustomsRows} isLocked={isLocked} />
+      <CustomsCostItems rows={customsRows} onChange={setCustomsRows} isLocked={isLocked} vatMode={vatMode} />
       <InterimResultsCard
-        calc={calc} systemAmount={systemAmount} roundingPolicy={roundingPolicy}
-        onRoundingChange={setRoundingPolicy} confirmedAmount={confirmed}
-        onConfirmedChange={setConfirmedOverride} isLocked={isLocked}
+        calc={calc} systemSupply={systemSupply} roundingPolicy={roundingPolicy}
+        onRoundingChange={setRoundingPolicy} supplyAmount={supply}
+        onSupplyChange={setSupplyOverride} isLocked={isLocked}
+        confirmedVat={confirmedVat} confirmedTotal={confirmedTotal}
         shippingSubtotal={shippingSubtotal} customsSubtotal={customsSubtotal}
       />
       {sid && (
