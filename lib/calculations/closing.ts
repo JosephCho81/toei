@@ -1,5 +1,5 @@
 import { applyRounding, computeVat } from './interim.ts'
-import { calcImportAmountKrw } from './helpers.ts'
+import { calcImportAmountKrw, usdToKrw } from './helpers.ts'
 export type { RoundingPolicy, VatMode } from './interim.ts'
 import type { RoundingPolicy, VatMode } from './interim.ts'
 
@@ -135,4 +135,46 @@ export function feeExchangeRate(row: LcFeeRateInput, bokRate: number): number {
 /** 별도 환율을 켜놓고 환율을 비워둔 행 — 0원으로 굳어버리므로 저장을 막아야 한다. */
 export function feeRateMissing(row: LcFeeRateInput): boolean {
   return row.currency === 'USD' && row.use_custom_rate && feeExchangeRate(row, 0) <= 0
+}
+
+/**
+ * LC 결제비용 입력. 결제액 일부를 다른 환율로 선지급한 경우가 있어
+ * 총액과 별개로 선지급 구간을 따로 받는다. (1차 선지급금 7,040$ 사례)
+ */
+export interface LcPaymentInput {
+  /** LC 결제비용 총액(USD) */
+  totalUsd: number | null
+  /** 그중 선지급분(USD). null·0 이면 선지급 없음 */
+  advanceUsd: number | null
+  /** 선지급분에만 적용할 환율. null 이면 미입력 */
+  advanceRate: number | null
+}
+
+/** 선지급 구간이 있는 입력인가 */
+export function hasAdvancePayment(p: LcPaymentInput): boolean {
+  const a = p.advanceUsd
+  return a != null && Number.isFinite(a) && a > 0
+}
+
+/** 선지급금을 넣어놓고 환율을 비워둔 입력 — 그 구간이 0원으로 굳으므로 저장을 막아야 한다. */
+export function advanceRateMissing(p: LcPaymentInput): boolean {
+  const r = p.advanceRate
+  return hasAdvancePayment(p) && !(r != null && Number.isFinite(r) && r > 0)
+}
+
+/** 선지급금이 총액을 넘는 입력 — 잔액이 음수가 되어 결제비용이 뒤집힌다. */
+export function advanceExceedsTotal(p: LcPaymentInput): boolean {
+  return hasAdvancePayment(p) && (p.advanceUsd ?? 0) > (p.totalUsd ?? 0)
+}
+
+/**
+ * LC 결제비용 원화.
+ * 선지급 구간과 잔액을 각각 환산해 더한다 — 은행이 구간별로 결제해 청구하므로
+ * 합계를 한 번에 환산하면 실제 청구액과 원 단위로 어긋난다.
+ */
+export function calcLcPaymentKrw(p: LcPaymentInput, bokRate: number): number {
+  const total = p.totalUsd ?? 0
+  if (!hasAdvancePayment(p)) return usdToKrw(total, bokRate)
+  const advanceUsd = p.advanceUsd ?? 0
+  return usdToKrw(advanceUsd, p.advanceRate) + usdToKrw(total - advanceUsd, bokRate)
 }

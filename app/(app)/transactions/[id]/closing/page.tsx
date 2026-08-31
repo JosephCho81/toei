@@ -4,7 +4,10 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
-import { calculateClosing, type RoundingPolicy, type VatMode } from '@/lib/calculations/closing'
+import {
+  calculateClosing, calcLcPaymentKrw, hasAdvancePayment, advanceRateMissing, advanceExceedsTotal,
+  type RoundingPolicy, type VatMode,
+} from '@/lib/calculations/closing'
 import { usdToKrw, krwToUsd } from '@/lib/calculations/helpers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,6 +61,9 @@ export default function ClosingSettlementPage() {
   const [lcPaymentUsd, setLcPaymentUsd] = useState('')
   // 달러 없이 원화만 저장된 과거 정산은 저장값을 그대로 계산 기준으로 쓴다(환산 오차 방지).
   const [legacyLcPaymentKrw, setLegacyLcPaymentKrw] = useState<number | null>(null)
+  // 결제액 일부를 다른 환율로 선지급한 건(1차 7,040$ 사례). 비어 있으면 총액을 클로징환율로 환산한다.
+  const [advanceUsd, setAdvanceUsd] = useState('')
+  const [advanceRate, setAdvanceRate] = useState('')
   // 초기엔 각 사 50% 였으나 이후 한국에이원 전액 부담으로 바뀌었다 (담당자 확인)
   const [fxBurdenA1Pct, setFxBurdenA1Pct] = useState(100)
   const [roundingPolicy, setRoundingPolicy] = useState<RoundingPolicy>('floor_100')
@@ -133,6 +139,10 @@ export default function ClosingSettlementPage() {
           setLcPaymentUsd(derived != null ? String(derived) : '')
           setLegacyLcPaymentKrw(Number(storedKrw))
         }
+        const storedAdvanceUsd = (closing as Record<string, unknown>).advance_payment_usd
+        const storedAdvanceRate = (closing as Record<string, unknown>).advance_exchange_rate
+        setAdvanceUsd(storedAdvanceUsd != null ? String(storedAdvanceUsd) : '')
+        setAdvanceRate(storedAdvanceRate != null ? String(storedAdvanceRate) : '')
         setFxBurdenA1Pct(closing.fx_burden_a1_pct ?? 100)
         setRoundingPolicy(closing.rounding_policy as RoundingPolicy)
         setVatMode((closing as Record<string, unknown>).vat_mode === 'inclusive' ? 'inclusive' : 'exclusive')
@@ -172,9 +182,16 @@ export default function ClosingSettlementPage() {
   const bokRateNum = parseFloat(bokRate) || 0
   const lcPaymentUsdNum = lcPaymentUsd === '' ? null : (parseFloat(lcPaymentUsd) || 0)
   // 달러를 새로 입력했으면 환산값, 과거 정산이면 저장된 원화를 그대로 쓴다
+  const advanceUsdNum = advanceUsd === '' ? null : (parseFloat(advanceUsd) || 0)
+  const advanceRateNum = advanceRate === '' ? null : (parseFloat(advanceRate) || 0)
+  const lcPaymentInput = {
+    totalUsd: lcPaymentUsdNum,
+    advanceUsd: advanceUsdNum,
+    advanceRate: advanceRateNum,
+  }
   const lcPaymentKrw = legacyLcPaymentKrw != null
     ? legacyLcPaymentKrw
-    : usdToKrw(lcPaymentUsdNum, bokRateNum)
+    : calcLcPaymentKrw(lcPaymentInput, bokRateNum)
 
   /** LC 수수료 1행의 원화 금액 (달러 항목은 별도 환율 또는 클로징환율로 반올림 환산) */
   function feeAmountKrw(r: FeeRow): number {
@@ -217,6 +234,15 @@ export default function ClosingSettlementPage() {
       toast.error(`'${missingRateRow.item_name || 'LC 수수료'}' 항목에 별도 환율을 입력하세요.`)
       return
     }
+    // 선지급금을 넣고 환율을 비우면 그 구간이 0원으로 굳어 결제비용이 통째로 틀어진다
+    if (advanceRateMissing(lcPaymentInput)) {
+      toast.error('선지급금에 적용할 환율을 입력하세요.')
+      return
+    }
+    if (advanceExceedsTotal(lcPaymentInput)) {
+      toast.error('선지급금이 LC 결제비용 총액보다 클 수 없습니다.')
+      return
+    }
     setSaving(true)
     try {
       const upsertData = {
@@ -225,6 +251,8 @@ export default function ClosingSettlementPage() {
         bok_exchange_rate: bokRateNum || null,
         lc_payment_total_usd: lcPaymentUsdNum,
         lc_payment_total_krw: lcPaymentKrw || null,
+        advance_payment_usd: advanceUsdNum,
+        advance_exchange_rate: advanceUsdNum ? advanceRateNum : null,
         fx_burden_a1_pct: fxBurdenA1Pct,
         rounding_policy: roundingPolicy,
         vat_mode: vatMode,
@@ -357,8 +385,42 @@ export default function ClosingSettlementPage() {
                 : lcPaymentUsdNum == null
                   ? '달러로 입력하면 클로징 환율로 원화가 환산됩니다.'
                   : bokRateNum > 0
-                    ? `원화 환산 ${formatKrw(lcPaymentKrw)} (× ${bokRateNum.toLocaleString('ko-KR')}원/$)`
+                    ? hasAdvancePayment(lcPaymentInput)
+                      ? `원화 환산 ${formatKrw(lcPaymentKrw)} (선지급분 별도 환율 적용)`
+                      : `원화 환산 ${formatKrw(lcPaymentKrw)} (× ${bokRateNum.toLocaleString('ko-KR')}원/$)`
                     : '클로징 환율을 먼저 입력해야 원화로 환산됩니다.'}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Label>선지급금 ($) — 선택</Label>
+            <NumberInput
+              value={advanceUsd}
+              onValueChange={setAdvanceUsd}
+              disabled={isLocked}
+              className="font-mono text-right"
+              placeholder="0.00"
+            />
+            <p className="text-xs text-muted-foreground">
+              LC 결제비용 중 다른 환율로 먼저 결제한 금액. 없으면 비워 둡니다.
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Label>선지급 환율 (원/$)</Label>
+            <NumberInput
+              value={advanceRate}
+              onValueChange={setAdvanceRate}
+              disabled={isLocked || !hasAdvancePayment(lcPaymentInput)}
+              className="font-mono text-right"
+              placeholder="1,156.4"
+            />
+            <p className="text-xs text-muted-foreground">
+              {!hasAdvancePayment(lcPaymentInput)
+                ? '선지급금을 입력하면 활성화됩니다.'
+                : advanceExceedsTotal(lcPaymentInput)
+                  ? '선지급금이 LC 결제비용 총액보다 큽니다.'
+                  : advanceRateMissing(lcPaymentInput)
+                    ? '선지급 환율을 입력해야 저장할 수 있습니다.'
+                    : `선지급 ${formatKrw(usdToKrw(advanceUsdNum, advanceRateNum))} + 잔액 ${formatKrw(usdToKrw((lcPaymentUsdNum ?? 0) - (advanceUsdNum ?? 0), bokRateNum))}`}
             </p>
           </div>
           <div className="space-y-1">
@@ -381,6 +443,8 @@ export default function ClosingSettlementPage() {
         lcPaymentKrw={lcPaymentKrw}
         lcPaymentUsd={legacyLcPaymentKrw != null ? null : lcPaymentUsdNum}
         bokRate={bokRateNum}
+        advanceUsd={legacyLcPaymentKrw != null ? null : advanceUsdNum}
+        advanceRate={advanceRateNum}
       />
 
       <ClosingLcFeeCard
