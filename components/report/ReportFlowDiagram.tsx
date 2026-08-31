@@ -9,6 +9,7 @@ interface Props {
   a1BurdenKrw: number
   a1BurdenWithVatKrw: number
   closingCostsTotalKrw: number
+  a1ClosingCostsKrw: number
   closingConfirmedKrw: number
   grandTotalKrw: number
 }
@@ -49,7 +50,7 @@ export function ReportFlowDiagram(props: Props) {
   const {
     importAmountKrw, nonVatCostsTotal, vatAmountKrw, interimConfirmedKrw,
     fxGainLossKrw, lcFeeTotalKrw, fxBurdenPct, a1BurdenKrw,
-    a1BurdenWithVatKrw, closingCostsTotalKrw, closingConfirmedKrw, grandTotalKrw,
+    a1BurdenWithVatKrw, closingCostsTotalKrw, a1ClosingCostsKrw, closingConfirmedKrw, grandTotalKrw,
   } = props
 
   const fxIsGain = fxGainLossKrw >= 0
@@ -91,7 +92,11 @@ export function ReportFlowDiagram(props: Props) {
         />
         <FlowRow label="× VAT (×1.1)" value={signed(a1BurdenWithVatKrw) + '원'} indent />
         {closingCostsTotalKrw !== 0 && (
-          <FlowRow label="+ 기타 미정산 비용" value={signed(closingCostsTotalKrw) + '원'} indent />
+          <FlowRow
+            label={`+ 기타 미정산 비용 × ${fxBurdenPct}%`}
+            value={signed(a1ClosingCostsKrw) + '원'}
+            indent
+          />
         )}
         <div className="border-t border-gray-300 my-1" />
         <FlowTotal

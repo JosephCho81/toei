@@ -238,6 +238,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           a1BurdenKrw={closingCalc.a1BurdenKrw}
           a1BurdenWithVatKrw={closingCalc.a1BurdenWithVatKrw}
           closingCostsTotalKrw={closingCalc.closingCostsTotalKrw}
+          a1ClosingCostsKrw={closingCalc.a1ClosingCostsKrw}
           closingConfirmedKrw={Number(closing.confirmed_amount_krw)}
           grandTotalKrw={closingCalc.grandTotalKrw}
         />
@@ -272,6 +273,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             outputVatKrw: closingCalc.vatKrw,
             closingCostItems: closingCostsParsed,
             closingCostsTotalKrw: closingCalc.closingCostsTotalKrw,
+            a1ClosingCostsKrw: closingCalc.a1ClosingCostsKrw,
             confirmed_amount_krw: closing.confirmed_amount_krw ? Number(closing.confirmed_amount_krw) : null,
             interimConfirmedKrw,
             grandTotalKrw: interimConfirmedKrw != null ? closingCalc.grandTotalKrw : null,

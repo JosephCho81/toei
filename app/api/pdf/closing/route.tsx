@@ -157,6 +157,7 @@ export async function GET(req: NextRequest) {
       amountKrw: Number((c as { amount_krw: number }).amount_krw) || 0,
     })),
     closingCostsTotalKrw: calc.closingCostsTotalKrw,
+    a1ClosingCostsKrw: calc.a1ClosingCostsKrw,
     confirmedAmountKrw: confirmedKrw,
     directionLabel,
     isPaid: (closing.is_paid as boolean) ?? false,

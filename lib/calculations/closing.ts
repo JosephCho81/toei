@@ -12,8 +12,11 @@ export interface ClosingCalculation {
   a1BurdenKrw: number
   /** 구방식 표시용 — 에이원 부담분에 부가세를 곱해 뭉친 값 */
   a1BurdenWithVatKrw: number
+  /** 기타 미정산 비용 원금 합계 (부담비율 적용 전) */
   closingCostsTotalKrw: number
-  /** 절사 후 공급가. exclusive = 에이원 부담분 + 클로징 추가비용 */
+  /** 기타 미정산 비용의 에이원 부담분 = 원금 × 부담비율 */
+  a1ClosingCostsKrw: number
+  /** 절사 후 공급가. exclusive = 에이원 부담분 + 기타 미정산 부담분 */
   supplyAmountKrw: number
   /** 매출부가세 = 공급가 × 10%. inclusive 모드는 0 */
   vatKrw: number
@@ -65,21 +68,25 @@ export function calculateClosing(params: {
   // 클로징 추가비용 (A+B+C) — 중간정산 이후 뒤늦게 청구된 통관·운송 실비
   const closingCostsTotalKrw = closingCostItems.reduce((sum, item) => sum + item.amountKrw, 0)
 
+  // 기타 미정산 비용도 LC 부대비용과 동일하게 분담한다 (담당자 확정).
+  // 원본 문서는 이 항목만 부담비율 밖 전액으로 뒀는데 그게 오류였다.
+  const a1ClosingCostsKrw = Math.round(closingCostsTotalKrw * (fxBurdenA1Pct / 100))
+
   let supplyAmountKrw: number
   let vatKrw: number
   let finalSettlementKrw: number
   let roundedFinalKrw: number
 
   if (vatMode === 'exclusive') {
-    // 공급가 = 에이원 부담분 + 클로징 추가비용. 절사는 여기에 건다 —
+    // 공급가 = 에이원 부담분 + 기타 미정산 부담분. 절사는 여기에 건다 —
     // 합계를 절사하면 공급가 + 부가세와 어긋나 세금계산서가 맞지 않는다.
-    supplyAmountKrw = applyRounding(a1BurdenKrw + closingCostsTotalKrw, roundingPolicy)
+    supplyAmountKrw = applyRounding(a1BurdenKrw + a1ClosingCostsKrw, roundingPolicy)
     vatKrw = computeVat(supplyAmountKrw)
     roundedFinalKrw = supplyAmountKrw + vatKrw
     finalSettlementKrw = roundedFinalKrw
   } else {
-    // 구방식: 부담분에 부가세를 곱해 뭉치고 클로징 추가비용은 부가세 밖에 더했다
-    finalSettlementKrw = a1BurdenWithVatKrw + closingCostsTotalKrw
+    // 구방식: 부담분에 부가세를 곱해 뭉치고 기타 미정산 부담분은 부가세 밖에 더했다
+    finalSettlementKrw = a1BurdenWithVatKrw + a1ClosingCostsKrw
     roundedFinalKrw = applyRounding(finalSettlementKrw, roundingPolicy)
     supplyAmountKrw = roundedFinalKrw
     vatKrw = 0
@@ -96,6 +103,7 @@ export function calculateClosing(params: {
     a1BurdenKrw,
     a1BurdenWithVatKrw,
     closingCostsTotalKrw,
+    a1ClosingCostsKrw,
     supplyAmountKrw,
     vatKrw,
     finalSettlementKrw,

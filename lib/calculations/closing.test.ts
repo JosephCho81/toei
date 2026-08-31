@@ -87,6 +87,37 @@ test('신방식은 클로징 추가비용(A+B+C)도 공급가에 넣어 10% 를 
   assert.equal(c.supplyAmountKrw + c.vatKrw, c.roundedFinalKrw)
 })
 
+test('기타 미정산 비용(A+B+C)에도 부담비율을 곱한다 — 신방식', () => {
+  const c = calculateClosing({
+    ...R20,
+    closingCostItems: [{ amountKrw: 182600, includesVat: false }, { amountKrw: 40800, includesVat: true }],
+    fxBurdenA1Pct: 50, roundingPolicy: 'none', vatMode: 'exclusive',
+  })
+  assert.equal(c.closingCostsTotalKrw, 223400)   // 원금은 그대로 표시한다
+  assert.equal(c.a1ClosingCostsKrw, 111700)      // 부담분만 공급가에 들어간다
+  assert.equal(c.supplyAmountKrw, 248261 + 111700)
+  assert.equal(c.supplyAmountKrw + c.vatKrw, c.roundedFinalKrw)
+})
+
+test('기타 미정산 비용(A+B+C)에도 부담비율을 곱한다 — 구방식', () => {
+  const c = calculateClosing({
+    ...R20,
+    closingCostItems: [{ amountKrw: 44000, includesVat: false }],
+    fxBurdenA1Pct: 50, roundingPolicy: 'none', vatMode: 'inclusive',
+  })
+  assert.equal(c.a1ClosingCostsKrw, 22000)
+  assert.equal(c.roundedFinalKrw, 273087 + 22000)  // 부담비율 밖 전액(44,000)이 아니다
+})
+
+test('부담비율 100%면 기타 미정산 비용이 원금 그대로 들어간다', () => {
+  const c = calculateClosing({
+    ...R20,
+    closingCostItems: [{ amountKrw: 223400, includesVat: false }],
+    fxBurdenA1Pct: 100, roundingPolicy: 'none', vatMode: 'exclusive',
+  })
+  assert.equal(c.a1ClosingCostsKrw, c.closingCostsTotalKrw)
+})
+
 test('환차손이면 부담이 늘고 환차익이면 준다', () => {
   const loss = calculateClosing({
     ...R20, lcPaymentTotalKrw: 46_000_000, fxBurdenA1Pct: 100,

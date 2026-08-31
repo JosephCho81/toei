@@ -25,6 +25,7 @@ export interface ClosingData {
   outputVatKrw?: number
   closingCostItems: FeeItem[]
   closingCostsTotalKrw: number
+  a1ClosingCostsKrw: number
   confirmed_amount_krw: number | null
   interimConfirmedKrw: number | null
   grandTotalKrw: number | null
@@ -94,11 +95,11 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
   const hasGrandTotal = data.interimConfirmedKrw != null && data.grandTotalKrw != null
   const exclusive = data.vatMode !== 'inclusive'
   const additionalCost = data.lcFeeTotalKrw - data.fxGainLossKrw
-  const supplyKrw = data.supplyAmountKrw ?? (data.a1BurdenKrw + data.closingCostsTotalKrw)
+  const supplyKrw = data.supplyAmountKrw ?? (data.a1BurdenKrw + data.a1ClosingCostsKrw)
   const outputVatKrw = data.outputVatKrw ?? Math.round(supplyKrw * 0.1)
   const systemClosingConfirmed = exclusive
     ? supplyKrw + outputVatKrw
-    : data.a1BurdenWithVatKrw + data.closingCostsTotalKrw
+    : data.a1BurdenWithVatKrw + data.a1ClosingCostsKrw
   const closingDiff = confirmed != null ? confirmed - systemClosingConfirmed : 0
 
   const closingDirection = confirmed != null && confirmed !== 0
@@ -251,10 +252,16 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
               </div>
             ))}
             {data.closingCostItems.length > 0 && (
-              <div className="flex justify-between px-4 py-1.5 border-b">
-                <span className="text-muted-foreground">기타 미정산 합계</span>
-                <span className="font-mono">{signed(data.closingCostsTotalKrw)}</span>
-              </div>
+              <>
+                <div className="flex justify-between px-4 py-1.5 border-b">
+                  <span className="text-muted-foreground">기타 미정산 합계</span>
+                  <span className="font-mono">{signed(data.closingCostsTotalKrw)}</span>
+                </div>
+                <div className="flex justify-between px-4 py-1.5 border-b">
+                  <span className="text-muted-foreground pl-3">× 에이원 분담 ({data.fx_burden_a1_pct}%)</span>
+                  <span className="font-mono">{signed(data.a1ClosingCostsKrw)}</span>
+                </div>
+              </>
             )}
             <div className="flex justify-between px-4 py-2 bg-muted/20 border-t-2">
               <span className="text-muted-foreground font-medium">= 최종정산 (시스템 계산)</span>

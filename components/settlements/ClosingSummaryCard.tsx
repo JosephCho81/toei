@@ -69,7 +69,10 @@ export function ClosingSummaryCard({
             <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm space-y-1">
               <SummaryRow label="에이원 부담분" value={formatKrw(calc.a1BurdenKrw)} />
               {calc.closingCostsTotalKrw !== 0 && (
-                <SummaryRow label="클로징 추가비용 (A+B+C)" value={formatKrw(calc.closingCostsTotalKrw)} />
+                <>
+                  <SummaryRow label="기타 미정산 비용 (A+B+C)" value={formatKrw(calc.closingCostsTotalKrw)} />
+                  <SummaryRow label="기타 미정산 부담분" value={formatKrw(calc.a1ClosingCostsKrw)} />
+                </>
               )}
               <SummaryRow label="공급가 (절사 후)" value={formatKrw(calc.supplyAmountKrw)} bold />
               <SummaryRow label="부가세 (공급가 × 10%)" value={formatKrw(calc.vatKrw)} />

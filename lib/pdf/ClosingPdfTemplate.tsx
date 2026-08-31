@@ -42,6 +42,7 @@ export interface ClosingPdfData {
   outputVatKrw: number
   closingCostItems: { itemName: string; amountKrw: number }[]
   closingCostsTotalKrw: number
+  a1ClosingCostsKrw: number
   confirmedAmountKrw: number
   directionLabel: string
   isPaid: boolean
@@ -242,7 +243,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
   const exclusive = data.vatMode !== 'inclusive'
   const nonVatCostsTotal = [...data.shippingItems, ...data.customsItems].reduce((s, r) => s + r.amountKrw, 0)
   const sensScenarios = data.bokExchangeRate != null && data.importAmountUsd
-    ? buildSensScenarios(data.bokExchangeRate, data.importAmountUsd, data.importAmountKrw, data.lcFeeTotalKrw, data.fxBurdenA1Pct, data.closingCostsTotalKrw)
+    ? buildSensScenarios(data.bokExchangeRate, data.importAmountUsd, data.importAmountKrw, data.lcFeeTotalKrw, data.fxBurdenA1Pct, data.a1ClosingCostsKrw)
     : null
 
   return (
@@ -434,7 +435,7 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
                 <View style={s.cellValue}>
                   <Text>{krwSigned(data.supplyAmountKrw)}</Text>
                   <Text style={{ fontSize: 7, color: MUTED, marginTop: 1 }}>
-                    {`에이원 부담분 ${krwSigned(data.a1BurdenKrw)}${data.closingCostsTotalKrw !== 0 ? ` + 기타 미정산 ${krwSigned(data.closingCostsTotalKrw)}` : ''}`}
+                    {`에이원 부담분 ${krwSigned(data.a1BurdenKrw)}${data.closingCostsTotalKrw !== 0 ? ` + 기타 미정산 부담분 ${krwSigned(data.a1ClosingCostsKrw)}` : ''}`}
                   </Text>
                 </View>
               </View>
@@ -551,10 +552,16 @@ export function ClosingPdfDocument({ data }: { data: ClosingPdfData }) {
             </View>
           ))}
           {data.closingCostItems.length > 0 && (
-            <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 20, alignItems: 'center' }}>
-              <Text style={{ flex: 1, paddingLeft: 10, fontSize: 8, color: MUTED }}>기타 미정산 합계</Text>
-              <Text style={{ width: '40%', textAlign: 'right', paddingRight: 10, fontSize: 8, color: MUTED }}>{krwSigned(data.closingCostsTotalKrw)}</Text>
-            </View>
+            <>
+              <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 20, alignItems: 'center' }}>
+                <Text style={{ flex: 1, paddingLeft: 10, fontSize: 8, color: MUTED }}>기타 미정산 합계</Text>
+                <Text style={{ width: '40%', textAlign: 'right', paddingRight: 10, fontSize: 8, color: MUTED }}>{krwSigned(data.closingCostsTotalKrw)}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 20, alignItems: 'center' }}>
+                <Text style={{ flex: 1, paddingLeft: 20, fontSize: 8, color: MUTED }}>{`× 에이원 분담 (${data.fxBurdenA1Pct}%)`}</Text>
+                <Text style={{ width: '40%', textAlign: 'right', paddingRight: 10, fontSize: 8, color: MUTED }}>{krwSigned(data.a1ClosingCostsKrw)}</Text>
+              </View>
+            </>
           )}
           <View style={{ flexDirection: 'row', minHeight: 24, alignItems: 'center', backgroundColor: '#E8F5E9' }}>
             <Text style={{ flex: 1, paddingLeft: 10, fontSize: 9, color: GREEN, fontWeight: 700 }}>= 최종 정산금액</Text>
