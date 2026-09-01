@@ -8,112 +8,15 @@ import { formatDate } from '@/lib/utils/format'
 import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { toast } from 'sonner'
-import { createClient } from '@/lib/supabase/client'
-import { DEFAULT_UNIT } from '@/lib/constants/units'
 import { TransactionFlagPanel } from '@/components/transactions/TransactionFlagPanel'
-import { summarizeAmountChecks, type AmountCheckLevel, type AmountCheckSummary } from '@/lib/calculations/amountCheckSummary'
-import { formatDiffUsd } from '@/lib/calculations/itemTotals'
+import { AmountCheckDetail, CHECK_STYLES } from '@/components/transactions/AmountCheckDetail'
+import { summarizeAmountChecks } from '@/lib/calculations/amountCheckSummary'
+import { getEta, getEtaDisplay, getEtd, getMfr, summarizeItems } from '@/lib/transactions/rowSummary'
+import { useTxFlags } from '@/lib/transactions/useTxFlags'
 import type { TxFlag, TxAmountCheck } from '@/types/transaction'
-
-/** 대조금액 차이 단계별 표시 */
-const CHECK_STYLES: Record<Exclude<AmountCheckLevel, 'none'>, { row: string; badge: string; icon: string; label: string }> = {
-  mismatch: {
-    row: 'bg-red-50/60 hover:bg-red-50 dark:bg-red-950/20',
-    badge: 'text-red-600',
-    icon: '🔴',
-    label: '금액 불일치',
-  },
-  minor: {
-    row: 'bg-amber-50/60 hover:bg-amber-50 dark:bg-amber-950/20',
-    badge: 'text-amber-600',
-    icon: '⚠️',
-    label: '금액 차이',
-  },
-  note: {
-    row: '',
-    badge: 'text-amber-600',
-    icon: '📝',
-    label: '검토 메모',
-  },
-}
-
-const usd = (v: number) => `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-
-/** 확장 행에 펼쳐지는 '어디가 어떻게 다른지' 상세 */
-function AmountCheckDetail({ summary }: { summary: AmountCheckSummary }) {
-  if (summary.level === 'none') return null
-  const style = CHECK_STYLES[summary.level]
-  return (
-    <div className={cn('mt-3 rounded-md border px-3 py-2 text-xs',
-      summary.level === 'mismatch'
-        ? 'border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/30'
-        : 'border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/30')}>
-      <p className="font-semibold mb-1">
-        {style.icon} 토에이 자료 대조 — 품목 합계 {usd(summary.itemsTotalUsd)}
-      </p>
-      <ul className="space-y-1">
-        {summary.entries.map((e, i) => (
-          <li key={i} className="flex flex-wrap gap-x-3">
-            <span className="font-medium">{e.label}</span>
-            <span className="font-mono">{e.amountUsd != null ? usd(e.amountUsd) : '금액 미입력'}</span>
-            {e.diff.status !== 'empty' && e.diff.status !== 'match' && (
-              <span className={cn('font-mono', e.diff.status === 'mismatch' ? 'text-red-600 font-semibold' : 'text-amber-600')}>
-                차액 {formatDiffUsd(e.diff.diffUsd)}
-                {e.diff.diffPct != null && ` (${e.diff.diffPct.toFixed(2)}%)`}
-              </span>
-            )}
-            {e.note && <span className="text-muted-foreground">사유: {e.note}</span>}
-          </li>
-        ))}
-      </ul>
-      <p className="mt-1 text-muted-foreground">상세 수정은 해당 차수 상세보기 → 품목 명세에서.</p>
-    </div>
-  )
-}
-
-type Item = {
-  spec: string | null; size: string | null; quantity: number | null
-  color: string | null; glove_type: string | null; unit: string | null
-  unit_price_usd: number | null; sort_order: number
-}
 
 export type { TxRow } from '@/types/transaction'
 import type { TxRow } from '@/types/transaction'
-
-function getMfr(raw: TxRow['manufacturers']): string {
-  if (!raw) return '-'
-  if (Array.isArray(raw)) return raw[0]?.name ?? '-'
-  return (raw as { name: string }).name ?? '-'
-}
-
-function summarizeItems(items: Item[]): string {
-  if (!items.length) return '-'
-  const sorted = [...items].sort((a, b) => a.sort_order - b.sort_order)
-  const first = sorted[0]
-  const label = [first.glove_type, first.color].filter(Boolean).join(' ')
-  const sizes = [...new Set(sorted.map((i) => i.size).filter(Boolean as unknown as (v: string | null) => v is string))].join('/')
-  const total = sorted.reduce((s, i) => s + (i.quantity ?? 0), 0)
-  const unit = first.unit ?? DEFAULT_UNIT
-  const parts = [label || first.spec, sizes, total > 0 ? `${total.toLocaleString('ko-KR')} ${unit}` : '']
-  return parts.filter(Boolean).join(' · ')
-}
-
-function getEtd(containers: { etd: string | null }[]): string | null {
-  const dates = containers.map((c) => c.etd).filter(Boolean) as string[]
-  return dates.sort()[0] ?? null
-}
-
-function getEta(containers: { eta: string | null }[]): string | null {
-  const dates = containers.map((c) => c.eta).filter(Boolean) as string[]
-  return dates.sort().at(-1) ?? null
-}
-
-function getEtaDisplay(eta: string | null, deliveryDates: Array<{ seq: number; date: string }> | null): string {
-  if (eta) return formatDate(eta) ?? '-'
-  if (deliveryDates && deliveryDates.length > 0) return deliveryDates.map((d) => `${d.seq}차: ${d.date}`).join(' / ')
-  return '-'
-}
 
 export function TransactionTable({ rows, initialFlags = [], amountChecks = [] }: {
   rows: TxRow[]
@@ -121,42 +24,8 @@ export function TransactionTable({ rows, initialFlags = [], amountChecks = [] }:
   amountChecks?: TxAmountCheck[]
 }) {
   const router = useRouter()
-  const supabase = createClient()
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [flags, setFlags] = useState<TxFlag[]>(initialFlags)
-
-  function flagsOf(txId: string) {
-    return flags.filter((f) => f.transaction_id === txId)
-  }
-
-  function replaceFlagsOf(txId: string, next: TxFlag[]) {
-    setFlags((p) => [...p.filter((f) => f.transaction_id !== txId), ...next])
-  }
-
-  /** 체크 = 오류 있음. 체크 해제 시 열려 있는 항목을 모두 '처리 완료'로 바꾼다(이력 보존). */
-  async function toggleError(txId: string, checked: boolean) {
-    const current = flagsOf(txId)
-    const openFlags = current.filter((f) => f.status === 'open')
-
-    if (checked) {
-      if (openFlags.length > 0) return
-      const { data, error } = await supabase.from('transaction_flags')
-        .insert({ transaction_id: txId, field: '기타' })
-        .select('id,transaction_id,field,memo,status,resolved_memo,created_at')
-        .single()
-      if (error || !data) { toast.error(`오류 표시 실패: ${error?.message ?? '알 수 없는 오류'}`); return }
-      replaceFlagsOf(txId, [...current, data as TxFlag])
-      setExpandedId(txId)
-      return
-    }
-
-    if (openFlags.length === 0) return
-    replaceFlagsOf(txId, current.map((f) => f.status === 'open' ? { ...f, status: 'resolved' } : f))
-    const { error } = await supabase.from('transaction_flags')
-      .update({ status: 'resolved', resolved_at: new Date().toISOString() })
-      .in('id', openFlags.map((f) => f.id))
-    if (error) toast.error(`처리 실패: ${error.message}`)
-  }
+  const { flagsOf, replaceFlagsOf, toggleError } = useTxFlags(initialFlags)
 
   return (
     <div className="border rounded-lg overflow-x-auto">
@@ -210,7 +79,7 @@ export function TransactionTable({ rows, initialFlags = [], amountChecks = [] }:
                     <Checkbox
                       checked={hasError}
                       aria-label="오류 표시"
-                      onCheckedChange={(v) => toggleError(t.id, !!v)}
+                      onCheckedChange={async (v) => { if (await toggleError(t.id, !!v)) setExpandedId(t.id) }}
                     />
                   </TableCell>
                   <TableCell className="font-medium whitespace-nowrap">

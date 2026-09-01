@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import TransactionEditForm from '@/components/transactions/TransactionEditForm'
-import { ShipmentsEditSection } from '@/components/transactions/ShipmentsEditSection'
+import { ContainerList } from '@/components/containers/ContainerList'
 import { DeleteTransactionButton } from '@/components/transactions/DeleteTransactionButton'
 
 export default async function TransactionEditPage({ params }: { params: Promise<{ id: string }> }) {
@@ -28,7 +28,7 @@ export default async function TransactionEditPage({ params }: { params: Promise<
         manufacturers={manufacturers ?? []}
         initialData={t}
       />
-      <ShipmentsEditSection transactionId={id} />
+      <ContainerList transactionId={id} isLocked={false} defaultLcNumber={t.lc_no} />
       <DeleteTransactionButton transactionId={id} roundLabel={t.round_label} />
     </div>
   )

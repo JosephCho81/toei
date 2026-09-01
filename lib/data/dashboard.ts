@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { normalizeOne } from '@/lib/utils/normalize'
-import type { VerRow } from '@/components/dashboard/VerificationIssueCard'
+import { buildVerificationRows, VERIFICATION_SELECT } from '@/lib/data/verificationRows'
 
 export type ContainerRow = {
   id: string
@@ -76,7 +75,7 @@ export async function loadDashboardData(supabase: SupabaseClient, year: string) 
       .order('round_no', { ascending: false })
       .limit(5),
     supabase.from('interim_settlements')
-      .select('id, notes, confirmed_amount_krw, customs_exchange_rate, transactions(id, round_no, round_label, import_amount_usd, margin_rate_pct), interim_cost_items(amount_krw)')
+      .select(VERIFICATION_SELECT)
       .like('notes', '%[검증]%')
       .not('notes', 'like', '%[확인완료]%')
       .order('created_at'),
@@ -122,51 +121,7 @@ export async function loadDashboardData(supabase: SupabaseClient, year: string) 
   const inTransit = containers.length
   const arrivingSoon = containers.filter((c) => c.isArrivingSoon).length
 
-  type RawVerRow = {
-    id: string
-    notes: string | null
-    confirmed_amount_krw: number | null
-    customs_exchange_rate: number | null
-    transactions: {
-      id: string; round_no: number; round_label: string
-      import_amount_usd: number | null; margin_rate_pct: number | null
-    } | {
-      id: string; round_no: number; round_label: string
-      import_amount_usd: number | null; margin_rate_pct: number | null
-    }[] | null
-    interim_cost_items: { amount_krw: number | null }[] | null
-  }
-  const rawVerRows = (verificationIssues ?? []) as unknown as RawVerRow[]
-  const verRows: VerRow[] = rawVerRows.map((row) => {
-    const tx = normalizeOne(row.transactions)
-    const costSum = (row.interim_cost_items ?? []).reduce(
-      (s, c) => s + Number(c.amount_krw || 0), 0,
-    )
-    let diff: number | null = null
-    if (
-      tx &&
-      row.confirmed_amount_krw != null &&
-      row.customs_exchange_rate != null &&
-      tx.import_amount_usd != null &&
-      tx.margin_rate_pct != null
-    ) {
-      const calcAmount =
-        Math.round(
-          Number(tx.import_amount_usd) * Number(row.customs_exchange_rate)
-          * (1 + Number(tx.margin_rate_pct) / 100)
-          + costSum,
-        ) * 1.10
-      diff = Number(row.confirmed_amount_krw) - calcAmount
-    }
-    return {
-      id: row.id,
-      notes: row.notes,
-      confirmed_amount_krw: row.confirmed_amount_krw,
-      round_label: tx?.round_label ?? '-',
-      transaction_id: tx?.id ?? '',
-      diff,
-    }
-  })
+  const verRows = buildVerificationRows(verificationIssues)
 
   return {
     totalCount,

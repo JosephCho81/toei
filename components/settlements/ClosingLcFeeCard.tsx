@@ -8,7 +8,8 @@ import { Plus, Trash2 } from 'lucide-react'
 import { formatKrw } from '@/lib/utils/format'
 import { usdToKrw } from '@/lib/calculations/helpers'
 import type { ClosingCalculation } from '@/lib/calculations/closing'
-import { DEFAULT_LC_FEE_ROWS, EMPTY_FEE_ROW, feeExchangeRate, feeRateMissing, type FeeRow } from './lcFeeDefaults'
+import { feeExchangeRate, feeRateMissing } from '@/lib/calculations/closing'
+import { DEFAULT_LC_FEE_ROWS, EMPTY_FEE_ROW, type FeeRow } from './lcFeeDefaults'
 
 function CalcRow({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (

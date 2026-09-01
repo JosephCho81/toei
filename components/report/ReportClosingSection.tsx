@@ -1,10 +1,9 @@
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table'
 import { ReportSection } from './ReportSection'
+import { ReportClosingLcSection } from './ReportClosingLcSection'
+import { FeeTable, InfoRow, signed, type FeeItem } from './ReportRows'
+import { computeVat } from '@/lib/calculations/interim'
 import { formatKrw, formatDate } from '@/lib/utils/format'
 
-interface FeeItem { item_name: string; amount_krw: number }
 
 export interface ClosingData {
   closing_date: string | null
@@ -31,64 +30,6 @@ export interface ClosingData {
   grandTotalKrw: number | null
 }
 
-function signed(n: number) {
-  return `${n >= 0 ? '+' : ''}${formatKrw(n)}`
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex text-sm py-1 border-b last:border-0">
-      <span className="w-48 text-muted-foreground shrink-0 font-medium">{label}</span>
-      <span className="font-mono">{value}</span>
-    </div>
-  )
-}
-
-function AmountRow({ label, value, color, bold, formula }: {
-  label: string; value: string; color?: string; bold?: boolean; formula?: string
-}) {
-  return (
-    <div className="py-0.5">
-      <div className="flex justify-between text-sm">
-        <span className="text-muted-foreground">{label}</span>
-        <span className={`font-mono ${bold ? 'font-semibold' : 'font-medium'} ${color ?? ''}`}>{value}</span>
-      </div>
-      {formula && <p className="text-xs text-gray-400 mt-0.5 font-mono">{formula}</p>}
-    </div>
-  )
-}
-
-function FeeTable({ title, items, footerLabel, footerValue }: {
-  title: string; items: FeeItem[]; footerLabel: string; footerValue: number
-}) {
-  if (!items.length) return null
-  return (
-    <div className="mb-3">
-      <p className="text-xs font-semibold text-muted-foreground mb-1">{title}</p>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>항목</TableHead>
-            <TableHead className="text-right">금액(원)</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.map((f, i) => (
-            <TableRow key={i}>
-              <TableCell className="text-sm">{f.item_name}</TableCell>
-              <TableCell className="text-right text-sm font-mono">{f.amount_krw.toLocaleString('ko-KR')}</TableCell>
-            </TableRow>
-          ))}
-          <TableRow className="bg-muted/50 font-semibold">
-            <TableCell className="text-sm">{footerLabel}</TableCell>
-            <TableCell className="text-right text-sm font-mono">{footerValue.toLocaleString('ko-KR')}</TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </div>
-  )
-}
-
 export function ReportClosingSection({ data }: { data: ClosingData }) {
   const fxIsGain = data.fxGainLossKrw >= 0
   const confirmed = data.confirmed_amount_krw
@@ -96,7 +37,7 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
   const exclusive = data.vatMode !== 'inclusive'
   const additionalCost = data.lcFeeTotalKrw - data.fxGainLossKrw
   const supplyKrw = data.supplyAmountKrw ?? (data.a1BurdenKrw + data.a1ClosingCostsKrw)
-  const outputVatKrw = data.outputVatKrw ?? Math.round(supplyKrw * 0.1)
+  const outputVatKrw = data.outputVatKrw ?? computeVat(supplyKrw)
   const systemClosingConfirmed = exclusive
     ? supplyKrw + outputVatKrw
     : data.a1BurdenWithVatKrw + data.a1ClosingCostsKrw
@@ -134,92 +75,10 @@ export function ReportClosingSection({ data }: { data: ClosingData }) {
         </div>
       </ReportSection>
 
-      {/* V-2: LC 결제 내역 (LC 결제 + 수수료 + 추가비용 분담 통합) */}
-      <ReportSection title="V-2. LC 결제 내역">
-        <div className="space-y-1 mb-3">
-          <AmountRow
-            label="LC 결제비용 (토에이 지불)"
-            value={data.lc_payment_total_krw != null ? formatKrw(data.lc_payment_total_krw) : '-'}
-          />
-          <AmountRow
-            label={`원금 × 통관환율 (${data.customs_exchange_rate?.toLocaleString('ko-KR')}원/$)`}
-            value={formatKrw(data.importAmountKrw)}
-            formula={
-              data.importAmountUsd && data.customs_exchange_rate
-                ? `$${data.importAmountUsd.toLocaleString('en-US')}(수입금액USD) × ${data.customs_exchange_rate.toLocaleString('ko-KR')}원(통관환율) = ${data.importAmountKrw.toLocaleString('ko-KR')}원`
-                : undefined
-            }
-          />
-          <div className="py-0.5">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{`환율차액 (환차${fxIsGain ? '익' : '손'})`}</span>
-              <span className={`font-mono font-semibold ${fxIsGain ? 'text-blue-600' : 'text-red-600'}`}>
-                {signed(data.fxGainLossKrw)}
-              </span>
-            </div>
-            <p className="text-xs text-gray-400 mt-0.5 font-mono">
-              {data.lc_payment_total_krw != null
-                ? `원금×통관환율 ${data.importAmountKrw.toLocaleString('ko-KR')}원 - LC결제비용 ${data.lc_payment_total_krw.toLocaleString('ko-KR')}원 = ${signed(data.fxGainLossKrw)}`
-                : `원금×통관환율 - LC결제비용 = ${signed(data.fxGainLossKrw)}`}
-            </p>
-          </div>
-        </div>
-        {data.lcFeeItems.length > 0 && (
-          <div className="mb-3">
-            <FeeTable
-              title="▸ LC 제비용"
-              items={data.lcFeeItems}
-              footerLabel="LC 제비용 합계"
-              footerValue={data.lcFeeTotalKrw}
-            />
-          </div>
-        )}
-        <div className="border border-border rounded-lg overflow-hidden">
-          <div className="px-3 py-1.5 border-b bg-muted/20">
-            <div className="flex text-sm">
-              <span className="w-56 text-muted-foreground shrink-0">추가비용 합계 (VAT 별도)</span>
-              <span className={`font-mono font-medium ${additionalCost < 0 ? 'text-red-600' : ''}`}>
-                {signed(additionalCost)}
-              </span>
-            </div>
-            <p className="text-xs text-gray-400 mt-0.5 font-mono">
-              LC제비용 {signed(data.lcFeeTotalKrw)} - 환차{fxIsGain ? '익' : '손'} {signed(data.fxGainLossKrw)} = {signed(additionalCost)}
-            </p>
-          </div>
-          <div className="flex text-sm py-1.5 px-3 border-b">
-            <span className="w-56 text-muted-foreground shrink-0">분담 비율</span>
-            <span>에이원 {data.fx_burden_a1_pct}% / 토에이 {100 - data.fx_burden_a1_pct}%</span>
-          </div>
-          <div className="px-3 py-1.5 border-b">
-            <div className="flex text-sm">
-              <span className="w-56 text-muted-foreground shrink-0">에이원 부담 (VAT 별도)</span>
-              <span className="font-mono font-medium">{signed(data.a1BurdenKrw)}</span>
-            </div>
-            <p className="text-xs text-gray-400 mt-0.5 font-mono">
-              추가비용 {signed(additionalCost)} × {data.fx_burden_a1_pct}%(에이원분담) = {signed(data.a1BurdenKrw)}
-            </p>
-          </div>
-          {exclusive ? (
-            <div className="px-3 py-1.5">
-              <p className="text-xs text-gray-400 font-mono">
-                부가세는 기타 미정산 비용까지 더한 공급가에 한 번에 적용된다 (V-4 참조)
-              </p>
-            </div>
-          ) : (
-            <div className="px-3 py-1.5">
-              <div className="flex text-sm">
-                <span className="w-56 text-muted-foreground shrink-0">에이원 부담 (VAT 포함)</span>
-                <span className="font-mono font-semibold">{signed(data.a1BurdenWithVatKrw)}</span>
-              </div>
-              <p className="text-xs text-gray-400 mt-0.5 font-mono">
-                VAT별도 {signed(data.a1BurdenKrw)} × 1.1(VAT 10%) = {signed(data.a1BurdenWithVatKrw)}
-              </p>
-            </div>
-          )}
-        </div>
-      </ReportSection>
+      <ReportClosingLcSection
+        data={data} fxIsGain={fxIsGain} additionalCost={additionalCost} exclusive={exclusive}
+      />
 
-      {/* V-3: 기타 미정산 비용 */}
       {data.closingCostItems.length > 0 && (
         <ReportSection title="V-3. 기타 미정산 비용 (A+B+C)">
           <FeeTable

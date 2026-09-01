@@ -6,10 +6,6 @@ export function calcImportAmountKrw(
   return Math.round(importAmountUsd * customsExchangeRate * (1 + marginRatePct / 100))
 }
 
-export function sumAmountKrw(items: { amountKrw: number }[]): number {
-  return items.reduce((s, i) => s + i.amountKrw, 0)
-}
-
 /**
  * 달러 → 원화 환산. 담당자가 원화 소수점을 보지 않도록 항상 반올림한다.
  * 환율이나 금액이 비어 있으면 0 (계산에서 조용히 빠지도록).

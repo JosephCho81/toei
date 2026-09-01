@@ -12,19 +12,19 @@ export const ITEM_DATALIST = {
 
 export const GLOVE_TYPES = ['니트릴', '라텍스', '비닐']
 /** 마스터에 없는 품목을 입력할 때 쓰는 일반 목록. XS 는 A1 제품 전용이라 넣지 않는다. */
-export const SIZES = ['S', 'M', 'L', 'XL']
+const SIZES = ['S', 'M', 'L', 'XL']
 
 function unique(values: (string | null | undefined)[]): string[] {
   return [...new Set(values.filter((v): v is string => !!v && v.trim() !== ''))]
 }
 
 /** 선택한 품목에 등록된 사이즈만 보여주기 위한 목록 id. 마스터에 없으면 일반 목록. */
-export function sizeListId(product: Product | undefined): string {
+function sizeListId(product: Product | undefined): string {
   return product ? `dl-item-size-${product.id}` : ITEM_DATALIST.size
 }
 
 /** 선택한 품목(같은 재질 계열)에 등록된 색상만 보여주기 위한 목록 id. */
-export function colorListId(product: Product | undefined): string {
+function colorListId(product: Product | undefined): string {
   return product ? `dl-item-color-${product.id}` : ITEM_DATALIST.color
 }
 

@@ -32,7 +32,7 @@ export function calculateClosing(params: {
   customsExchangeRate: number
   lcFeeItems: { amountKrw: number }[]
   fxBurdenA1Pct: number
-  closingCostItems: { amountKrw: number; includesVat: boolean }[]
+  closingCostItems: { amountKrw: number }[]
   roundingPolicy: RoundingPolicy
   interimConfirmedKrw: number
   vatMode?: VatMode

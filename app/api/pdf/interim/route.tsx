@@ -110,12 +110,17 @@ export async function GET(req: NextRequest) {
     isPaid: (interim.is_paid as boolean) ?? false,
     issuedAt,
     costItems: sortedItems.map((item) => {
-      const i = item as { item_name: string; amount_krw: number; group_type: string; is_import_vat?: boolean }
+      const i = item as {
+        item_name: string; amount_krw: number; group_type: string
+        is_import_vat?: boolean; is_vat_taxable?: boolean; vat_amount_krw?: number
+      }
       return {
         itemName: String(i.item_name ?? ''),
         amountKrw: Number(i.amount_krw) || 0,
         groupType: String(i.group_type ?? 'customs'),
         isImportVat: Boolean(i.is_import_vat),
+        isVatTaxable: Boolean(i.is_vat_taxable),
+        vatAmountKrw: Number(i.vat_amount_krw) || 0,
       }
     }),
     forwardingQuotes: aggregateForwardingQuotes(fwdRows).map(q => ({

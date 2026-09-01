@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
 
 async function requireAdmin(): Promise<NextResponse | null> {
   // AUTH_RESTORE: uncomment body when auth is re-enabled (see proxy.ts)

@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
-import { fetchTransactionBase, fetchInterimSettlement, fetchInterimCostItems } from '@/lib/data/queries'
-import { toCostRow } from '@/lib/utils/costRows'
+import { loadInterimForm, saveInterimSettlement, type InterimTx } from '@/lib/settlements/interimIo'
 import { calculateInterim, computeVat, type RoundingPolicy, type CostItem, type VatMode } from '@/lib/calculations/interim'
 import { formatKrw, formatUsd } from '@/lib/utils/format'
 import { Button } from '@/components/ui/button'
@@ -21,13 +20,12 @@ import { MemoField } from '@/components/ui/MemoField'
 import { UnlockButton } from '@/components/settlements/UnlockButton'
 import { DeleteSettlementButton } from '@/components/settlements/DeleteSettlementButton'
 
-
 export default function InterimSettlementPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(createClient)
 
-  const [tx, setTx] = useState<{ import_amount_usd: number | null; customs_exchange_rate: number | null; margin_rate_pct: number | null } | null>(null)
+  const [tx, setTx] = useState<InterimTx | null>(null)
   const [sid, setSid] = useState<string | null>(null)
   const [isLocked, setIsLocked] = useState(false)
   const [customsRate, setCustomsRate] = useState('')
@@ -37,70 +35,26 @@ export default function InterimSettlementPage() {
   const [shippingRows, setShippingRows] = useState<CostRow[]>(DEFAULT_SHIPPING)
   const [customsRows, setCustomsRows] = useState<CostRow[]>(DEFAULT_CUSTOMS)
   const [prefilled, setPrefilled] = useState(false)
-  // null이면 시스템 계산값을 그대로 따라간다. 담당자가 직접 입력했거나 DB에 저장된 확정값이 있을 때만 문자열.
-  // 확정 대상은 공급가다 — 부가세·합계를 여기서 파생시켜야 세금계산서가 항상 맞는다.
+  // null이면 시스템 계산값을 그대로 따라간다. 확정 대상은 공급가다.
   const [supplyOverride, setSupplyOverride] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [notes, setNotes] = useState<string | null>(null)
 
   useEffect(() => {
-    async function load() {
-      const t = await fetchTransactionBase(supabase, id)
-      setTx(t)
-      if (t?.customs_exchange_rate) setCustomsRate(String(t.customs_exchange_rate))
-
-      const interim = await fetchInterimSettlement(supabase, id)
-      let hasShippingItems = false
-      if (interim) {
-        setSid(interim.id); setIsLocked(interim.is_locked)
-        setCustomsRate(String(interim.customs_exchange_rate))
-        setRoundingPolicy(interim.rounding_policy as RoundingPolicy)
-        const mode: VatMode = (interim as Record<string, unknown>).vat_mode === 'inclusive' ? 'inclusive' : 'exclusive'
-        setVatMode(mode)
-        const storedSupply = (interim as Record<string, unknown>).supply_amount_krw
-        // inclusive(구방식) 정산은 공급가 컬럼이 없으니 확정금액을 그대로 쓴다
-        const stored = mode === 'exclusive' && storedSupply != null ? storedSupply : interim.confirmed_amount_krw
-        setSupplyOverride(stored != null ? String(stored) : null)
-        setNotes(interim.notes ?? null)
-
-        const items = await fetchInterimCostItems(supabase, interim.id)
-        if (items?.length) {
-          const ship = items.filter((i) => (i as Record<string, unknown>).group_type === 'shipping').map(toCostRow)
-          const cust = items.filter((i) => (i as Record<string, unknown>).group_type !== 'shipping').map(toCostRow)
-          if (ship.length) { setShippingRows(ship); hasShippingItems = true }
-          if (cust.length) setCustomsRows(cust)
-        }
-      }
-
-      if (!hasShippingItems) {
-        const { data: fqList } = await supabase
-          .from('forwarding_quotes')
-          .select('id,forwarding_quote_items(item_name,amount_krw,vat_amount_krw,is_vat_taxable,sort_order,item_type)')
-          .eq('transaction_id', id)
-          .order('sort_order')
-        type InvoiceItem = { item_name: string | null; amount_krw: number | null; vat_amount_krw: number | null; is_vat_taxable: boolean | null; sort_order: number | null; item_type: string }
-        const firstFq = (fqList ?? []).find(fq =>
-          (fq.forwarding_quote_items as InvoiceItem[]).some(i => i.item_type === 'invoice')
-        )
-        if (firstFq) {
-          const invoiceItems = (firstFq.forwarding_quote_items as InvoiceItem[])
-            .filter(i => i.item_type === 'invoice')
-            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-          if (invoiceItems.length) {
-            setShippingRows(invoiceItems.map(item => ({
-              item_name: item.item_name ?? '',
-              amount_krw: String(item.amount_krw ?? '0'),
-              is_vat_taxable: item.is_vat_taxable ?? false,
-              vat_amount_krw: String(item.vat_amount_krw ?? '0'),
-              is_import_vat: false,
-            })))
-            setPrefilled(true)
-          }
-        }
-      }
-    }
-    load()
-  }, [id])
+    loadInterimForm(supabase, id).then((d) => {
+      setTx(d.tx)
+      setSid(d.settlementId)
+      setIsLocked(d.isLocked)
+      setCustomsRate(d.customsRate)
+      setRoundingPolicy(d.roundingPolicy as RoundingPolicy)
+      setVatMode(d.vatMode)
+      setSupplyOverride(d.storedSupply)
+      setNotes(d.notes)
+      setPrefilled(d.prefilled)
+      if (d.shippingRows) setShippingRows(d.shippingRows)
+      if (d.customsRows) setCustomsRows(d.customsRows)
+    })
+  }, [supabase, id])
 
   const costItems: CostItem[] = [...shippingRows, ...customsRows].map((r) => ({
     amountKrw: parseFloat(r.amount_krw) || 0,
@@ -126,39 +80,22 @@ export default function InterimSettlementPage() {
   async function handleSave(lock = false) {
     setSaving(true)
     try {
-      const payload = {
-        transaction_id: id, customs_exchange_rate: parseFloat(customsRate), rounding_policy: roundingPolicy,
-        vat_mode: vatMode,
-        supply_amount_krw: vatMode === 'exclusive' ? supplyNum : null,
-        vat_amount_krw: vatMode === 'exclusive' ? confirmedVat : null,
-        confirmed_amount_krw: confirmedTotal, is_locked: lock,
-      }
-      let id2 = sid
-      if (id2) {
-        const { error } = await supabase.from('interim_settlements').update(payload).eq('id', id2)
-        if (error) throw error
-      } else {
-        const { data, error } = await supabase.from('interim_settlements').insert(payload).select('id').single()
-        if (error) throw error
-        id2 = data?.id ?? null; setSid(id2)
-      }
-      if (!id2) throw new Error('중간정산 ID를 확인할 수 없습니다.')
-
-      const mkItem = (r: CostRow, i: number, grp: string) => ({
-        item_name: r.item_name, group_type: grp,
-        amount_krw: parseFloat(r.amount_krw) || 0, is_vat_taxable: r.is_vat_taxable,
-        vat_amount_krw: parseFloat(r.vat_amount_krw) || 0, is_import_vat: r.is_import_vat,
-        sort_order: i,
+      const newId = await saveInterimSettlement(supabase, {
+        settlementId: sid,
+        payload: {
+          transaction_id: id,
+          customs_exchange_rate: parseFloat(customsRate),
+          rounding_policy: roundingPolicy,
+          vat_mode: vatMode,
+          supply_amount_krw: vatMode === 'exclusive' ? supplyNum : null,
+          vat_amount_krw: vatMode === 'exclusive' ? confirmedVat : null,
+          confirmed_amount_krw: confirmedTotal,
+          is_locked: lock,
+        },
+        shippingRows,
+        customsRows,
       })
-      const { error: itemsError } = await supabase.rpc('save_interim_cost_items', {
-        p_interim_settlement_id: id2,
-        p_items: [
-          ...shippingRows.map((r, i) => mkItem(r, i, 'shipping')),
-          ...customsRows.map((r, i) => mkItem(r, shippingRows.length + i, 'customs')),
-        ],
-      })
-      if (itemsError) throw itemsError
-
+      setSid(newId)
       toast.success(lock ? '확정 및 잠금 완료' : '저장 완료')
       if (lock) { setIsLocked(true); router.push(`/transactions/${id}`) }
     } catch (e) {

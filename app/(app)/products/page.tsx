@@ -9,49 +9,14 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Plus, Trash2, Download } from 'lucide-react'
-import { DEFAULT_UNIT } from '@/lib/constants/units'
-import { PRODUCT_SELECT, type Product } from '@/lib/products/useProducts'
-import { sizeSequenceFor } from '@/lib/products/sizes'
 import { GLOVE_TYPES } from '@/components/transactions/ItemDatalists'
-
-type Row = {
-  _key: string
-  id?: string
-  name: string
-  glove_type: string
-  color: string
-  default_unit: string
-  size_sequence: string   // 쉼표 구분 문자열로 편집
-  is_active: boolean
-}
-
-function blank(): Row {
-  return {
-    _key: crypto.randomUUID(),
-    name: '', glove_type: '', color: '',
-    default_unit: DEFAULT_UNIT, size_sequence: 'S, M, L', is_active: true,
-  }
-}
-
-function toRow(p: Product): Row {
-  return {
-    _key: crypto.randomUUID(),
-    id: p.id,
-    name: p.name,
-    glove_type: p.glove_type ?? '',
-    color: p.color ?? '',
-    default_unit: p.default_unit || DEFAULT_UNIT,
-    size_sequence: (p.size_sequence ?? []).join(', '),
-    is_active: p.is_active,
-  }
-}
-
-function parseSizes(v: string): string[] {
-  return v.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)
-}
+import {
+  blankProductRow, importProductsFromTransactions, loadProductRows, saveProductRows,
+  type ProductRow as Row,
+} from '@/lib/products/masterRows'
 
 export default function ProductsPage() {
-  const supabase = createClient()
+  const [supabase] = useState(createClient)
   const [rows, setRows] = useState<Row[]>([])
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -60,10 +25,11 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const { data, error: err } = await supabase.from('products')
-      .select(PRODUCT_SELECT).order('sort_order').order('name')
-    if (err) setError(`품목 마스터를 불러오지 못했습니다: ${err.message}`)
-    setRows(((data as Product[] | null) ?? []).map(toRow))
+    try {
+      setRows(await loadProductRows(supabase))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
     setLoaded(true)
   }, [supabase])
 
@@ -79,88 +45,26 @@ export default function ProductsPage() {
 
   async function save() {
     setSaving(true); setError(null)
-    const valid = rows.filter((r) => r.name.trim())
-
-    const keptIds = new Set(valid.filter((r) => r.id).map((r) => r.id!))
-    const { data: dbRows } = await supabase.from('products').select('id')
-    const toDelete = (dbRows ?? []).map((r) => r.id).filter((id: string) => !keptIds.has(id))
-    if (toDelete.length) await supabase.from('products').delete().in('id', toDelete)
-
-    const toInsert: Record<string, unknown>[] = []
-    for (const [i, r] of valid.entries()) {
-      const payload = {
-        name: r.name.trim(),
-        glove_type: r.glove_type.trim() || null,
-        color: r.color.trim() || null,
-        default_unit: r.default_unit.trim() || DEFAULT_UNIT,
-        size_sequence: parseSizes(r.size_sequence).length
-          ? parseSizes(r.size_sequence)
-          : sizeSequenceFor(null, r.name),
-        is_active: r.is_active,
-        sort_order: i,
-      }
-      if (r.id) {
-        const { error: err } = await supabase.from('products').update(payload).eq('id', r.id)
-        if (err) { setError(err.message); setSaving(false); return }
-      } else {
-        toInsert.push(payload)
-      }
-    }
-    if (toInsert.length) {
-      const { error: err } = await supabase.from('products').insert(toInsert)
-      if (err) { setError(err.message); setSaving(false); return }
-    }
-
+    const errors = await saveProductRows(supabase, rows)
     await load()
     setSaving(false)
+    if (errors.length) { setError(errors[0]); return }
     setSaved(true)
   }
 
-  /** 기존 거래 품목에서 마스터에 없는 품목명을 끌어온다(재질·색상은 최빈값). */
   async function importFromTransactions() {
     setError(null); setMessage(null)
-    const { data, error: err } = await supabase
-      .from('transaction_items')
-      .select('spec,glove_type,color,unit')
-      .not('spec', 'is', null)
-      .limit(5000)
-    if (err) { setError(err.message); return }
-
-    const bySpec = new Map<string, { types: string[]; colors: string[]; units: string[] }>()
-    for (const it of (data ?? []) as { spec: string; glove_type: string | null; color: string | null; unit: string | null }[]) {
-      const key = it.spec.trim()
-      if (!key) continue
-      const entry = bySpec.get(key) ?? { types: [], colors: [], units: [] }
-      if (it.glove_type) entry.types.push(it.glove_type)
-      if (it.color) entry.colors.push(it.color)
-      if (it.unit) entry.units.push(it.unit)
-      bySpec.set(key, entry)
+    try {
+      const added = await importProductsFromTransactions(supabase, rows)
+      if (!added.length) { setMessage('새로 가져올 품목이 없습니다.'); return }
+      setRows((p) => [...p, ...added])
+      setSaved(false)
+      setMessage(`${added.length}건을 불러왔습니다. 확인 후 저장하세요.`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
     }
-
-    const mostCommon = (values: string[]): string =>
-      [...values.reduce((m, v) => m.set(v, (m.get(v) ?? 0) + 1), new Map<string, number>())]
-        .sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
-
-    const existing = new Set(rows.map((r) => r.name.trim().toLowerCase()))
-    const added: Row[] = []
-    for (const [name, entry] of bySpec) {
-      if (existing.has(name.toLowerCase())) continue
-      const glove_type = mostCommon(entry.types)
-      added.push({
-        ...blank(),
-        name,
-        glove_type,
-        color: mostCommon(entry.colors),
-        default_unit: mostCommon(entry.units) || DEFAULT_UNIT,
-        size_sequence: sizeSequenceFor(null, name).join(', '),
-      })
-    }
-
-    if (!added.length) { setMessage('새로 가져올 품목이 없습니다.'); return }
-    setRows((p) => [...p, ...added])
-    setSaved(false)
-    setMessage(`${added.length}건을 불러왔습니다. 확인 후 저장하세요.`)
   }
+
 
   if (!loaded) return null
 
@@ -177,7 +81,7 @@ export default function ProductsPage() {
           <Button size="sm" variant="outline" onClick={importFromTransactions}>
             <Download className="h-4 w-4 mr-1" />거래 데이터에서 가져오기
           </Button>
-          <Button size="sm" variant="outline" onClick={() => { setRows((p) => [...p, blank()]); setSaved(false) }}>
+          <Button size="sm" variant="outline" onClick={() => { setRows((p) => [...p, blankProductRow()]); setSaved(false) }}>
             <Plus className="h-4 w-4 mr-1" />행 추가
           </Button>
           <Button size="sm" onClick={save} disabled={saving || saved}>

@@ -1,7 +1,3 @@
-import { feeExchangeRate, feeRateMissing } from '@/lib/calculations/closing'
-
-export { feeExchangeRate, feeRateMissing }
-
 /** 클로징 LC 수수료 기본 항목. 새 정산에서만 쓰이고 저장된 정산은 DB 값을 따른다. */
 export interface FeeRow {
   id?: string

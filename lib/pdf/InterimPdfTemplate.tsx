@@ -1,23 +1,10 @@
-import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer'
-import path from 'path'
-import { pdfStyles, GREEN, GREEN_LIGHT, GRAY_BG, BORDER, TEXT, MUTED, WHITE } from './pdfStyles'
-
-Font.register({
-  family: 'NotoSansKR',
-  fonts: [
-    {
-      src: 'https://fonts.gstatic.com/s/notosanskr/v39/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzuoyeLQ.ttf',
-      fontWeight: 400,
-    },
-    {
-      src: 'https://fonts.gstatic.com/s/notosanskr/v39/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzg01eLQ.ttf',
-      fontWeight: 700,
-    },
-  ],
-})
-
-const CI_A1 = path.join(process.cwd(), 'public', 'CI_a1korea.png')
-const CI_TOEI = path.join(process.cwd(), 'public', 'CI_toei.png')
+import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
+import { pdfStyles, GREEN, GREEN_LIGHT, GRAY_BG, BORDER, MUTED, WHITE } from './pdfStyles'
+import {
+  ApprovalPage, PdfFooter, PdfHeader, Row, krw, usd, fdate, labelStyles,
+} from './parts'
+import { CostRatioBlock } from './CostRatioBlock'
+import { buildInterimCostRows, type InterimPdfCostItem } from './interimRows'
 
 export interface InterimPdfData {
   roundLabel: string
@@ -36,82 +23,12 @@ export interface InterimPdfData {
   outputVatKrw: number
   isPaid: boolean
   issuedAt: string
-  costItems: { itemName: string; amountKrw: number; groupType: string; isImportVat: boolean }[]
+  costItems: InterimPdfCostItem[]
   forwardingQuotes: { itemName: string; quoteAmountKrw: number | null; actualAmountKrw: number | null }[]
 }
 
-const s = {
-  ...pdfStyles,
-  cellLabel: {
-    width: '38%',
-    paddingLeft: 10,
-    paddingRight: 8,
-    paddingTop: 6,
-    paddingBottom: 6,
-    borderRightWidth: 1,
-    borderRightColor: BORDER,
-    color: MUTED,
-    fontWeight: 700 as const,
-    fontSize: 9,
-  },
-  cellValue: {
-    width: '62%',
-    paddingLeft: 10,
-    paddingRight: 8,
-    paddingTop: 6,
-    paddingBottom: 6,
-  },
-}
-
-function krw(n: number): string {
-  return n.toLocaleString('ko-KR') + '원'
-}
-
-function usd(n: number): string {
-  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function fdate(s: string | null): string {
-  return s ?? '-'
-}
-
-function Row({
-  label,
-  value,
-  even,
-  isLast,
-}: {
-  label: string
-  value: string
-  even?: boolean
-  isLast?: boolean
-}) {
-  const rowStyle = isLast
-    ? (even ? s.lastRowEven : s.lastRowOdd)
-    : (even ? s.rowEven : s.rowOdd)
-  return (
-    <View style={rowStyle}>
-      <View style={s.cellLabel}><Text>{label}</Text></View>
-      <View style={s.cellValue}><Text>{value}</Text></View>
-    </View>
-  )
-}
-
-function PaidRow({ isPaid, even, isLast }: { isPaid: boolean; even?: boolean; isLast?: boolean }) {
-  const rowStyle = isLast
-    ? (even ? s.lastRowEven : s.lastRowOdd)
-    : (even ? s.rowEven : s.rowOdd)
-  return (
-    <View style={rowStyle}>
-      <View style={s.cellLabel}><Text>지불여부</Text></View>
-      <View style={s.cellValue}>
-        <View style={isPaid ? s.paidView : s.unpaidView}>
-          <Text style={s.badgeText}>{isPaid ? '지불완료' : '미지불'}</Text>
-        </View>
-      </View>
-    </View>
-  )
-}
+const s = pdfStyles
+const rowStyles = labelStyles('38%')
 
 const triCol = StyleSheet.create({
   table: { borderWidth: 1, borderColor: BORDER },
@@ -128,11 +45,8 @@ const triCol = StyleSheet.create({
 })
 
 export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
-  const shippingItems = data.costItems.filter((c) => c.groupType === 'shipping')
-  const customsItems = data.costItems.filter((c) => c.groupType !== 'shipping')
-  const itemsTotal = data.costItems.reduce((s, c) => s + c.amountKrw, 0)
+  const itemsTotal = data.costItems.reduce((sum, c) => sum + c.amountKrw, 0)
   const exclusive = data.vatMode !== 'inclusive'
-  const importVatKrw = data.costItems.reduce((s, c) => s + (c.isImportVat ? c.amountKrw : 0), 0)
   const subTotal = data.importAmountKrw + itemsTotal
 
   const direction = data.confirmedAmountKrw >= 0
@@ -144,23 +58,14 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
     : ''
   const importFormula = `$${data.importAmountUsd.toLocaleString('en-US')} × ${data.customsExchangeRate.toLocaleString('ko-KR')}원${marginSuffix}`
 
-  const allCostRows = [
-    { itemName: '수입금액 (원화환산)', formula: importFormula, amountKrw: data.importAmountKrw, indent: false },
-    ...shippingItems.map((c) => ({ itemName: c.itemName, formula: '', amountKrw: c.amountKrw, indent: true })),
-    ...customsItems.map((c) => ({
-      itemName: c.itemName,
-      formula: exclusive && c.isImportVat ? '수입부가세 — 매입세액공제분이라 공급가에서 제외' : '',
-      amountKrw: c.amountKrw,
-      indent: true,
-    })),
-    ...(exclusive
-      ? [
-          { itemName: '수입부가세 차감', formula: '공급가 계산에서 제외', amountKrw: -importVatKrw, indent: false },
-          { itemName: '공급가 (부가세 별도)', formula: '', amountKrw: data.supplyAmountKrw, indent: false },
-          { itemName: '부가세', formula: '공급가 x 10%', amountKrw: data.outputVatKrw, indent: false },
-        ]
-      : []),
-  ]
+  const allCostRows = buildInterimCostRows({
+    costItems: data.costItems,
+    importAmountKrw: data.importAmountKrw,
+    importFormula,
+    exclusive,
+    supplyAmountKrw: data.supplyAmountKrw,
+    outputVatKrw: data.outputVatKrw,
+  })
 
   const systemSubTotal = exclusive
     ? data.supplyAmountKrw + data.outputVatKrw
@@ -170,25 +75,18 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        <View style={s.header}>
-          <Image src={CI_A1} style={s.headerLogo} />
-          <View style={s.headerCenter}>
-            <Text style={s.companyName}>㈜한국에이원 ↔ 토에이산교</Text>
-            <Text style={s.docTitle}>LC 거래 중간정산 내역</Text>
-          </View>
-          <Image src={CI_TOEI} style={s.headerLogo} />
-        </View>
+        <PdfHeader title="LC 거래 중간정산 내역" />
 
         <Text style={s.disclaimer}>{exclusive ? '※ 공급가는 부가세 별도이며, 합계 = 공급가 + 부가세(10%) 입니다. 통관 시 납부한 수입부가세는 청구 대상이 아닙니다.' : '※ 모든 금액은 부가세 별도 기준입니다.'}</Text>
 
         <Text style={s.sectionLabel}>섹션 1 — 거래 기본 정보</Text>
         <View style={s.table}>
-          <Row label="회 차" value={data.roundLabel} />
-          <Row label="제조사명" value={data.manufacturerName} even />
-          <Row label="수입금액 (USD)" value={usd(data.importAmountUsd)} />
-          <Row label="L/C 개설일" value={fdate(data.lcOpenDate)} even />
-          <Row label="통관일" value={fdate(data.customsDate)} />
-          <Row label="통관환율" value={`${data.customsExchangeRate.toLocaleString('ko-KR')}원/$`} even isLast />
+          <Row label="회 차" value={data.roundLabel} styles={rowStyles} />
+          <Row label="제조사명" value={data.manufacturerName} even styles={rowStyles} />
+          <Row label="수입금액 (USD)" value={usd(data.importAmountUsd)} styles={rowStyles} />
+          <Row label="L/C 개설일" value={fdate(data.lcOpenDate)} even styles={rowStyles} />
+          <Row label="통관일" value={fdate(data.customsDate)} styles={rowStyles} />
+          <Row label="통관환율" value={`${data.customsExchangeRate.toLocaleString('ko-KR')}원/$`} even isLast styles={rowStyles} />
         </View>
 
         <Text style={s.sectionLabel}>섹션 2 — 수입 원가 계산</Text>
@@ -274,75 +172,12 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
           <Text style={s.summaryValue}>{krw(Math.abs(data.confirmedAmountKrw))}</Text>
         </View>
 
-        {/* 원가 구성 비율 */}
-        <View>
-          <Text style={s.sectionLabel}>원가 구성 비율</Text>
-          <View style={{ borderWidth: 1, borderColor: BORDER, padding: 8, backgroundColor: GRAY_BG }}>
-            {(() => {
-              const total = data.importAmountKrw + itemsTotal
-              if (total <= 0) return null
-              const segs = [
-                { label: '수입원가', amount: data.importAmountKrw, color: GREEN },
-                { label: '통관/운송비', amount: itemsTotal, color: '#f97316' },
-              ].filter(s => s.amount > 0)
-              return (
-                <View>
-                  {segs.map((seg, i) => (
-                    <View key={i} style={{ flexDirection: 'row', marginBottom: 3, alignItems: 'center' }}>
-                      <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: seg.color, marginRight: 6 }} />
-                      <Text style={{ fontSize: 8, color: MUTED, width: 80 }}>{seg.label}</Text>
-                      <Text style={{ fontSize: 8, color: seg.color, fontWeight: 700, width: 40, textAlign: 'right' }}>
-                        {Math.round(seg.amount / total * 100)}%
-                      </Text>
-                      <Text style={{ fontSize: 8, color: MUTED, marginLeft: 8 }}>
-                        ({seg.amount.toLocaleString('ko-KR')}원)
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )
-            })()}
-          </View>
-        </View>
+        <CostRatioBlock importAmountKrw={data.importAmountKrw} costsKrw={itemsTotal} />
 
-        <View style={s.footer}>
-          <Text>발행일: {data.issuedAt}</Text>
-          <Text>발행자: ㈜한국에이원</Text>
-        </View>
+        <PdfFooter issuedAt={data.issuedAt} />
       </Page>
 
-      {/* 결재 도장 페이지 */}
-      <Page size="A4" style={s.page}>
-        <View style={{ backgroundColor: GREEN, padding: 14, marginBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Image src={CI_A1} style={{ height: 40, width: 80, objectFit: 'contain' }} />
-          <View style={{ flex: 1, alignItems: 'center' }}>
-            <Text style={{ color: WHITE, fontSize: 9, fontWeight: 700, textAlign: 'center' }}>㈜한국에이원 ↔ 토에이산교</Text>
-            <Text style={{ color: WHITE, fontSize: 14, fontWeight: 700, textAlign: 'center', marginTop: 5 }}>{data.roundLabel} — 결재 확인</Text>
-          </View>
-          <Image src={CI_TOEI} style={{ height: 40, width: 80, objectFit: 'contain' }} />
-        </View>
-        <View style={{ marginTop: 40 }}>
-          <Text style={{ fontSize: 9, color: MUTED, textAlign: 'center', marginBottom: 10 }}>결재</Text>
-          <View style={{ flexDirection: 'row', borderWidth: 1, borderColor: '#9ca3af' }}>
-            <View style={{ flex: 1, borderRightWidth: 1, borderRightColor: '#9ca3af' }}>
-              <Text style={{ fontSize: 9, textAlign: 'center', paddingTop: 6, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#9ca3af', color: MUTED }}>담당자</Text>
-              <View style={{ height: 80 }} />
-            </View>
-            <View style={{ flex: 1, borderRightWidth: 1, borderRightColor: '#9ca3af' }}>
-              <Text style={{ fontSize: 9, textAlign: 'center', paddingTop: 6, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#9ca3af', color: MUTED }}>확인자</Text>
-              <View style={{ height: 80 }} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 9, textAlign: 'center', paddingTop: 6, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#9ca3af', color: MUTED }}>승인자</Text>
-              <View style={{ height: 80 }} />
-            </View>
-          </View>
-        </View>
-        <View style={s.footer}>
-          <Text>발행일: {data.issuedAt}</Text>
-          <Text>발행자: ㈜한국에이원</Text>
-        </View>
-      </Page>
+      <ApprovalPage roundLabel={data.roundLabel} issuedAt={data.issuedAt} />
     </Document>
   )
 }

@@ -15,11 +15,6 @@ export function formatDate(date: string | Date | null | undefined): string {
   return `${y}-${m}-${day}`
 }
 
-export function formatRate(rate: number | null | undefined): string {
-  if (rate == null) return '-'
-  return `${rate.toFixed(2)}%`
-}
-
 export function formatExchangeRate(rate: number | null | undefined): string {
   if (rate == null) return '-'
   return `${rate.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}원/$`
@@ -52,11 +47,4 @@ export function parseNumberInput(value: string): string {
   const [intPart, ...rest] = cleaned.replace(/-/g, '').split('.')
   const decPart = rest.length > 0 ? `.${rest.join('')}` : ''
   return `${negative ? '-' : ''}${intPart}${decPart}`
-}
-
-export function formatYearMonth(date: Date | string): string {
-  const d = typeof date === 'string' ? new Date(date) : date
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  return `${y}-${m}`
 }
