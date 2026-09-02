@@ -25,8 +25,9 @@ export default async function DashboardPage({
   const sp = await searchParams
   const thisYear = new Date().getFullYear()
 
+  // 기본은 올해만. 기간 필터로 과거 연도까지 넓혀 볼 수 있다.
   // 기존 ?year= 링크도 그대로 동작하게 둔다.
-  const from = parseYear(sp.from ?? sp.year, EARLIEST_YEAR)
+  const from = parseYear(sp.from ?? sp.year, thisYear)
   const rawTo = parseYear(sp.to ?? sp.year, thisYear)
   const to = rawTo < from ? from : rawTo
 

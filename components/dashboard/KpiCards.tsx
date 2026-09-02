@@ -16,7 +16,7 @@ export function KpiCards({ totalCount, totalUsd, periodLabel }: {
         <CardContent className="px-4 py-2.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <Package className="h-4 w-4 shrink-0" style={{ color: '#81C784' }} />
-            <span className="text-sm font-medium whitespace-nowrap" style={{ color: '#2E7D32' }}>전체 거래</span>
+            <span className="text-sm font-medium whitespace-nowrap" style={{ color: '#2E7D32' }}>거래 건수</span>
             <span className="text-xs text-muted-foreground truncate">{periodLabel}</span>
           </div>
           <span className="text-xl font-bold font-mono shrink-0" style={{ color: '#2E7D32' }}>
