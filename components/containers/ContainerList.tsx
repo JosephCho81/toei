@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ContainerForm } from './ContainerForm'
+import { BlLink } from '@/components/tracking/BlLink'
 import { MemoField } from '@/components/ui/MemoField'
 import { formatDate } from '@/lib/utils/format'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 
 interface Container {
-  id: string; container_no: string; bl_no: string | null; lc_number: string | null
+  id: string; container_no: string; bl_no: string | null; mbl_no: string | null; lc_number: string | null
   container_size: string | null; carrier: string | null; eta: string | null; etd: string | null
   actual_departure: string | null; actual_arrival: string | null; vessel_name: string | null
   voyage_no: string | null; carton_count: number | null; manual_notes: string | null
@@ -30,7 +31,7 @@ export function ContainerList({ transactionId, isLocked, defaultLcNumber }: {
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('containers')
-      .select('id,container_no,bl_no,lc_number,container_size,carrier,eta,etd,actual_departure,actual_arrival,vessel_name,voyage_no,carton_count,manual_notes,tracking_status')
+      .select('id,container_no,bl_no,mbl_no,lc_number,container_size,carrier,eta,etd,actual_departure,actual_arrival,vessel_name,voyage_no,carton_count,manual_notes,tracking_status')
       .eq('transaction_id', transactionId).order('created_at')
     setContainers(data ?? [])
   }, [supabase, transactionId])
@@ -63,7 +64,8 @@ export function ContainerList({ transactionId, isLocked, defaultLcNumber }: {
           <div key={c.id} className="border rounded-lg p-3 text-sm">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono font-semibold">{c.container_no}</span>
+                <BlLink blNo={c.bl_no} mblNo={c.mbl_no} carrierName={c.carrier} containerNo={c.container_no} />
+                {c.container_no && <span className="font-mono text-xs text-muted-foreground">{c.container_no}</span>}
                 {c.container_size && <Badge variant="outline" className="text-xs">{c.container_size}</Badge>}
                 {c.carrier && <Badge variant="outline" className="text-xs">{c.carrier}</Badge>}
                 {c.tracking_status && (
@@ -90,7 +92,6 @@ export function ContainerList({ transactionId, isLocked, defaultLcNumber }: {
               <span><span className="font-medium text-foreground/70">ETD:</span> {formatDate(c.etd) ?? '-'}</span>
               <span><span className="font-medium text-foreground/70">ETA:</span> {formatDate(c.eta) ?? '-'}</span>
               <span><span className="font-medium text-foreground/70">실착:</span> {c.actual_arrival ? formatDate(c.actual_arrival) : '-'}</span>
-              <span><span className="font-medium text-foreground/70">B/L:</span> {c.bl_no ?? '-'}</span>
               <span><span className="font-medium text-foreground/70">선박:</span> {c.vessel_name ?? '-'}</span>
               <span><span className="font-medium text-foreground/70">카톤:</span> {c.carton_count != null ? c.carton_count.toLocaleString() : '-'}</span>
             </div>
