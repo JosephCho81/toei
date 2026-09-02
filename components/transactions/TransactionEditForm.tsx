@@ -8,6 +8,7 @@ import { schema, toFormDefaults, toUpdatePayload, type FV, type InitData } from 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NumberInput } from '@/components/ui/NumberInput'
+import { CustomsRateField } from './CustomsRateField'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -98,7 +99,13 @@ export default function TransactionEditForm({
           <F label="A1 지불일"><Input type="date" {...register('a1_payment_date')} /></F>
           <F label="LC 만기일"><Input type="date" {...register('lc_expiry_date')} /></F>
           <F label="통관일"><Input type="date" {...register('customs_date')} /></F>
-          <F label="통관환율 (원/$)"><NumberInput className="font-mono text-right" {...numberField('customs_exchange_rate')} /></F>
+          <F label="통관환율 (원/$)">
+            <CustomsRateField
+              customsDate={watch('customs_date')}
+              value={watch('customs_exchange_rate') ?? ''}
+              onValueChange={(v) => setValue('customs_exchange_rate', v, { shouldDirty: true })}
+            />
+          </F>
           <F label="마진율 (%)"><NumberInput className="font-mono text-right" {...numberField('margin_rate_pct')} /></F>
           <StatusFields
             values={{ lc_status: ls, logistics_status: lgs, document_status: ds }}

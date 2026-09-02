@@ -5,6 +5,8 @@ import type { ItemRow } from '@/components/transactions/ItemsInputSection'
 
 export interface ContainerRow {
   _key: string
+  bl_no: string
+  mbl_no: string
   container_no: string
   carrier: string
   etd: string
@@ -41,7 +43,7 @@ export function blankDetail(item_name = ''): ForwardingDetailRow {
 }
 
 export function blankContainer(): ContainerRow {
-  return { _key: crypto.randomUUID(), container_no: '', carrier: '', etd: '', eta: '' }
+  return { _key: crypto.randomUUID(), bl_no: '', mbl_no: '', container_no: '', carrier: '', etd: '', eta: '' }
 }
 
 export function blankForwarding(): ForwardingRow {
@@ -127,10 +129,12 @@ export async function createTransaction(
     })))
   }
 
-  const validContainers = containers.filter((r) => r.container_no || r.etd || r.eta)
+  const validContainers = containers.filter((r) => r.bl_no || r.container_no || r.etd || r.eta)
   if (validContainers.length > 0) {
     await supabase.from('containers').insert(validContainers.map((r) => ({
       transaction_id: transactionId,
+      bl_no: r.bl_no || null,
+      mbl_no: r.mbl_no || null,
       container_no: r.container_no || null,
       carrier: r.carrier || null,
       etd: r.etd || null,
