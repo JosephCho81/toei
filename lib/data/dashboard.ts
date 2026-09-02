@@ -33,13 +33,6 @@ export interface DashboardRow {
   scheduleApplicable: boolean
 }
 
-export interface YearSummary {
-  year: string
-  count: number
-  totalUsd: number
-  closingDone: number
-}
-
 export type SettlementStatus =
   | 'pending' | 'interim_saved' | 'interim_done' | 'closing_saved' | 'closing_done'
 
@@ -154,21 +147,8 @@ export async function loadDashboardData(
   const totalCount = rows.length
   const totalUsd = rows.reduce((s, r) => s + r.importAmountUsd, 0)
 
-  const byYear = new Map<string, YearSummary>()
-  for (const r of rows) {
-    const year = r.lcOpenDate?.slice(0, 4)
-    if (!year) continue
-    const y = byYear.get(year) ?? { year, count: 0, totalUsd: 0, closingDone: 0 }
-    y.count += 1
-    y.totalUsd += r.importAmountUsd
-    if (r.settlementStatus === 'closing_done') y.closingDone += 1
-    byYear.set(year, y)
-  }
-  const yearSummaries = [...byYear.values()].sort((a, b) => b.year.localeCompare(a.year))
-
   return {
     rows,
-    yearSummaries,
     totalCount,
     totalUsd,
     verRows: buildVerificationRows(verificationIssues),

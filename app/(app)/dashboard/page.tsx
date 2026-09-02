@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase/server'
 import { VerificationIssueCard } from '@/components/dashboard/VerificationIssueCard'
 import { PeriodFilterBar } from '@/components/dashboard/PeriodFilterBar'
 import { KpiCards } from '@/components/dashboard/KpiCards'
-import { YearSummaryTable } from '@/components/dashboard/YearSummaryTable'
 import { TransactionOverviewTable } from '@/components/dashboard/TransactionOverviewTable'
 import { loadDashboardData, EARLIEST_YEAR } from '@/lib/data/dashboard'
 
@@ -32,7 +31,7 @@ export default async function DashboardPage({
   const to = rawTo < from ? from : rawTo
 
   const supabase = await createClient()
-  const { rows, yearSummaries, totalCount, totalUsd, verRows } =
+  const { rows, totalCount, totalUsd, verRows } =
     await loadDashboardData(supabase, from, to)
 
   const periodLabel = from === to ? `${from}년` : `${from}~${to}년`
@@ -46,8 +45,6 @@ export default async function DashboardPage({
       </div>
 
       <KpiCards totalCount={totalCount} totalUsd={totalUsd} periodLabel={periodLabel} />
-
-      <YearSummaryTable summaries={yearSummaries} />
 
       <TransactionOverviewTable rows={rows} />
 
