@@ -27,10 +27,13 @@
 NEXT_PUBLIC_SUPABASE_URL=       # Supabase 프로젝트 URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY=  # Supabase anon key
 SUPABASE_SERVICE_ROLE_KEY=      # Supabase service_role JWT
-MAERSK_CLIENT_ID=               # Maersk API Client ID
-MAERSK_CLIENT_SECRET=           # Maersk API Client Secret
-HAPAG_API_KEY=                  # Hapag-Lloyd API Key
+BOK_API_KEY=                    # 한국은행 ECOS (클로징 환율)
+UNIPASS_API_KEY_CARGO=          # 관세청 유니패스 API001 화물통관진행정보
+UNIPASS_API_KEY_FXRATE=         # 관세청 유니패스 API012 관세환율 정보
 ```
+
+유니패스 인증키는 unipass.customs.go.kr 회원가입 후
+**My메뉴 → 서비스관리 → OpenAPI 사용관리**에서 API 별로 따로 발급받는다 (즉시 승인).
 
 ---
 
@@ -76,46 +79,31 @@ npm run dev
 
 ---
 
-## 컨테이너 Edge Function 수동 배포
+## 관세청 유니패스 연동
 
-Edge Function 코드는 완성되어 있지만, **배포는 수동으로 진행**해야 합니다.
+House B/L 로 통관 정보를 조회하는 유일한 공식 경로다. 포워더가 끊은 House B/L(`KULFE…`)은
+선사 시스템에 등재되지 않고, 컨테이너 번호는 재사용되므로 선사 사이트에서 다른 화물이 나온다.
 
-### 1. 환경변수(시크릿) 설정
+| API | 모듈 | 라우트 | 쓰임 |
+|---|---|---|---|
+| API001 화물통관진행정보 | `lib/tracking/unipass.ts` | `POST /api/unipass` | 입항일·선사·Master B/L·선박/항차·컨테이너번호 자동 입력 |
+| API012 관세환율 정보 | `lib/tracking/customsRate.ts` | `POST /api/customs-rate` | 통관환율 자동 입력 + 수기 입력값 대조 |
 
-```bash
-supabase secrets set MAERSK_CLIENT_ID=<your_maersk_client_id>
-supabase secrets set MAERSK_CLIENT_SECRET=<your_maersk_client_secret>
-supabase secrets set HAPAG_API_KEY=<your_hapag_api_key>
-```
+인증키는 서버에서만 읽는다(라우트 프록시). 클라이언트로 내려가지 않는다.
 
-### 2. Function 배포
+### 알려진 한계
 
-```bash
-supabase functions deploy sync-containers --project-ref roemjrdmccjpvcmmkper
-```
+- **출항일(ETD)은 제공하지 않는다.** 관세청은 한국 입항 이후만 다룬다 — ETD 는 수기 입력이다
+- **보관주기 3년.** `'23.06.17` 부터 3년 이내 데이터만 조회된다
+- 조회 결과가 다건이면 `ntceInfo` 가 `[N00]` 으로 시작하고 목록이 온다. 목록의 화물관리번호로
+  다시 호출해야 상세를 받는다 (`fetchUnipassCargo` 가 처리)
+- `수입 제세 납부여부`(API) 는 유효한 신고번호를 넣어도 서버 오류만 돌아와 사용하지 않는다
 
-### 3. 크론 스케줄 설정
+### B/L 조회 링크
 
-Supabase Dashboard → Database → Cron Jobs → New Cron Job:
-
-```
-Schedule:  0 0 * * *
-Command:
-  SELECT net.http_post(
-    url := 'https://roemjrdmccjpvcmmkper.supabase.co/functions/v1/sync-containers',
-    headers := '{"Authorization": "Bearer <SERVICE_ROLE_KEY>"}'::jsonb
-  );
-```
-
-매일 09:00 KST(= 00:00 UTC)에 실행됩니다.
-
-### 지원 선사
-
-| 선사 | 컨테이너 접두사 |
-|------|----------------|
-| Maersk | MRKU, MSKU, MRSU, TCKU, TGBU |
-| Hapag-Lloyd | HLXU, HLCU, UACU, FSCU |
-| 기타 | 수기 입력 |
+`lib/tracking/carriers.ts` 에 선사 12곳의 화물추적 URL 과 prefix 가 있다. 2026-09-02 에
+전부 실제 접속해 확인했고, 딥링크(번호를 URL 에 실어 보내기)는 Maersk 만 지원한다.
+나머지는 조회 페이지를 열고 번호를 클립보드에 복사한다.
 
 ---
 
@@ -123,5 +111,4 @@ Command:
 
 | 항목 | 상태 |
 |------|------|
-| 컨테이너 Edge Function 배포 | 수동 배포 필요 (위 가이드 참고) |
 | 로그인/인증 | 비활성화 중 (`proxy.ts` AUTH_DISABLED 블록), 추후 별도 진행 |
