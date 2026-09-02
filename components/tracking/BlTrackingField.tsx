@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-  CARRIERS, CUSTOMS_TRACKERS, detectCarrier, detectBlKind, getCarrier,
-  trackingHref, normalizeTrackingNo,
+  CARRIERS, CUSTOMS_TRACKERS, detectBlKind, getCarrier,
+  resolveTracking,
 } from '@/lib/tracking/carriers'
 import type { UnipassCargo, UnipassCargoBrief, UnipassResult } from '@/lib/tracking/unipass'
 
@@ -56,21 +56,19 @@ export function BlTrackingField({
   const [choices, setChoices] = useState<UnipassCargoBrief[]>([])
 
   const kind = detectBlKind(blNo)
-  const detected = detectCarrier(blNo, containerNo)
-  const carrier = getCarrier(carrierName) ?? detected
   const customs = CUSTOMS_TRACKERS.find((c) => c.code === customsCode) ?? CUSTOMS_TRACKERS[0]
 
   // 선사 사이트는 House B/L 을 모른다. Master B/L 을 알아냈을 때만 선사로 보낸다.
-  const carrierNo = kind === 'carrier' ? blNo : (mblNo ?? '')
-  const useCustoms = !carrierNo || !carrier
-  const href = useCustoms ? customs.url : trackingHref(carrier!, carrierNo)
-  const deepLinks = !useCustoms && Boolean(carrier?.deepLink)
-  const copyNo = useCustoms ? blNo : carrierNo
+  // 담당자가 드롭다운에서 고른 선사가 있으면 그 선택을 존중한다.
+  const target = resolveTracking({ blNo, mblNo, carrierName, customs })
+  const useCustoms = !target || target.via === 'customs'
+  const href = target?.href ?? customs.url
+  const deepLinks = Boolean(target?.deepLink)
 
   async function handleOpen() {
-    if (!deepLinks && copyNo) {
+    if (target?.queryNo) {
       try {
-        await navigator.clipboard.writeText(normalizeTrackingNo(copyNo))
+        await navigator.clipboard.writeText(target.queryNo)
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
       } catch { /* 클립보드가 막혀도 페이지는 연다 */ }
@@ -156,13 +154,14 @@ export function BlTrackingField({
         </Button>
       </div>
 
-      {blNo.length >= 4 && (
+      {blNo.length >= 4 && target && (
         <p className="text-xs text-muted-foreground leading-relaxed">
-          {kind === 'house' && <span className="text-green-700 font-medium">House B/L{carrier && ` · ${carrier.name}`} — 선사 시스템에 없어 유니패스로 조회한다. </span>}
-          {kind === 'carrier' && <span className="text-green-700 font-medium">선사 B/L — {carrier?.name} 사이트로 연결된다. </span>}
-          {kind === 'unknown' && <span>앞 4자리 <span className="font-mono">{normalizeTrackingNo(blNo).slice(0, 4)}</span> 로는 종류를 알 수 없어 유니패스로 연결한다. </span>}
-          {mblNo && <>Master B/L <span className="font-mono">{mblNo}</span> · </>}
-          {!deepLinks && '사이트 열기를 누르면 번호가 복사된다.'}
+          <span className={target.via === 'carrier' ? 'text-green-700 font-medium' : 'text-amber-700 font-medium'}>
+            {kind === 'house' ? 'House B/L' : kind === 'carrier' ? '선사 B/L' : '종류 미상'}
+            {' → '}{target.targetName}.{' '}
+          </span>
+          {target.reason}{' '}
+          {!deepLinks && <>사이트 열기를 누르면 <span className="font-mono">{target.queryNo}</span> 가 복사된다.</>}
         </p>
       )}
 
@@ -194,7 +193,7 @@ export function BlTrackingField({
       <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground shrink-0">조회처</span>
         <Select
-          value={useCustoms ? customsCode : (carrier?.code ?? '')}
+          value={useCustoms ? customsCode : (target?.carrier?.code ?? '')}
           onValueChange={(v) => {
             if (!v) return
             if (CUSTOMS_TRACKERS.some((c) => c.code === v)) setCustomsCode(v)

@@ -17,6 +17,11 @@ export interface Carrier {
   trackingUrl: string
   /** 번호를 URL에 실을 수 있는 선사만. 없으면 페이지만 열고 번호는 복사한다. */
   deepLink?: (no: string) => string
+  /**
+   * 선사 사이트가 받는 형식으로 번호를 다듬는다.
+   * (ONE 은 B/L 앞 ONEY 를 뗀 12자리만 받는다 — 그대로 붙여넣으면 조회되지 않는다.)
+   */
+  queryFormat?: (no: string) => string
   /** B/L·컨테이너 번호 앞 4자리. 자동 감지에만 쓰이고, 최종 선택은 담당자 몫이다. */
   prefixes: string[]
   /** 입력 형식 주의사항 — 선사마다 받는 번호가 다르다. */
@@ -36,7 +41,9 @@ export const CARRIERS: Carrier[] = [
     aliases: ['KMTC', '고려해운'],
     name: '고려해운 (KMTC)',
     trackingUrl: 'https://www.ekmtc.com/index.html#/cargo-tracking',
-    prefixes: ['KMTC', 'KMTU', 'KTMU', 'KULF'],
+    // KULF 는 포워더 House B/L 접두사다(HOUSE_BL_PREFIXES). 여기 두면 남성·ONE·에버그린
+    // Master B/L 을 가진 건까지 전부 고려해운으로 보내진다 — 실제로 그랬다.
+    prefixes: ['KMTC', 'KMTU', 'KTMU'],
     hint: '선사 B/L(KMTC…)·부킹번호로 조회. House B/L(KULFE…)은 조회되지 않으니 통관조회를 쓸 것.',
     verified: true,
   },
@@ -45,7 +52,7 @@ export const CARRIERS: Carrier[] = [
     aliases: ['NSSL', '남성해운', 'NAMSUNG'],
     name: '남성해운 (Namsung)',
     trackingUrl: 'https://ebiz.namsung.co.kr/?direct=Y&code=00010025&rtnUrl=/WS/trk/UIE0710.xml&title=%ED%99%94%EB%AC%BC%EC%B6%94%EC%A0%81',
-    prefixes: ['NSSU'],
+    prefixes: ['NSSU', 'NSSL'],
     hint: '컨테이너 번호 또는 B/L 번호로 조회.',
     verified: true,
   },
@@ -63,6 +70,7 @@ export const CARRIERS: Carrier[] = [
     aliases: ['ONEY', 'OCEAN NETWORK'],
     name: 'ONE (Ocean Network Express)',
     trackingUrl: 'https://ecomm.one-line.com/one-ecom/manage-shipment/cargo-tracking',
+    queryFormat: (no) => no.replace(/^ONEY/, ''),
     prefixes: ['ONEY', 'ONEU'],
     hint: 'B/L 번호에서 앞의 ONEY 를 떼고 뒤 12자리만 입력. 포워더 House B/L 은 조회 불가(사이트 명시).',
     verified: true,
@@ -179,9 +187,15 @@ export function detectCarrier(
   return detectCarrierByNo(blNo) ?? detectCarrierByNo(containerNo)
 }
 
+/** 선사 사이트에 실제로 넣어야 하는 번호. */
+export function formatTrackingNo(carrier: Carrier | null, no: string | null | undefined): string {
+  const n = normalizeTrackingNo(no)
+  return carrier?.queryFormat ? carrier.queryFormat(n) : n
+}
+
 /** 조회 버튼이 열 URL. deepLink 가 없으면 조회 페이지만 연다. */
 export function trackingHref(carrier: Carrier, no: string | null | undefined): string {
-  const n = normalizeTrackingNo(no)
+  const n = formatTrackingNo(carrier, no)
   return carrier.deepLink && n ? carrier.deepLink(n) : carrier.trackingUrl
 }
 
@@ -246,3 +260,81 @@ export const CUSTOMS_TRACKERS: CustomsTracker[] = [
     verified: true,
   },
 ]
+
+// ---------------------------------------------------------------------------
+// 조회처 결정
+// ---------------------------------------------------------------------------
+
+export interface TrackingTarget {
+  /** 선사 사이트로 보내는가, 통관조회로 보내는가 */
+  via: 'carrier' | 'customs'
+  carrier: Carrier | null
+  /** 열 페이지 */
+  href: string
+  /** 그 페이지에 넣어야 하는 번호 (선사 형식으로 다듬은 것) */
+  queryNo: string
+  /** 번호가 URL 에 실려 조회까지 자동으로 되는가 */
+  deepLink: boolean
+  /** 링크 툴팁에 쓸 조회처 이름 */
+  targetName: string
+  /** 왜 이 조회처인지 — 담당자가 "왜 안 나오지" 하기 전에 알려준다 */
+  reason: string
+  hint?: string
+}
+
+/**
+ * B/L 한 건을 어디서 조회할지 정한다. 목록·상세·입력폼이 모두 이 함수를 쓴다.
+ *
+ * 선사 사이트는 **자기가 끊은 Master B/L 만** 안다. 우리 데이터의 B/L 은 43건 중 42건이
+ * 포워더 House B/L(KULFE·WTTJ·PNKT·PKGI·STTS)이므로, 선사로 보낼 수 있는 건은
+ * 유니패스가 채워준 Master B/L 이 있는 경우뿐이다.
+ *
+ * 선사 판별은 **실제로 조회에 쓸 번호(Master B/L)** 로 한다.
+ * containers.carrier 원문은 포워더명(KORCHINA·PANAKOR 등)이거나 실제 선사와 어긋난
+ * 경우가 있어(09차: carrier=KMTC 인데 M B/L 은 NSSL) 뒷순위로 둔다.
+ */
+export function resolveTracking(input: {
+  blNo: string | null | undefined
+  mblNo?: string | null
+  carrierName?: string | null
+  customs?: CustomsTracker
+}): TrackingTarget | null {
+  const blNo = normalizeTrackingNo(input.blNo)
+  if (!blNo) return null
+
+  const customs = input.customs ?? CUSTOMS_TRACKERS[0]
+  const kind = detectBlKind(blNo)
+  // 선사에 넣을 수 있는 번호. House B/L 이면 Master B/L 이 있어야만 한다.
+  const carrierNo = kind === 'carrier' ? blNo : normalizeTrackingNo(input.mblNo)
+  const carrier = carrierNo
+    ? (detectCarrierByNo(carrierNo) ?? getCarrier(input.carrierName))
+    : null
+
+  if (carrierNo && carrier) {
+    return {
+      via: 'carrier',
+      carrier,
+      href: trackingHref(carrier, carrierNo),
+      queryNo: formatTrackingNo(carrier, carrierNo),
+      deepLink: Boolean(carrier.deepLink),
+      targetName: `${carrier.name} 화물추적`,
+      reason: kind === 'carrier'
+        ? '선사 B/L 이라 선사 사이트에서 바로 조회된다.'
+        : `House B/L 은 선사가 모른다 — Master B/L ${carrierNo} 로 조회한다.`,
+      hint: carrier.hint,
+    }
+  }
+
+  return {
+    via: 'customs',
+    carrier: null,
+    href: customs.url,
+    queryNo: blNo,
+    deepLink: false,
+    targetName: `${customs.name} 통관조회`,
+    reason: !carrierNo
+      ? 'Master B/L 이 아직 없다. 거래 상세에서 유니패스 조회를 한 번 돌리면 채워진다.'
+      : `Master B/L ${carrierNo} 의 선사를 특정하지 못했다. 통관조회로 보낸다.`,
+    hint: customs.hint,
+  }
+}

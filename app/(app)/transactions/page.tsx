@@ -37,7 +37,16 @@ export default async function TransactionsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">거래 목록</h2>
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold">거래 목록</h2>
+          <p className="text-xs text-muted-foreground">
+            품목·금액 대조와 오류 표시용. LC 개설일·ETD·정산 일정은{' '}
+            <Link href="/dashboard" className="underline hover:no-underline" style={{ color: '#2E7D32' }}>
+              정산 현황
+            </Link>
+            에서 본다.
+          </p>
+        </div>
         <div className="flex gap-2">
           <a
             href="/api/export/transactions"

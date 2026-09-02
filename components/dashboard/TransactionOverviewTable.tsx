@@ -13,7 +13,8 @@ function short(date: string | null): string {
   return date ? `${date.slice(5, 7)}/${date.slice(8, 10)}` : '-'
 }
 
-const TH = 'px-3 py-2 font-medium text-xs whitespace-nowrap'
+const TH = 'px-3 py-2 font-medium text-xs whitespace-nowrap text-center'
+const TD = 'px-3 py-2 whitespace-nowrap text-center'
 
 /**
  * 기간 내 거래 전부를 한 줄씩. 물류(B/L·ETD·ETA)와 정산 일정(LC개설·중간·최종)을
@@ -42,16 +43,8 @@ export function TransactionOverviewTable({ rows }: { rows: DashboardRow[] }) {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ backgroundColor: '#E8F5E9', color: '#2E7D32' }}>
-                <th className={cn(TH, 'text-left')}>회차</th>
-                <th className={cn(TH, 'text-left')}>제조사</th>
-                <th className={cn(TH, 'text-right')}>수입금액</th>
-                <th className={cn(TH, 'text-left')}>B/L</th>
-                <th className={cn(TH, 'text-center')}>ETD</th>
-                <th className={cn(TH, 'text-center')}>ETA</th>
-                <th className={cn(TH, 'text-center')}>LC 개설</th>
-                <th className={cn(TH, 'text-center')}>중간정산</th>
-                <th className={cn(TH, 'text-center')}>최종정산</th>
-                <th className={cn(TH, 'text-center')}>상태</th>
+                {['회차', '제조사', '수입금액', 'B/L', 'ETD', 'ETA', 'LC 개설', '중간정산', '최종정산', '상태']
+                  .map((h) => <th key={h} className={TH}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -61,34 +54,34 @@ export function TransactionOverviewTable({ rows }: { rows: DashboardRow[] }) {
                   className="border-b last:border-0"
                   style={{ backgroundColor: i % 2 === 1 ? '#F1F8E9' : '#ffffff' }}
                 >
-                  <td className="px-3 py-2 font-semibold whitespace-nowrap">
+                  <td className={cn(TD, 'font-semibold')}>
                     <Link href={`/transactions/${r.id}`} className="hover:underline" style={{ color: '#2E7D32' }}>
                       {r.roundLabel}
                     </Link>
                   </td>
-                  <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{r.manufacturer ?? '-'}</td>
-                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap">
+                  <td className={cn(TD, 'text-muted-foreground')}>{r.manufacturer ?? '-'}</td>
+                  <td className={cn(TD, 'font-mono')}>
                     ${Math.round(r.importAmountUsd).toLocaleString('en-US')}
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <BlLink blNo={r.blNo} mblNo={r.mblNo} carrierName={r.carrierName} containerNo={r.containerNo} />
+                  <td className={TD}>
+                    <BlLink blNo={r.blNo} mblNo={r.mblNo} carrierName={r.carrierName} />
                   </td>
-                  <td className="px-3 py-2 text-center font-mono text-xs text-muted-foreground">{short(r.etd)}</td>
-                  <td className="px-3 py-2 text-center font-mono text-xs text-muted-foreground">{short(r.eta)}</td>
-                  <td className="px-3 py-2 text-center font-mono text-xs">{short(r.lcOpenDate)}</td>
-                  <td className="px-3 py-2 text-center">
+                  <td className={cn(TD, 'font-mono text-xs text-muted-foreground')}>{short(r.etd)}</td>
+                  <td className={cn(TD, 'font-mono text-xs text-muted-foreground')}>{short(r.eta)}</td>
+                  <td className={cn(TD, 'font-mono text-xs')}>{short(r.lcOpenDate)}</td>
+                  <td className={TD}>
                     <SettlementDateCell
                       due={r.interimDue} actual={r.interimActual}
                       state={r.interimState} applicable={r.scheduleApplicable}
                     />
                   </td>
-                  <td className="px-3 py-2 text-center">
+                  <td className={TD}>
                     <SettlementDateCell
                       due={r.closingDue} actual={r.closingActual}
                       state={r.closingState} applicable={r.scheduleApplicable}
                     />
                   </td>
-                  <td className="px-3 py-2 text-center"><StatusBadge status={r.settlementStatus} /></td>
+                  <td className={TD}><StatusBadge status={r.settlementStatus} /></td>
                 </tr>
               ))}
               {rows.length === 0 && (

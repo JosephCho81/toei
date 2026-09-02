@@ -4,14 +4,14 @@ import { useState, Fragment } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { formatDate } from '@/lib/utils/format'
+
 import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { TransactionFlagPanel } from '@/components/transactions/TransactionFlagPanel'
 import { AmountCheckDetail, CHECK_STYLES } from '@/components/transactions/AmountCheckDetail'
 import { summarizeAmountChecks } from '@/lib/calculations/amountCheckSummary'
-import { getEta, getEtaDisplay, getEtd, getMfr, summarizeItems } from '@/lib/transactions/rowSummary'
+import { getEta, getEtaDisplay, getMfr, summarizeItems } from '@/lib/transactions/rowSummary'
 import { useTxFlags } from '@/lib/transactions/useTxFlags'
 import type { TxFlag, TxAmountCheck } from '@/types/transaction'
 
@@ -37,8 +37,6 @@ export function TransactionTable({ rows, initialFlags = [], amountChecks = [] }:
             <TableHead>P/O No.</TableHead>
             <TableHead>제조사</TableHead>
             <TableHead>품목</TableHead>
-            <TableHead>LC 개설일</TableHead>
-            <TableHead>ETD</TableHead>
             <TableHead>ETA</TableHead>
             <TableHead>상태</TableHead>
           </TableRow>
@@ -46,14 +44,13 @@ export function TransactionTable({ rows, initialFlags = [], amountChecks = [] }:
         <TableBody>
           {!rows.length && (
             <TableRow>
-              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                 등록된 거래가 없습니다.
               </TableCell>
             </TableRow>
           )}
           {rows.map((t) => {
             const done = t.settlement_status === 'closing_done'
-            const etd = getEtd(t.containers ?? [])
             const eta = getEta(t.containers ?? [])
             const items = [...(t.transaction_items ?? [])].sort((a, b) => a.sort_order - b.sort_order)
             const isExpanded = expandedId === t.id
@@ -117,8 +114,6 @@ export function TransactionTable({ rows, initialFlags = [], amountChecks = [] }:
                         : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm whitespace-nowrap">{formatDate(t.lc_open_date)}</TableCell>
-                  <TableCell className="text-sm whitespace-nowrap">{formatDate(etd)}</TableCell>
                   <TableCell className="text-sm whitespace-nowrap">{getEtaDisplay(eta, t.delivery_dates)}</TableCell>
                   <TableCell>
                     <Badge variant={done ? 'default' : 'secondary'}>{done ? '완료' : '진행중'}</Badge>
@@ -126,7 +121,7 @@ export function TransactionTable({ rows, initialFlags = [], amountChecks = [] }:
                 </TableRow>
                 {isExpanded && (
                   <TableRow className="bg-muted/30 hover:bg-muted/30" onClick={(e) => e.stopPropagation()}>
-                    <TableCell colSpan={9} className="pt-0 pb-3 px-6">
+                    <TableCell colSpan={7} className="pt-0 pb-3 px-6">
                       {items.length === 0
                         ? <p className="text-xs text-muted-foreground py-2">품목 데이터가 없습니다.</p>
                         : (
