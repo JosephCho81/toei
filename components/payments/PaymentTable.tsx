@@ -100,6 +100,10 @@ function issueText(r: PaymentRow): string | null {
 const TH = 'px-3 py-2.5 font-semibold whitespace-nowrap text-slate-600'
 const TD = 'px-3 py-2.5 whitespace-nowrap align-middle'
 
+/** 금액은 오른쪽으로 붙여야 자릿수가 세로로 선다. 글자 열은 가운데. */
+const NUM = 'text-right'
+const CENTER = 'text-center'
+
 export function PaymentTable({
   rows,
   view,
@@ -171,17 +175,17 @@ export function PaymentTable({
       </div>
 
       <div className="mt-2 overflow-x-auto rounded-md border">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full table-fixed border-collapse text-sm">
           <thead>
             <tr className="border-b bg-slate-50">
-              <th className={cn(TH, 'text-left w-24')}>차수</th>
-              <th className={cn(TH, 'text-right w-32')}>수입금액 (USD)</th>
-              <th className={cn(TH, 'text-right w-40')}>청구금액 (원)</th>
-              <th className={cn(TH, 'text-right w-40')}>지급액 (원)</th>
-              <th className={cn(TH, 'text-right w-36')}>{balanceLabel} (원)</th>
-              <th className={cn(TH, 'text-left w-28')}>기일</th>
-              <th className={cn(TH, 'text-left w-full')}>상태</th>
-              <th className={cn(TH, 'w-12')} />
+              <th className={cn(TH, CENTER, 'w-[8%]')}>차수</th>
+              <th className={cn(TH, NUM, 'w-[13%]')}>수입금액 (USD)</th>
+              <th className={cn(TH, NUM, 'w-[16%]')}>청구금액 (원)</th>
+              <th className={cn(TH, NUM, 'w-[16%]')}>지급액 (원)</th>
+              <th className={cn(TH, NUM, 'w-[14%]')}>{balanceLabel} (원)</th>
+              <th className={cn(TH, CENTER, 'w-[11%]')}>기일</th>
+              <th className={cn(TH, CENTER, 'w-[18%]')}>상태</th>
+              <th className={cn(TH, 'w-[4%]')} />
             </tr>
           </thead>
 
@@ -196,7 +200,7 @@ export function PaymentTable({
                   className={cn('group cursor-pointer hover:bg-slate-100/70', zebra)}
                   onClick={() => toggle(r.transactionId)}
                 >
-                  <td className={cn(TD, 'font-semibold')}>
+                  <td className={cn(TD, CENTER, 'font-semibold')}>
                     <span className="inline-flex items-center gap-1">
                       {isOpen
                         ? <ChevronDown className="h-4 w-4 text-slate-400" />
@@ -204,20 +208,20 @@ export function PaymentTable({
                       {roundName(r)}
                     </span>
                   </td>
-                  <td className={cn(TD, 'text-right tabular-nums text-slate-600')}>{usd(r.importAmountUsd)}</td>
-                  <td className={cn(TD, 'text-right tabular-nums')}>
+                  <td className={cn(TD, NUM, 'tabular-nums text-slate-600')}>{usd(r.importAmountUsd)}</td>
+                  <td className={cn(TD, NUM, 'tabular-nums')}>
                     {r.billedKrw != null ? krw(r.billedKrw) : (
                       <span className="text-muted-foreground">
-                        {r.plannedKrw == null ? '—' : `(${krw(r.plannedKrw)})`}
+                        {r.plannedKrw == null ? '—' : `예상 ${krw(r.plannedKrw)}`}
                       </span>
                     )}
                   </td>
-                  <td className={cn(TD, 'text-right tabular-nums')}>
+                  <td className={cn(TD, NUM, 'tabular-nums')}>
                     {r.installments.length === 0
                       ? <span className="text-muted-foreground">—</span>
                       : krw(r.paidKrw)}
                   </td>
-                  <td className={cn(TD, 'text-right font-semibold tabular-nums',
+                  <td className={cn(TD, NUM, 'font-semibold tabular-nums',
                     // 빨강은 「덜 나간 돈」에만. 초과 지급은 확인 대상이지 연체가 아니다.
                     r.state === 'no_record' || r.state === 'overdue' ? 'text-red-700' : 'text-slate-600')}>
                     {r.billedKrw == null ? '—'
@@ -225,14 +229,14 @@ export function PaymentTable({
                       : r.balanceKrw < 0 ? `+${krw(-r.balanceKrw)}`
                       : krw(r.balanceKrw)}
                   </td>
-                  <td className={cn(TD, 'tabular-nums text-slate-600')}>{r.dueDate ?? '미정'}</td>
-                  <td className={TD}>
+                  <td className={cn(TD, CENTER, 'tabular-nums text-slate-600')}>{r.dueDate ?? '미정'}</td>
+                  <td className={cn(TD, CENTER)}>
                     {statusText(r)}
                     {r.installments.length > 1 && (
                       <span className="text-muted-foreground"> · {r.installments.length}회 분할</span>
                     )}
                   </td>
-                  <td className={cn(TD, 'text-right')}>
+                  <td className={cn(TD, CENTER, 'px-1')}>
                     <button
                       type="button"
                       aria-label={`${roundName(r)} 지급 입력`}
@@ -279,7 +283,7 @@ export function PaymentTable({
 
       <p className="mt-2 text-sm text-muted-foreground">
         차수 {rows.length}개를 최근 차수부터 보여줍니다 (맨 아래가 1차).
-        괄호 친 청구금액은 아직 청구 전인 예상액입니다.
+        「예상」이 붙은 청구금액은 아직 청구 전이라 시스템이 계산한 값입니다.
         1,000원 미만 차이는 절사로 보아 완납으로 봅니다.
       </p>
 

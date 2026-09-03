@@ -50,7 +50,7 @@ export function PaymentKpis({
     <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((c) => (
         <div key={c.label} className="bg-card px-4 py-3">
-          <div className="text-sm text-muted-foreground">{c.label}</div>
+          <div className="break-keep text-sm text-muted-foreground">{c.label}</div>
           <div className={cn(
             'mt-1 text-xl font-semibold tabular-nums tracking-tight',
             c.alert && 'text-red-700',
@@ -58,7 +58,7 @@ export function PaymentKpis({
             {Math.round(c.value).toLocaleString('ko-KR')}
             <span className="ml-0.5 text-sm font-normal text-muted-foreground">원</span>
           </div>
-          <div className="mt-1 text-sm leading-snug text-muted-foreground">{c.sub}</div>
+          <div className="mt-1 break-keep text-sm leading-snug text-muted-foreground">{c.sub}</div>
         </div>
       ))}
     </div>
