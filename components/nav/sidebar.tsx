@@ -4,10 +4,11 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, FileText, Building2, LogOut, ClipboardList, Package, Container } from 'lucide-react'
+import { LayoutDashboard, FileText, Building2, LogOut, ClipboardList, Package, Container, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const navItems = [
+  { href: '/payments', label: '지급 현황', icon: Wallet, badge: null },
   { href: '/dashboard', label: '정산 현황', icon: LayoutDashboard, badge: null },
   { href: '/transactions', label: '거래 목록', icon: FileText, badge: null },
   { href: '/manufacturers', label: '제조사', icon: Building2, badge: null },
