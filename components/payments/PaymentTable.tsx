@@ -4,36 +4,29 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, Check, AlertTriangle } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react'
 import { PaymentDialog, type PaymentDraft } from './PaymentDialog'
-import { PAID_TOLERANCE_KRW, type PaymentRow, type PaymentState } from '@/lib/data/payments'
+import { PAID_TOLERANCE_KRW, roundName, type Installment, type PaymentRow } from '@/lib/data/payments'
 
 /**
- * 차수별 지급 대사표.
+ * 차수별 지급 현황.
  *
- * 이 화면이 답하는 것은 하나다 — 「그 차수에 나간 돈을 다 합치면 청구액이 되는가」.
- * 그래서 지급 회차를 접지 않고 세로로 세운 뒤, 바로 밑에 합계와 청구액을 나란히
- * 놓고 차액을 적는다. 막대그래프는 축을 먼저 읽어야 해서 이 대사에는 느리다.
+ * 읽는 사람이 둘이다 — 양사 대표(한눈에 「얼마 남았나」)와 담당자(빨리 입력).
+ * 그래서 기본은 차수당 한 줄이고, 줄을 누르면 그 차수의 지급 내역과 입력 버튼이 열린다.
+ * 입력 모드를 따로 두지 않는다. 모드를 나누면 담당자가 매번 화면을 갈아타야 한다.
  *
- * 정렬은 차수 내림차순 하나뿐이다(43차 위, 1차 아래). 상태순으로 섞으면
- * 「43차 다음이 19차」가 되어 차수를 눈으로 좇을 수 없다 — 손댈 것은 필터가 잡는다.
+ * 색은 빨강 하나만 쓴다. 손댈 곳이 빨강이고 나머지는 전부 회색조다.
+ * 상태마다 색을 주면 44줄이 전부 물들어 정작 연체가 묻힌다.
+ * 「검산차」·「배분 확인 대기」 같은 내부 용어는 표에 올리지 않고 펼친 상세에만 둔다.
  *
- * 글자는 크기 하나(text-sm)·서체 하나(본문 sans)로만 쓴다. 위계는 굵기와 색으로 낸다.
- * 크기·서체를 섞으면 표가 여러 벌처럼 보인다. 금액 자릿수는 등폭 서체(font-mono)가 아니라
- * `tabular-nums`(고정폭 숫자)로 맞춘다 — 서체를 갈지 않고도 세로줄이 선다.
+ * 글자는 크기 하나(text-sm)·서체 하나(본문 sans)다. 위계는 굵기와 색으로 낸다.
+ * 금액 자릿수는 등폭 서체가 아니라 tabular-nums 로 맞춘다.
  */
 
-const TONE: Record<PaymentState, { bar: string; chip: string; label: string }> = {
-  no_record: { bar: 'bg-red-500', chip: 'bg-red-100 text-red-800', label: '지급 기록 없음' },
-  overdue: { bar: 'bg-red-500', chip: 'bg-red-100 text-red-800', label: '연체' },
-  overpaid: { bar: 'bg-sky-500', chip: 'bg-sky-100 text-sky-800', label: '초과 지급' },
-  due_soon: { bar: 'bg-amber-500', chip: 'bg-amber-100 text-amber-800', label: '기일 임박' },
-  upcoming: { bar: 'bg-slate-300', chip: 'bg-slate-100 text-slate-700', label: '예정' },
-  paid: { bar: 'bg-emerald-500', chip: 'bg-emerald-100 text-emerald-800', label: '완납' },
-  unbilled: { bar: 'bg-slate-200', chip: 'bg-slate-100 text-slate-500', label: '청구 전' },
-}
+/** 표의 열 수 — 펼친 상세가 가로로 다 차지하려면 이 값을 쓴다. */
+const COLS = 8
 
-type FilterKey = 'all' | 'attention' | 'open' | 'paid' | 'unbilled'
+type FilterKey = 'all' | 'attention' | 'open' | 'paid' | 'unbilled' | 'closing'
 
 const FILTERS: { key: FilterKey; label: string; test: (r: PaymentRow) => boolean }[] = [
   { key: 'all', label: '전체', test: () => true },
@@ -42,15 +35,25 @@ const FILTERS: { key: FilterKey; label: string; test: (r: PaymentRow) => boolean
     label: '확인 필요',
     test: (r) =>
       r.state === 'no_record' || r.state === 'overdue' || r.state === 'overpaid' ||
-      r.needsConfirm || (r.billedKrw == null && r.paidKrw !== 0),
+      (r.billedKrw == null && r.paidKrw !== 0),
   },
-  { key: 'open', label: '미완납', test: (r) => r.billedKrw != null && r.state !== 'paid' },
+  { key: 'open', label: '미납', test: (r) => r.billedKrw != null && r.state !== 'paid' },
   { key: 'paid', label: '완납', test: (r) => r.state === 'paid' },
   { key: 'unbilled', label: '청구 전', test: (r) => r.billedKrw == null },
+  { key: 'closing', label: '최종정산 남음', test: (r) => hasOpenClosing(r) },
 ]
+
+/** 최종정산에 아직 오갈 돈이 남았는가. */
+function hasOpenClosing(r: PaymentRow): boolean {
+  return r.closingBilledKrw != null && Math.abs(r.closingBalanceKrw) >= PAID_TOLERANCE_KRW
+}
 
 function krw(n: number | null | undefined): string {
   return n == null ? '—' : Math.round(n).toLocaleString('ko-KR')
+}
+
+function usd(n: number | null): string {
+  return n == null ? '—' : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function dayGap(from: string | null, to: string): number | null {
@@ -58,59 +61,56 @@ function dayGap(from: string | null, to: string): number | null {
   return Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000)
 }
 
-/** 기일 대비 며칠인지. 완납이면 마지막 지급 기준, 미납이면 오늘 기준. */
-function delayText(row: PaymentRow): string {
-  if (row.state === 'paid' || row.state === 'overpaid') {
-    const last = row.installments.at(-1)
-    const gap = last ? dayGap(row.dueDate, last.paidAt) : null
-    if (gap == null) return ''
-    return gap === 0 ? '기일 당일' : gap > 0 ? `${gap.toLocaleString('ko-KR')}일 늦게` : `${-gap}일 먼저`
+/** 대표가 읽는 한 마디. 내부 용어를 쓰지 않는다. */
+function statusText(r: PaymentRow): string {
+  const d = r.delayDays
+  switch (r.state) {
+    case 'paid': return '완납'
+    case 'overpaid': return '초과 지급'
+    case 'no_record':
+    case 'overdue': return d != null ? `연체 ${d.toLocaleString('ko-KR')}일` : '연체'
+    case 'due_soon':
+    case 'upcoming': return d != null ? `기일 ${-d}일 남음` : '지급 예정'
+    case 'unbilled': return r.paidKrw !== 0 ? '청구액 미등록' : '청구 전'
   }
-  if (row.delayDays == null) return ''
-  return row.delayDays > 0
-    ? `${row.delayDays.toLocaleString('ko-KR')}일 경과`
-    : `D${row.delayDays}`
 }
 
 /**
- * 나간 돈의 합이 청구액과 맞는가 — 이 화면의 결론.
- *
- * 기일 전 차수의 미지급을 「부족」이라 빨갛게 쓰지 않는다. 아직 낼 때가 아닌 것을
- * 연체와 같은 색으로 칠하면 정작 진짜 연체가 묻힌다.
+ * 손대야 할 줄에만 붙는 한 문장. 붙지 않았으면 문제가 없다는 뜻이다.
+ * 화면에서 빨강은 이 문장과 그 줄의 잔액, 두 곳뿐이다.
  */
-function reconcile(row: PaymentRow) {
-  const { billedKrw: billed, paidKrw: paid, state } = row
-  if (billed == null) {
-    return paid === 0
-      ? null
-      : { kind: 'nobase' as const, diff: 0, text: '청구액이 등재되지 않아 대사할 기준이 없습니다' }
+function issueText(r: PaymentRow): string | null {
+  if (r.billedKrw == null) {
+    return r.paidKrw !== 0
+      ? `지급 ${krw(r.paidKrw)}원이 나갔으나 청구액이 등록되지 않아 대조할 기준이 없습니다`
+      : null
   }
-  const diff = billed - paid
-  if (Math.abs(diff) < PAID_TOLERANCE_KRW) {
-    return { kind: 'match' as const, diff, text: diff === 0 ? '청구액과 일치' : `청구액과 일치 (절사 ${krw(Math.abs(diff))}원)` }
+  if (r.state === 'no_record') return '지급 기록이 없습니다'
+  if (r.state === 'overdue') {
+    const last = r.installments.at(-1)
+    return `${krw(r.balanceKrw)}원이 덜 나갔습니다`
+      + (last ? ` (마지막 지급 ${last.paidAt})` : '')
   }
-  if (diff < 0) return { kind: 'over' as const, diff, text: `${krw(-diff)}원 초과` }
-  const pending = state === 'upcoming' || state === 'due_soon'
-  return pending
-    ? { kind: 'pending' as const, diff, text: `${krw(diff)}원 미지급 — 기일 전` }
-    : { kind: 'short' as const, diff, text: `${krw(diff)}원 부족` }
+  if (r.state === 'overpaid') {
+    return `청구액보다 ${krw(-r.balanceKrw)}원 더 나갔습니다 — 상계 여부 확인이 필요합니다`
+  }
+  return null
 }
 
-const RECON_STYLE = {
-  match: 'text-emerald-700',
-  short: 'text-red-700',
-  over: 'text-sky-800',
-  nobase: 'text-amber-700',
-  pending: 'text-muted-foreground',
-} as const
+const TH = 'px-3 py-2.5 font-semibold whitespace-nowrap text-slate-600'
+const TD = 'px-3 py-2.5 whitespace-nowrap align-middle'
 
-const TH = 'px-3 py-2 font-semibold whitespace-nowrap'
-const TD = 'px-3 py-1.5 whitespace-nowrap'
-
-export function PaymentTable({ rows, editable }: { rows: PaymentRow[]; editable: boolean }) {
+export function PaymentTable({
+  rows,
+  view,
+}: {
+  rows: PaymentRow[]
+  /** 같은 금액을 토에이는 미지급으로, 에이원은 미수로 읽는다 */
+  view: 'toei' | 'a1'
+}) {
   const router = useRouter()
   const [filter, setFilter] = useState<FilterKey>('all')
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [open, setOpen] = useState<Set<string>>(new Set())
   const [draft, setDraft] = useState<PaymentDraft | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -118,12 +118,18 @@ export function PaymentTable({ rows, editable }: { rows: PaymentRow[]; editable:
     () => Object.fromEntries(FILTERS.map((f) => [f.key, rows.filter(f.test).length])) as Record<FilterKey, number>,
     [rows],
   )
-  const visible = useMemo(
-    () => rows.filter(FILTERS.find((f) => f.key === filter)!.test),
-    [rows, filter],
-  )
+  const visible = useMemo(() => rows.filter(FILTERS.find((f) => f.key === filter)!.test), [rows, filter])
 
-  const cols = editable ? 9 : 8
+  const balanceLabel = view === 'toei' ? '미지급' : '미수'
+
+  function toggle(id: string) {
+    setOpen((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   async function remove(paymentId: string, label: string) {
     if (!confirm(`${label} 지급 기록을 삭제합니다. 되돌릴 수 없습니다.`)) return
@@ -138,8 +144,6 @@ export function PaymentTable({ rows, editable }: { rows: PaymentRow[]; editable:
     router.refresh()
   }
 
-  const allCollapsed = visible.every((r) => collapsed.has(r.transactionId))
-
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -151,287 +155,119 @@ export function PaymentTable({ rows, editable }: { rows: PaymentRow[]; editable:
               onClick={() => setFilter(f.key)}
               className={cn(
                 'border-l px-3 py-1.5 first:border-l-0',
-                filter === f.key ? 'bg-emerald-700 font-semibold text-white' : 'hover:bg-muted',
+                filter === f.key ? 'bg-slate-800 font-semibold text-white' : 'hover:bg-muted',
               )}
             >
               {f.label}
-              <span className={cn('ml-1.5 tabular-nums', filter === f.key ? 'text-emerald-100' : 'text-muted-foreground')}>
+              <span className={cn('ml-1.5 tabular-nums', filter === f.key ? 'text-slate-300' : 'text-muted-foreground')}>
                 {counts[f.key]}
               </span>
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() =>
-            setCollapsed(allCollapsed ? new Set() : new Set(visible.map((r) => r.transactionId)))
-          }
-          className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
-        >
-          {allCollapsed ? '지급 내역 모두 펼치기' : '지급 내역 모두 접기'}
-        </button>
+        <p className="text-sm text-muted-foreground">
+          금액은 중간정산 기준입니다 · 차수를 누르면 지급 내역이 열리고, 거기서 바로 입력·수정합니다.
+        </p>
       </div>
 
-      {/* 헤더 고정(sticky)은 걸지 않는다 — 레이아웃의 main 이 overflow 컨테이너라
-          뷰포트에 붙지 않는다. 대신 차수를 왼쪽 색막대와 큰 글씨로 세워 두었다. */}
       <div className="mt-2 overflow-x-auto rounded-md border">
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b border-slate-300 bg-slate-100 text-slate-600">
-              <th className={cn(TH, 'text-left w-20')}>차수</th>
-              <th className={cn(TH, 'text-left w-24')}>구분</th>
-              <th className={cn(TH, 'text-left w-32')}>지급일</th>
-              <th className={cn(TH, 'text-right w-40')}>청구금액</th>
-              <th className={cn(TH, 'text-right w-40')}>지급액</th>
-              <th className={cn(TH, 'text-right w-36')}>잔액</th>
+            <tr className="border-b bg-slate-50">
+              <th className={cn(TH, 'text-left w-24')}>차수</th>
+              <th className={cn(TH, 'text-right w-32')}>수입금액 (USD)</th>
+              <th className={cn(TH, 'text-right w-40')}>청구금액 (원)</th>
+              <th className={cn(TH, 'text-right w-40')}>지급액 (원)</th>
+              <th className={cn(TH, 'text-right w-36')}>{balanceLabel} (원)</th>
               <th className={cn(TH, 'text-left w-28')}>기일</th>
               <th className={cn(TH, 'text-left w-full')}>상태</th>
-              {editable && <th className={cn(TH, 'text-right w-24')} />}
+              <th className={cn(TH, 'w-12')} />
             </tr>
           </thead>
 
-          {visible.map((r, gi) => {
-            const tone = TONE[r.state]
-            const split = r.installments.length > 1
-            const isOpen = split && !collapsed.has(r.transactionId)
-            const instSum = r.installments.reduce((s, i) => s + i.amountKrw, 0)
-            const recon = reconcile(r)
-            // 원장 합계와 뷰의 지급 합계가 어긋나면 대사 자체를 믿을 수 없다.
-            const ledgerMismatch = Math.abs(instSum - r.paidKrw) >= 1
-            const zebra = gi % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'
-            // 돈은 나갔는데 청구액이 없는 차수 — 「청구 전」으로 보이면 안 된다
-            const noBase = recon?.kind === 'nobase'
+          {visible.map((r, i) => {
+            const isOpen = open.has(r.transactionId)
+            const issue = issueText(r)
+            const zebra = i % 2 === 1 ? 'bg-slate-50/60' : ''
 
             return (
-              <tbody key={r.transactionId} className="border-t-[3px] border-slate-300">
-                {/* ── 차수 머리줄 ── */}
-                <tr className={cn(zebra, 'align-middle')}>
-                  <td className={cn(TD, 'relative py-2.5 pl-4')}>
-                    <span className={cn('absolute inset-y-0 left-0 w-1.5', tone.bar)} />
-                    <Link
-                      href={`/transactions/${r.transactionId}`}
-                      className="font-bold tabular-nums hover:underline"
-                    >
-                      {r.roundNo != null ? `${r.roundNo}차` : r.roundLabel}
-                    </Link>
+              <tbody key={r.transactionId} className="border-t">
+                <tr
+                  className={cn('group cursor-pointer hover:bg-slate-100/70', zebra)}
+                  onClick={() => toggle(r.transactionId)}
+                >
+                  <td className={cn(TD, 'font-semibold')}>
+                    <span className="inline-flex items-center gap-1">
+                      {isOpen
+                        ? <ChevronDown className="h-4 w-4 text-slate-400" />
+                        : <ChevronRight className="h-4 w-4 text-slate-400" />}
+                      {roundName(r)}
+                    </span>
                   </td>
-                  <td className={cn(TD, 'text-muted-foreground')}>중간정산</td>
-                  <td className={TD}>
-                    {r.installments.length === 0 ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : split ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCollapsed((prev) => {
-                            const next = new Set(prev)
-                            if (next.has(r.transactionId)) next.delete(r.transactionId)
-                            else next.add(r.transactionId)
-                            return next
-                          })
-                        }
-                        className="inline-flex items-center gap-0.5 hover:underline"
-                      >
-                        {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                        {r.installments.length}회 분할
-                      </button>
-                    ) : (
-                      r.installments[0].paidAt
+                  <td className={cn(TD, 'text-right tabular-nums text-slate-600')}>{usd(r.importAmountUsd)}</td>
+                  <td className={cn(TD, 'text-right tabular-nums')}>
+                    {r.billedKrw != null ? krw(r.billedKrw) : (
+                      <span className="text-muted-foreground">
+                        {r.plannedKrw == null ? '—' : `(${krw(r.plannedKrw)})`}
+                      </span>
                     )}
                   </td>
                   <td className={cn(TD, 'text-right tabular-nums')}>
-                    {r.billedKrw != null ? (
-                      krw(r.billedKrw)
-                    ) : (
-                      <span
-                        className="text-muted-foreground"
-                        title={r.plannedKrw == null
-                          ? '중간정산이 아직 계산되지 않았습니다'
-                          : '아직 청구 전 — 시스템 확정값(예상)입니다'}
-                      >
-                        {r.plannedKrw == null ? '미산출' : `(${krw(r.plannedKrw)})`}
-                      </span>
-                    )}
-                    {r.calcDiffKrw != null && Math.abs(r.calcDiffKrw) >= PAID_TOLERANCE_KRW && (
-                      <span
-                        className="ml-1 cursor-help text-amber-700"
-                        title={`시스템 확정값 ${krw(r.confirmedKrw)}원과 ${krw(Math.abs(r.calcDiffKrw))}원 차이 — 미지급이 아니라 검산 차이입니다`}
-                      >
-                        검산차
-                      </span>
-                    )}
+                    {r.installments.length === 0
+                      ? <span className="text-muted-foreground">—</span>
+                      : krw(r.paidKrw)}
                   </td>
-                  <td className={cn(TD, 'text-right font-semibold tabular-nums')}>
-                    {r.installments.length === 0 ? <span className="text-muted-foreground">—</span> : krw(r.paidKrw)}
-                  </td>
-                  <td
-                    className={cn(
-                      TD, 'text-right font-semibold tabular-nums',
-                      recon?.kind === 'short' && 'text-red-700',
-                      recon?.kind === 'over' && 'text-sky-800',
-                      (recon?.kind === 'match' || recon?.kind === 'pending') && 'text-muted-foreground',
-                    )}
-                  >
-                    {r.billedKrw == null ? <span className="text-muted-foreground">—</span>
-                      : recon?.kind === 'over' ? `+${krw(-recon.diff)}`
-                      : recon?.kind === 'match' ? '0'
+                  <td className={cn(TD, 'text-right font-semibold tabular-nums',
+                    // 빨강은 「덜 나간 돈」에만. 초과 지급은 확인 대상이지 연체가 아니다.
+                    r.state === 'no_record' || r.state === 'overdue' ? 'text-red-700' : 'text-slate-600')}>
+                    {r.billedKrw == null ? '—'
+                      : Math.abs(r.balanceKrw) < PAID_TOLERANCE_KRW ? '0'
+                      : r.balanceKrw < 0 ? `+${krw(-r.balanceKrw)}`
                       : krw(r.balanceKrw)}
                   </td>
+                  <td className={cn(TD, 'tabular-nums text-slate-600')}>{r.dueDate ?? '미정'}</td>
                   <td className={TD}>
-                    {r.dueDate ?? '미정'}
-                    {!r.dueIsExplicit && r.dueDate && (
-                      <span className="text-muted-foreground" title="LC 개설일 + 165일 계산값"> *</span>
+                    {statusText(r)}
+                    {r.installments.length > 1 && (
+                      <span className="text-muted-foreground"> · {r.installments.length}회 분할</span>
                     )}
                   </td>
-                  <td className={TD}>
-                    <span
-                      className={cn('rounded-sm px-1.5 py-0.5 font-semibold',
-                        noBase ? 'bg-amber-100 text-amber-800' : tone.chip)}
+                  <td className={cn(TD, 'text-right')}>
+                    <button
+                      type="button"
+                      aria-label={`${roundName(r)} 지급 입력`}
+                      title="지급 입력"
+                      onClick={(e) => { e.stopPropagation(); setDraft({ mode: 'create', row: r }) }}
+                      className="rounded-sm border bg-white p-1 text-slate-500 opacity-0 transition-opacity hover:bg-slate-100 focus:opacity-100 group-hover:opacity-100"
                     >
-                      {noBase ? '청구액 없음' : tone.label}
-                    </span>
-                    {delayText(r) && <span className="ml-2 text-muted-foreground">{delayText(r)}</span>}
-                    {r.needsConfirm && (
-                      <span className="ml-2 rounded-sm bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
-                        배분 확인 대기
-                      </span>
-                    )}
-                    {r.stalled && (
-                      <span className="ml-2 rounded-sm bg-red-100 px-1.5 py-0.5 font-semibold text-red-800">
-                        30일 이상 정체
-                      </span>
-                    )}
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
                   </td>
-                  {editable && (
-                    <td className={cn(TD, 'text-right')}>
-                      <button
-                        type="button"
-                        onClick={() => setDraft({ mode: 'create', row: r })}
-                        className="inline-flex items-center gap-1 rounded-sm border bg-white px-2 py-0.5 hover:bg-muted"
-                      >
-                        <Plus className="h-3 w-3" /> 지급
-                      </button>
-                    </td>
-                  )}
                 </tr>
 
-                {/* ── 분할 지급 회차 ── */}
-                {isOpen && r.installments.map((inst, i) => {
-                  const gap = dayGap(r.dueDate, inst.paidAt)
-                  return (
-                    <tr key={inst.paymentId || `${r.transactionId}-${i}`} className={zebra}>
-                      <td className={cn(TD, 'relative pl-4')}>
-                        <span className={cn('absolute inset-y-0 left-0 w-1.5', tone.bar)} />
-                      </td>
-                      <td className={cn(TD, 'pl-6 text-muted-foreground')}>{i + 1}회</td>
-                      <td className={cn(TD, 'text-muted-foreground')}>{inst.paidAt}</td>
-                      <td className={TD} />
-                      <td className={cn(TD, 'text-right tabular-nums')}>
-                        {inst.direction === 'in' && <span className="text-emerald-700">환급 </span>}
-                        {krw(Math.abs(inst.amountKrw))}
-                      </td>
-                      <td className={TD} />
-                      <td className={cn(TD, 'text-muted-foreground')}>
-                        {gap == null ? '' : gap === 0 ? '당일' : gap > 0 ? `+${gap}일` : `${gap}일`}
-                      </td>
-                      <td className={TD}>
-                        {!inst.confirmed && (
-                          <span className="rounded-sm bg-amber-100 px-1 font-semibold text-amber-800">
-                            배분 확인 대기
-                          </span>
-                        )}
-                      </td>
-                      {editable && (
-                        <td className={cn(TD, 'text-right')}>
-                          {inst.paymentId && (
-                            <span className="inline-flex gap-1">
-                              <button
-                                type="button"
-                                onClick={() => setDraft({ mode: 'edit', row: r, installment: inst })}
-                                className="rounded-sm border bg-white px-1.5 py-0.5 hover:bg-muted"
-                                aria-label="수정"
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </button>
-                              <button
-                                type="button"
-                                disabled={busy === inst.paymentId}
-                                onClick={() => remove(inst.paymentId, `${r.roundNo}차 ${i + 1}회`)}
-                                className="rounded-sm border bg-white px-1.5 py-0.5 text-red-700 hover:bg-red-50 disabled:opacity-40"
-                                aria-label="삭제"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </button>
-                            </span>
-                          )}
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-
-                {/* ── 대사: 나간 돈의 합 = 청구액인가 ── */}
-                {recon && (
-                  <tr className={zebra}>
-                    <td className={cn(TD, 'relative pl-4')}>
-                      <span className={cn('absolute inset-y-0 left-0 w-1.5', tone.bar)} />
-                    </td>
-                    <td colSpan={cols - 1} className="px-3 pb-2.5">
-                      <span className={cn('inline-flex items-center gap-1.5 font-medium', RECON_STYLE[recon.kind])}>
-                        {recon.kind === 'match' ? <Check className="h-3.5 w-3.5" />
-                          : recon.kind === 'pending' ? <span className="w-3.5" />
-                          : <AlertTriangle className="h-3.5 w-3.5" />}
-                        {r.installments.length > 0 && (
-                          <span className="tabular-nums">
-                            {r.installments.length}회 합계 {krw(r.paidKrw)}원
-                          </span>
-                        )}
-                        {r.installments.length === 0 && <span>지급 기록 없음</span>}
-                        {r.billedKrw != null && (
-                          <span className="text-muted-foreground">
-                            / 청구 <span className="tabular-nums">{krw(r.billedKrw)}</span>원
-                          </span>
-                        )}
-                        <span>· {recon.text}</span>
-                      </span>
-                      {ledgerMismatch && (
-                        <span className="ml-2 text-red-700">
-                          회차 합계({krw(instSum)})가 집계값과 어긋납니다 — 원장을 확인하세요
-                        </span>
-                      )}
+                {issue && (
+                  <tr className={cn('cursor-pointer', zebra)} onClick={() => toggle(r.transactionId)}>
+                    <td />
+                    <td
+                      colSpan={COLS - 1}
+                      className={cn('px-3 pb-2.5',
+                        r.state === 'overpaid' ? 'text-muted-foreground' : 'text-red-700')}
+                    >
+                      {issue}
                     </td>
                   </tr>
                 )}
 
-                {/* ── 최종정산은 별개의 청구·지급이다 ── */}
-                {r.closingBilledKrw != null && (
-                  <tr className={zebra}>
-                    <td className={cn(TD, 'relative pl-4')}>
-                      <span className={cn('absolute inset-y-0 left-0 w-1.5', tone.bar)} />
-                    </td>
-                    <td className={cn(TD, 'text-muted-foreground')}>최종정산</td>
-                    <td className={cn(TD, 'text-muted-foreground')}>
-                      {r.closingInstallments.at(-1)?.paidAt ?? '—'}
-                    </td>
-                    <td className={cn(TD, 'text-right tabular-nums')}>{krw(r.closingBilledKrw)}</td>
-                    <td className={cn(TD, 'text-right tabular-nums')}>
-                      {r.closingInstallments.length === 0 ? '—' : krw(r.closingPaidKrw)}
-                    </td>
-                    <td
-                      className={cn(TD, 'text-right tabular-nums',
-                        Math.abs(r.closingBalanceKrw) >= PAID_TOLERANCE_KRW
-                          ? 'font-semibold text-amber-700'
-                          : 'text-muted-foreground')}
-                    >
-                      {Math.abs(r.closingBalanceKrw) < PAID_TOLERANCE_KRW ? '0' : krw(r.closingBalanceKrw)}
-                    </td>
-                    <td colSpan={cols - 6} className={cn(TD, 'text-muted-foreground')}>
-                      {Math.abs(r.closingBalanceKrw) < PAID_TOLERANCE_KRW
-                        ? '정산 완료'
-                        : r.closingInstallments.length === 0
-                          ? '지급 기록 없음'
-                          : `${r.closingInstallments.length}회 지급`}
-                      {r.closingBilledKrw < 0 && ' · 에이원 환급분'}
+                {isOpen && (
+                  <tr>
+                    <td colSpan={COLS} className="border-l-4 border-slate-300 bg-slate-100/70 px-6 py-3">
+                      <RoundDetail
+                        row={r}
+                        onAdd={() => setDraft({ mode: 'create', row: r })}
+                        onEdit={(inst) => setDraft({ mode: 'edit', row: r, installment: inst })}
+                        onDelete={remove}
+                        busy={busy}
+                      />
                     </td>
                   </tr>
                 )}
@@ -442,9 +278,9 @@ export function PaymentTable({ rows, editable }: { rows: PaymentRow[]; editable:
       </div>
 
       <p className="mt-2 text-sm text-muted-foreground">
-        차수 {rows.length}개 전부를 최근 차수부터 보여줍니다 (맨 아래가 1차).
-        기일 옆 <span className="font-semibold">*</span> 는 LC 개설일 + 165일 계산값입니다 (원본 「입금일」이 없는 차수).
-        {PAID_TOLERANCE_KRW.toLocaleString('ko-KR')}원 미만 차이는 절사로 보아 일치로 판정합니다.
+        차수 {rows.length}개를 최근 차수부터 보여줍니다 (맨 아래가 1차).
+        괄호 친 청구금액은 아직 청구 전인 예상액입니다.
+        1,000원 미만 차이는 절사로 보아 완납으로 봅니다.
       </p>
 
       {draft && (
@@ -455,5 +291,150 @@ export function PaymentTable({ rows, editable }: { rows: PaymentRow[]; editable:
         />
       )}
     </>
+  )
+}
+
+/**
+ * 펼친 한 차수의 속.
+ * 대표에게는 「나눠 낸 돈이 청구액과 맞는가」의 근거이고, 담당자에게는 입력·수정·삭제 자리다.
+ */
+function RoundDetail({
+  row,
+  onAdd,
+  onEdit,
+  onDelete,
+  busy,
+}: {
+  row: PaymentRow
+  onAdd: () => void
+  onEdit: (inst: Installment) => void
+  onDelete: (paymentId: string, label: string) => void
+  busy: string | null
+}) {
+  const sum = row.installments.reduce((s, i) => s + i.amountKrw, 0)
+  const matched = row.billedKrw != null && Math.abs(row.billedKrw - row.paidKrw) < PAID_TOLERANCE_KRW
+  const ledgerMismatch = Math.abs(sum - row.paidKrw) >= 1
+  const unconfirmed = row.installments.filter((i) => !i.confirmed).length
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-semibold">{roundName(row)} 중간정산 지급 내역</span>
+        <button
+          type="button"
+          onClick={onAdd}
+          className="inline-flex items-center gap-1 rounded-md border bg-white px-2.5 py-1 hover:bg-slate-100"
+        >
+          <Plus className="h-3.5 w-3.5" /> 지급 입력
+        </button>
+      </div>
+
+      {row.installments.length === 0 ? (
+        <p className="text-muted-foreground">아직 지급 기록이 없습니다.</p>
+      ) : (
+        <table className="w-full max-w-2xl border-collapse">
+          <tbody>
+            {row.installments.map((inst, i) => {
+              const gap = dayGap(row.dueDate, inst.paidAt)
+              return (
+                <tr key={inst.paymentId || i} className="border-b border-slate-200 last:border-0">
+                  <td className="w-12 py-1.5 pr-3 text-muted-foreground">{i + 1}회</td>
+                  <td className="w-28 py-1.5 pr-3 tabular-nums">{inst.paidAt}</td>
+                  <td className="w-40 py-1.5 pr-3 text-right tabular-nums">
+                    {inst.direction === 'in' && <span className="text-muted-foreground">환급 </span>}
+                    {krw(Math.abs(inst.amountKrw))}
+                  </td>
+                  <td className="w-28 py-1.5 pr-3 text-muted-foreground">
+                    {gap == null ? '' : gap === 0 ? '기일 당일' : gap > 0 ? `기일 +${gap}일` : `기일 ${gap}일`}
+                  </td>
+                  <td className="py-1.5 text-right">
+                    {inst.paymentId && (
+                      <span className="inline-flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => onEdit(inst)}
+                          className="rounded-sm border bg-white p-1 text-slate-500 hover:bg-slate-100"
+                          aria-label="수정"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy === inst.paymentId}
+                          onClick={() => onDelete(inst.paymentId, `${roundName(row)} ${i + 1}회`)}
+                          className="rounded-sm border bg-white p-1 text-red-700 hover:bg-red-50 disabled:opacity-40"
+                          aria-label="삭제"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      )}
+
+      {unconfirmed > 0 && (
+        <p className="text-muted-foreground">
+          이 중 {unconfirmed}건은 여러 차수를 한 번에 묶어 낸 이체입니다. 차수별로 얼마씩인지{' '}
+          <Link href="/payments/ledger" className="underline underline-offset-2">통장 원장</Link>에서
+          확인해 주세요.
+        </p>
+      )}
+
+      {row.billedKrw != null && row.installments.length > 0 && (
+        <p className={matched ? 'text-slate-700' : 'text-red-700'}>
+          {row.installments.length}회 합계 <b className="tabular-nums">{krw(row.paidKrw)}</b>원
+          {' · 청구액 '}<b className="tabular-nums">{krw(row.billedKrw)}</b>원
+          {matched
+            ? (row.billedKrw === row.paidKrw
+                ? ' — 일치합니다'
+                : ` — 일치합니다 (절사 ${krw(Math.abs(row.billedKrw - row.paidKrw))}원)`)
+            : (row.balanceKrw > 0
+                ? ` — ${krw(row.balanceKrw)}원 모자랍니다`
+                : ` — ${krw(-row.balanceKrw)}원 더 나갔습니다`)}
+        </p>
+      )}
+
+      {ledgerMismatch && (
+        <p className="text-red-700">
+          회차를 더한 값({krw(sum)}원)이 집계와 어긋납니다 — 통장 원장을 확인하세요.
+        </p>
+      )}
+
+      {row.closingBilledKrw != null && (
+        <p className="text-slate-700">
+          <span className="font-semibold">최종정산</span>
+          {' · 청구 '}<b className="tabular-nums">{krw(Math.abs(row.closingBilledKrw))}</b>원
+          {row.closingBilledKrw < 0 ? ' (에이원이 토에이에 돌려줄 몫)' : ''}
+          {' · 지급 '}
+          <b className="tabular-nums">
+            {row.closingInstallments.length === 0 ? '없음' : `${krw(Math.abs(row.closingPaidKrw))}원`}
+          </b>
+          {' — '}
+          {Math.abs(row.closingBalanceKrw) < PAID_TOLERANCE_KRW
+            ? '정산이 끝났습니다'
+            : `${krw(Math.abs(row.closingBalanceKrw))}원이 `
+              + (row.closingBalanceKrw > 0 ? '아직 토에이에서 나가지 않았습니다' : '아직 에이원에서 돌아오지 않았습니다')}
+        </p>
+      )}
+
+      {row.calcDiffKrw != null && Math.abs(row.calcDiffKrw) >= PAID_TOLERANCE_KRW && (
+        <p className="text-muted-foreground">
+          실제 청구액과 시스템 계산값({krw(row.confirmedKrw)}원)이 {krw(Math.abs(row.calcDiffKrw))}원 다릅니다.
+          미지급이 아니라 계산 차이이며{' '}
+          <Link href="/verification" className="underline underline-offset-2">검증 리포트</Link>에서 다룹니다.
+        </p>
+      )}
+
+      <p>
+        <Link href={`/transactions/${row.transactionId}`} className="underline underline-offset-2">
+          {roundName(row)} 거래 상세 보기
+        </Link>
+      </p>
+    </div>
   )
 }

@@ -47,6 +47,8 @@ export interface PaymentRow {
   transactionId: string
   roundNo: number | null
   roundLabel: string
+  /** 수입금액(USD) — 원본 엑셀의 차수별 수입금액과 같은 값 */
+  importAmountUsd: number | null
   /** 실제로 청구한 금액(invoiced_amount_krw). 아직 청구 전이면 null */
   billedKrw: number | null
   /** 시스템 확정값. billedKrw 와 다르면 검산 차이가 있다는 뜻 */
@@ -117,7 +119,7 @@ export interface PaymentSummary {
   next90Krw: number
   next90Count: number
   nextDue: PaymentRow | null
-  lastPayment: { roundLabel: string; paidAt: string; amountKrw: number } | null
+  lastPayment: { roundNo: number | null; roundLabel: string; paidAt: string; amountKrw: number } | null
   /** 아직 청구하지 않은 차수의 예상 청구액 합계 */
   plannedKrw: number
   plannedCount: number
@@ -143,6 +145,16 @@ type StatusRow = {
   }[]
 }
 
+/**
+ * 화면에 쓰는 차수 이름.
+ *
+ * `round_label` 을 그대로 쓰지 않는다 — 1차가 「26년 01차」인 등 연도가 어긋난 행이 있다.
+ * 차수 번호는 `round_no` 하나만 믿는다.
+ */
+export function roundName(r: { roundNo: number | null; roundLabel: string }): string {
+  return r.roundNo != null ? `${r.roundNo}차` : r.roundLabel
+}
+
 function daysBetween(from: string, to: string): number {
   const a = Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10))
   const b = Date.UTC(+to.slice(0, 4), +to.slice(5, 7) - 1, +to.slice(8, 10))
@@ -164,7 +176,7 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
   ] = await Promise.all([
     supabase
       .from('transactions')
-      .select('id, round_no, round_label, lc_open_date, payment_due_date')
+      .select('id, round_no, round_label, import_amount_usd, lc_open_date, payment_due_date')
       .order('round_no', { ascending: false }),
     supabase
       .from('interim_settlements')
@@ -206,6 +218,7 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
 
   const rows: PaymentRow[] = ((txRows ?? []) as {
     id: string; round_no: number | null; round_label: string
+    import_amount_usd: number | string | null
     lc_open_date: string | null; payment_due_date: string | null
   }[]).map((t) => {
     const s = status.get(t.id)
@@ -264,6 +277,7 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
       transactionId: t.id,
       roundNo: t.round_no,
       roundLabel: t.round_label,
+      importAmountUsd: t.import_amount_usd == null ? null : Number(t.import_amount_usd),
       billedKrw,
       confirmedKrw,
       calcDiffKrw: billedKrw != null && confirmedKrw != null ? billedKrw - confirmedKrw : null,
@@ -305,7 +319,7 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
   for (const r of rows) {
     for (const i of r.installments) {
       if (!lastPayment || i.paidAt > lastPayment.paidAt) {
-        lastPayment = { roundLabel: r.roundLabel, paidAt: i.paidAt, amountKrw: i.amountKrw }
+        lastPayment = { roundNo: r.roundNo, roundLabel: r.roundLabel, paidAt: i.paidAt, amountKrw: i.amountKrw }
       }
     }
   }

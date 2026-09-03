@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog'
-import type { PaymentRow, Installment } from '@/lib/data/payments'
+import { roundName, type PaymentRow, type Installment } from '@/lib/data/payments'
 
 export type PaymentDraft =
   | { mode: 'create'; row: PaymentRow }
@@ -86,10 +86,10 @@ export function PaymentDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {row.roundLabel} 지급 {editing ? '수정' : '입력'}
+            {roundName(row)} 지급 {editing ? '수정' : '입력'}
           </DialogTitle>
           <DialogDescription>
-            청구 {row.billedKrw == null ? '—' : row.billedKrw.toLocaleString('ko-KR')}원
+            청구 {row.billedKrw == null ? '미등록' : `${row.billedKrw.toLocaleString('ko-KR')}원`}
             {' · '}
             {editing ? '이 회차만 고칩니다' : `현재 잔액 ${row.balanceKrw.toLocaleString('ko-KR')}원`}
           </DialogDescription>
@@ -108,7 +108,7 @@ export function PaymentDialog({
               value={amount}
               onValueChange={setAmount}
               placeholder="0"
-              className="text-right font-mono"
+              className="text-right tabular-nums"
             />
           </div>
 
@@ -157,7 +157,7 @@ export function PaymentDialog({
         <DialogFooter className="items-center justify-between sm:justify-between">
           <span className="text-xs text-muted-foreground">
             {valid
-              ? <>반영 후 잔액 <b className="font-mono text-foreground">{after.toLocaleString('ko-KR')}원</b></>
+              ? <>반영 후 잔액 <b className="tabular-nums text-foreground">{after.toLocaleString('ko-KR')}원</b></>
               : '금액을 입력하세요'}
           </span>
           <span className="flex gap-2">

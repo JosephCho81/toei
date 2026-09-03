@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { loadPaymentsData } from '@/lib/data/payments'
+import { loadPaymentsData, roundName } from '@/lib/data/payments'
 import { PaymentKpis } from '@/components/payments/PaymentKpis'
 import { PaymentAlerts } from '@/components/payments/PaymentAlerts'
 import { PaymentTable } from '@/components/payments/PaymentTable'
@@ -15,97 +15,80 @@ export const metadata: Metadata = {
  * 양사 대표가 보는 첫 화면.
  *
  * ?view=a1 로 관점을 뒤집는다 — 같은 금액을 토에이는 미지급으로, 에이원은 미수로 읽는다.
- * ?edit=1 이면 담당자 모드가 되어 입력·수정 버튼이 붙는다.
- * (인증이 켜지면 view/edit 는 쿼리스트링이 아니라 로그인 역할에서 정한다.)
+ * 입력 모드는 두지 않는다. 담당자가 쓰려고 화면을 갈아타야 하면 결국 엑셀로 돌아간다 —
+ * 표에서 차수를 펴면 그 자리에서 입력·수정한다.
  */
 export default async function PaymentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; edit?: string }>
+  searchParams: Promise<{ view?: string }>
 }) {
-  const sp = await searchParams
-  const view = sp.view === 'a1' ? 'a1' : 'toei'
-  const editable = sp.edit === '1'
+  const view = (await searchParams).view === 'a1' ? 'a1' : 'toei'
 
   const today = new Date().toISOString().slice(0, 10)
   const supabase = await createClient()
   const { rows, summary, alerts } = await loadPaymentsData(supabase, today)
+
+  const billed = rows.filter((r) => r.billedKrw != null).length
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>지급 현황</h2>
-          <p className="text-xs text-muted-foreground">
-            {today} 기준 · 전체 {rows.length}차수 (청구 완료 {rows.filter((r) => r.billedKrw != null).length}
-            {' · '}청구 전 {rows.filter((r) => r.billedKrw == null).length})
-            {editable && ' · 담당자 모드'}
+          <p className="text-sm text-muted-foreground">
+            {today} 기준 · 전체 {rows.length}차수 중 청구 완료 {billed}차수
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="inline-flex overflow-hidden rounded-md border text-xs">
-            {(['toei', 'a1'] as const).map((v) => (
-              <Link
-                key={v}
-                href={`/payments?view=${v}${editable ? '&edit=1' : ''}`}
-                className={cn(
-                  'px-3 py-1.5',
-                  view === v ? 'bg-emerald-700 font-semibold text-white' : 'hover:bg-muted',
-                )}
-              >
-                {v === 'toei' ? '토에이 시점' : '에이원 시점'}
-              </Link>
-            ))}
-          </div>
-          <Link
-            href={`/payments?view=${view}${editable ? '' : '&edit=1'}`}
-            className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
-          >
-            {editable ? '읽기 전용으로' : '입력 모드'}
-          </Link>
+        <div className="inline-flex overflow-hidden rounded-md border text-sm">
+          {(['toei', 'a1'] as const).map((v) => (
+            <Link
+              key={v}
+              href={`/payments?view=${v}`}
+              className={cn(
+                'px-3 py-1.5',
+                view === v ? 'bg-slate-800 font-semibold text-white' : 'hover:bg-muted',
+              )}
+            >
+              {v === 'toei' ? '토에이 시점' : '에이원 시점'}
+            </Link>
+          ))}
         </div>
       </div>
 
-      <PaymentAlerts alerts={alerts} editable={editable} />
+      <PaymentAlerts alerts={alerts} />
 
       <PaymentKpis summary={summary} view={view} />
 
-      <PaymentTable rows={rows} editable={editable} />
+      <PaymentTable rows={rows} view={view} />
 
-      <div className="space-y-1.5 rounded-md border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+      <div className="space-y-1.5 rounded-md border bg-slate-50 px-4 py-3 text-sm text-muted-foreground">
         {summary.lastPayment && (
           <p>
             <span className="font-semibold text-foreground">최근 지급</span>
-            {' · '}{summary.lastPayment.roundLabel}{' '}
-            <span className="font-mono text-foreground">
+            {' · '}{roundName(summary.lastPayment)}{' '}
+            <span className="tabular-nums text-foreground">
               {Math.round(summary.lastPayment.amountKrw).toLocaleString('ko-KR')}원
             </span>
             {' · '}{summary.lastPayment.paidAt}
           </p>
         )}
+        {/* 부호 대신 방향을 말로 적는다 — 「-15,935,688원」은 누가 누구에게 줄 돈인지 알 수 없다. */}
         <p>
-          <span className="font-semibold text-foreground">최종정산(클로징)</span>
-          {' · '}미정산 {summary.closingOpenCount}차수 순액{' '}
-          <span className="font-mono text-foreground">
-            {Math.round(summary.closingBalanceKrw).toLocaleString('ko-KR')}원
+          <span className="font-semibold text-foreground">최종정산</span>
+          {' · '}아직 정산되지 않은 {summary.closingOpenCount}차수를 서로 상계하면{' '}
+          <span className="tabular-nums text-foreground">
+            {Math.abs(Math.round(summary.closingBalanceKrw)).toLocaleString('ko-KR')}원
           </span>
-          {'. '}창고 보관료·기타 입출금은 정산과 별개로{' '}
+          {'을 '}
+          {summary.closingBalanceKrw >= 0
+            ? (view === 'toei' ? '토에이가 더 내야 합니다' : '에이원이 더 받을 금액입니다')
+            : (view === 'toei' ? '토에이가 돌려받을 금액입니다' : '에이원이 돌려줄 금액입니다')}
+          {'. 창고 보관료 같은 그 밖의 입출금은 '}
           <Link href="/payments/ledger" className="underline underline-offset-2">통장 원장</Link>
           에서 봅니다.
         </p>
-        {summary.calcDiffCount > 0 && (
-          <p>
-            <span className="font-semibold text-foreground">검산 차이</span>
-            {' · '}실제 청구액과 시스템 확정값이 어긋나는 차수 {summary.calcDiffCount}건 (순
-            <span className="font-mono text-foreground">
-              {Math.round(summary.calcDiffKrw).toLocaleString('ko-KR')}원
-            </span>
-            ). 미지급이 아니라 계산 차이이며,{' '}
-            <Link href="/verification" className="underline underline-offset-2">검증 리포트</Link>
-            에서 다룹니다.
-          </p>
-        )}
       </div>
     </div>
   )
