@@ -27,7 +27,7 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   if (pathname === '/login') {
     const url = request.nextUrl.clone()
-    url.pathname = '/transactions'
+    url.pathname = '/payments'
     return NextResponse.redirect(url)
   }
   return proxyResponse
@@ -46,7 +46,7 @@ export async function proxy(request: NextRequest) {
 
   if (user && pathname === '/login') {
     const url = request.nextUrl.clone()
-    url.pathname = '/transactions'
+    url.pathname = '/payments'
     return NextResponse.redirect(url)
   }
 

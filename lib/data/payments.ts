@@ -68,6 +68,11 @@ export interface PaymentRow {
   needsConfirm: boolean
   /** 일부만 내고 30일 넘게 멈춰 있는가 */
   stalled: boolean
+  /** 최종정산(클로징) 확정액. 아직 클로징 전이면 null */
+  closingBilledKrw: number | null
+  closingPaidKrw: number
+  closingBalanceKrw: number
+  closingInstallments: Installment[]
 }
 
 export interface UnallocatedPayment {
@@ -93,6 +98,8 @@ export interface PaymentAlerts {
   stalled: PaymentRow[]
   /** 청구보다 많이 나간 차수 — 상계 여부 확인이 필요하다 */
   overpaid: PaymentRow[]
+  /** 지급 기록은 있는데 청구액이 등재되지 않은 차수 — 대사 자체가 불가능하다 */
+  billedMissing: PaymentRow[]
   /** 담당자가 처리해야 할 총 건수 — 사이드바 뱃지 */
   total: number
 }
@@ -213,6 +220,19 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
       confirmed: i.confirmed,
     }))
 
+    // 최종정산(클로징)은 중간정산과 별개의 청구·지급이다. 합치면 어느 쪽이
+    // 안 맞는지 알 수 없어져 한 줄로 나란히 보여준다.
+    const cs = closingStatus.get(t.id)
+    const closingBilledKrw = closingBilledOf.get(t.id) ?? null
+    const closingPaidKrw = num(cs?.paid_krw)
+    const closingInstallments: Installment[] = (cs?.installments ?? []).map((i) => ({
+      paymentId: i.payment_id,
+      paidAt: i.paid_at,
+      amountKrw: num(i.amount),
+      direction: i.direction,
+      confirmed: i.confirmed,
+    }))
+
     const schedule = computeSettlementSchedule(t.lc_open_date, holidays)
     const dueDate = t.payment_due_date ?? schedule.interimDue
     const balanceKrw = billedKrw == null ? 0 : billedKrw - paidKrw
@@ -257,21 +277,17 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
       state,
       needsConfirm: s ? !s.all_confirmed : false,
       stalled,
+      closingBilledKrw,
+      closingPaidKrw,
+      closingBalanceKrw: closingBilledKrw == null ? 0 : closingBilledKrw - closingPaidKrw,
+      closingInstallments,
     }
   })
 
-  // ── 정렬: 손대야 할 것부터. 완납·미청구는 뒤로 ──
-  const ORDER: Record<PaymentState, number> = {
-    no_record: 0, overdue: 1, due_soon: 2, overpaid: 3, upcoming: 4, paid: 5, unbilled: 6,
-  }
-  rows.sort((a, b) => {
-    if (ORDER[a.state] !== ORDER[b.state]) return ORDER[a.state] - ORDER[b.state]
-    // 처리 대상은 기일이 이른 것부터, 끝난 것은 최근 것부터
-    const asc = ORDER[a.state] <= 4
-    const da = a.dueDate ?? '', db = b.dueDate ?? ''
-    if (da !== db) return asc ? da.localeCompare(db) : db.localeCompare(da)
-    return (b.roundNo ?? 0) - (a.roundNo ?? 0)
-  })
+  // ── 정렬: 차수 내림차순. 최근 차수가 위, 1차가 맨 아래 ──
+  // 상태순으로 섞으면 「43차 다음이 19차」가 되어 차수를 눈으로 좇을 수 없다.
+  // 손댈 것은 상단 알림과 필터가 잡아 준다.
+  rows.sort((a, b) => (b.roundNo ?? 0) - (a.roundNo ?? 0))
 
   // ── 요약 ──
   const billedRows = rows.filter((r) => r.billedKrw != null)
@@ -347,6 +363,8 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
     .filter((p) => Number(p.unconfirmed_count) > 0).length
 
   const noRecord = rows.filter((r) => r.state === 'no_record')
+  // 청구액이 없는데 돈이 나간 차수. 잔액을 낼 근거가 없어 대사가 불가능하다.
+  const billedMissing = rows.filter((r) => r.billedKrw == null && r.paidKrw !== 0)
   const overpaidRows = rows.filter((r) => r.state === 'overpaid')
   const dueSoon = rows.filter((r) => r.state === 'due_soon')
   const stalled = rows.filter((r) => r.stalled)
@@ -359,7 +377,9 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
     dueSoon,
     stalled,
     overpaid: overpaidRows,
-    total: noRecord.length + unallocated.length + unconfirmedPayments + overpaidRows.length,
+    billedMissing,
+    total: noRecord.length + unallocated.length + unconfirmedPayments
+      + overpaidRows.length + billedMissing.length,
   }
 
   return { rows, summary, alerts }

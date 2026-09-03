@@ -37,7 +37,8 @@ export default async function PaymentsPage({
         <div>
           <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>지급 현황</h2>
           <p className="text-xs text-muted-foreground">
-            {today} 기준 · 중간정산 {rows.filter((r) => r.billedKrw != null).length}차수
+            {today} 기준 · 전체 {rows.length}차수 (청구 완료 {rows.filter((r) => r.billedKrw != null).length}
+            {' · '}청구 전 {rows.filter((r) => r.billedKrw == null).length})
             {editable && ' · 담당자 모드'}
           </p>
         </div>

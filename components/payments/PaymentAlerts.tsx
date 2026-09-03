@@ -23,6 +23,12 @@ export function PaymentAlerts({ alerts, editable }: { alerts: Alerts; editable: 
       text: `청구액보다 많이 나간 차수 ${alerts.overpaid.length}건 ${sum.toLocaleString('ko-KR')}원 (${alerts.overpaid.map((r) => r.roundLabel).join(', ')}) — 상계 여부 확인이 필요합니다`,
     })
   }
+  for (const r of alerts.billedMissing) {
+    items.push({
+      text: `${r.roundLabel} 지급 ${Math.round(r.paidKrw).toLocaleString('ko-KR')}원이 기록돼 있으나 중간정산 청구액이 등재되지 않았습니다 — 대사할 기준이 없습니다`,
+      href: `/transactions/${r.transactionId}`,
+    })
+  }
   if (alerts.unallocated.length > 0) {
     items.push({
       text: `귀속처를 모르는 입출금 ${alerts.unallocated.length}건 ${alerts.unallocatedKrw.toLocaleString('ko-KR')}원`,
