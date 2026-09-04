@@ -10,6 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { MasterTabs } from '@/components/masters/MasterTabs'
 
 interface Manufacturer {
   id: string
@@ -82,6 +83,7 @@ export default function ManufacturersPage() {
 
   return (
     <div className="space-y-4 max-w-3xl">
+      <MasterTabs />
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">제조사 관리</h2>
         <Button size="sm" onClick={openNew}><Plus className="h-4 w-4 mr-1" />추가</Button>

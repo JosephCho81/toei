@@ -9,6 +9,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Plus, Trash2, Download } from 'lucide-react'
+import { MasterTabs } from '@/components/masters/MasterTabs'
 import { GLOVE_TYPES } from '@/components/transactions/ItemDatalists'
 import {
   blankProductRow, importProductsFromTransactions, loadProductRows, saveProductRows,
@@ -70,6 +71,7 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-4 max-w-5xl">
+      <MasterTabs />
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">품목 마스터</h2>
