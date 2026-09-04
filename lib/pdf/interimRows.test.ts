@@ -5,7 +5,7 @@ import { buildInterimCostRows, type InterimPdfCostItem } from './interimRows.ts'
 import { calculateInterim } from '../calculations/interim.ts'
 
 // 청구서 PDF 는 나열한 금액을 더하면 공급가가 나와야 한다.
-// 「항목 부가세 가산」 줄이 빠지면 받는 쪽이 검산할 수 없다.
+// 차감 줄(수입부가세·관세)이 빠지면 받는 쪽이 검산할 수 없다.
 
 const item = (over: Partial<InterimPdfCostItem>): InterimPdfCostItem => ({
   itemName: '항목', amountKrw: 0, groupType: 'shipping',
@@ -46,11 +46,27 @@ test('신방식: 나열된 금액을 더하면 공급가가 나온다', () => {
   assert.equal(rows[supplyRowIdx].amountKrw, calc.supplyAmountKrw)
 })
 
-test('신방식: 항목 부가세 가산 줄이 있다', () => {
+// 2026-09-04 규약: 항목 부가세는 공급가에 들어가지 않는다. 참고 줄로만 남고 금액은 0이다.
+test('신방식: 항목 부가세는 참고 줄이고 공급가를 움직이지 않는다', () => {
   const { calc, rows } = build(true)
-  const vatRow = rows.find((r) => r.itemName === '항목 부가세 가산')
-  assert.ok(vatRow)
-  assert.equal(vatRow!.amountKrw, calc.itemVatKrw)
+  assert.ok(calc.itemVatKrw > 0)
+  assert.equal(rows.find((r) => r.itemName === '항목 부가세 가산'), undefined)
+  const ref = rows.find((r) => r.itemName === '(참고) 항목 부가세')
+  assert.ok(ref)
+  assert.equal(ref!.amountKrw, 0)
+})
+
+test('신방식: 관세는 차감 줄과 가산 줄로 한 번씩 나온다', () => {
+  const rows = buildInterimCostRows({
+    costItems: [item({ amountKrw: 100_000 }), item({ itemName: '관세', amountKrw: 1_836_920, groupType: 'customs', isDuty: true })],
+    importAmountKrw: 1_000_000, importFormula: '', exclusive: true,
+    supplyAmountKrw: 1_100_000, outputVatKrw: 110_000,
+  })
+  assert.equal(rows.find((r) => r.itemName === '관세 차감')!.amountKrw, -1_836_920)
+  assert.equal(rows.find((r) => r.itemName === '관세 가산')!.amountKrw, 1_836_920)
+  // 공급가 줄 앞까지 더하면 공급가가 나온다 — 관세가 빠진 상태여야 맞다
+  const idx = rows.findIndex((r) => r.itemName === '공급가 (부가세 별도)')
+  assert.equal(rows.slice(0, idx).reduce((s, r) => s + r.amountKrw, 0), 1_100_000)
 })
 
 test('신방식: 수입부가세는 음수로 차감 표기한다', () => {
@@ -65,14 +81,15 @@ test('항목 부가세가 없으면 그 줄을 넣지 않는다', () => {
     importAmountKrw: 1_000_000, importFormula: '', exclusive: true,
     supplyAmountKrw: 1_100_000, outputVatKrw: 110_000,
   })
-  assert.equal(rows.find((r) => r.itemName === '항목 부가세 가산'), undefined)
+  assert.equal(rows.find((r) => r.itemName === '(참고) 항목 부가세'), undefined)
   assert.equal(rows.find((r) => r.itemName === '수입부가세 차감'), undefined)
+  assert.equal(rows.find((r) => r.itemName === '관세 차감'), undefined)
 })
 
 test('구방식은 공급가·부가세 줄을 만들지 않는다', () => {
   const { rows } = build(false)
   assert.equal(rows.find((r) => r.itemName === '공급가 (부가세 별도)'), undefined)
-  assert.equal(rows.find((r) => r.itemName === '항목 부가세 가산'), undefined)
+  assert.equal(rows.find((r) => r.itemName === '(참고) 항목 부가세'), undefined)
 })
 
 test('운송비가 통관비보다 먼저 나온다', () => {

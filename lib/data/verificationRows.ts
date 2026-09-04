@@ -7,7 +7,7 @@ import type { VerRow } from '@/components/dashboard/VerificationIssueCard'
 export const VERIFICATION_SELECT =
   'id, notes, confirmed_amount_krw, rounding_policy, vat_mode, customs_exchange_rate,'
   + ' transactions(id, round_no, round_label, import_amount_usd, margin_rate_pct),'
-  + ' interim_cost_items(amount_krw, is_import_vat, is_vat_taxable, vat_amount_krw)'
+  + ' interim_cost_items(amount_krw, is_import_vat, is_duty, is_vat_taxable, vat_amount_krw)'
 
 type RawTx = {
   id: string; round_no: number; round_label: string
@@ -25,6 +25,7 @@ type RawRow = {
   interim_cost_items: {
     amount_krw: number | null
     is_import_vat: boolean | null
+    is_duty: boolean | null
     is_vat_taxable: boolean | null
     vat_amount_krw: number | null
   }[] | null
@@ -49,6 +50,7 @@ function diffKrw(row: RawRow, tx: RawTx | null): number | null {
   const costItems: CostItem[] = (row.interim_cost_items ?? []).map((c) => ({
     amountKrw: Number(c.amount_krw) || 0,
     isImportVat: Boolean(c.is_import_vat),
+    isDuty: Boolean(c.is_duty),
     isVatTaxable: Boolean(c.is_vat_taxable),
     vatAmountKrw: Number(c.vat_amount_krw) || 0,
   }))

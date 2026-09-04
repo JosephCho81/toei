@@ -8,6 +8,8 @@ export interface CostRow {
   vat_amount_krw: string
   /** 통관 시 세관에 납부한 수입부가세 — 공급가에서 제외한다 */
   is_import_vat: boolean
+  /** 관세 — 공급가에서 빼고 부가세를 매긴 뒤 합계에 얹는다 */
+  is_duty: boolean
 }
 
 export interface FeeRow {

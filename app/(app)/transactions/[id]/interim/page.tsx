@@ -59,6 +59,7 @@ export default function InterimSettlementPage() {
   const costItems: CostItem[] = [...shippingRows, ...customsRows].map((r) => ({
     amountKrw: parseFloat(r.amount_krw) || 0,
     isImportVat: r.is_import_vat,
+    isDuty: r.is_duty,
     isVatTaxable: r.is_vat_taxable,
     vatAmountKrw: parseFloat(r.vat_amount_krw) || 0,
   }))
@@ -75,7 +76,9 @@ export default function InterimSettlementPage() {
   const supply = supplyOverride ?? (systemSupply > 0 ? String(systemSupply) : '')
   const supplyNum = parseFloat(supply) || systemSupply
   const confirmedVat = vatMode === 'exclusive' ? computeVat(supplyNum) : 0
-  const confirmedTotal = supplyNum + confirmedVat
+  // 관세는 공급가·부가세 밖에서 합계에만 얹힌다. 담당자가 공급가를 손으로 덮어써도 그대로 남는다.
+  const dutyKrw = calc?.dutyKrw ?? 0
+  const confirmedTotal = supplyNum + confirmedVat + dutyKrw
 
   async function handleSave(lock = false) {
     setSaving(true)

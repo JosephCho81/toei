@@ -4,7 +4,7 @@ import type { InterimCostData } from './ReportInterimSection'
 /**
  * 중간정산 섹션이 보여줄 금액과 계산식 문자열.
  * 금액은 `calculateInterim` 과 같은 규약을 따른다 —
- * 항목 부가세는 더하고 수입부가세는 뺀다.
+ * 수입부가세와 관세를 공급가에서 빼고, 항목 부가세는 더하지 않는다.
  */
 export function interimSummary(data: InterimCostData) {
   const exclusive = data.vatMode !== 'inclusive'
@@ -12,21 +12,23 @@ export function interimSummary(data: InterimCostData) {
   const customsTotal = data.customsItems.reduce((s, r) => s + r.amount_krw, 0)
   const allItems = [...data.shippingItems, ...data.customsItems]
   const importVatKrw = allItems.reduce((s, r) => s + (r.is_import_vat ? r.amount_krw : 0), 0)
-  // 항목에 붙은 부가세는 토에이 실지급액이라 공급가에 포함한다 (계산 규약).
+  // 항목 부가세는 에이원 매입세액공제분이라 공급가에 넣지 않는다. 표시용으로만 낸다.
   const itemVatKrw = allItems.reduce((s, r) => s + costItemVat({
-    amountKrw: r.amount_krw, isImportVat: r.is_import_vat,
+    amountKrw: r.amount_krw, isImportVat: r.is_import_vat, isDuty: r.is_duty,
     isVatTaxable: r.is_vat_taxable, vatAmountKrw: r.vat_amount_krw,
   }), 0)
+  // 관세는 공급가 밖에서 합계에만 얹힌다. 구방식(inclusive)은 종전대로 전부 합산한다.
+  const dutyKrw = exclusive ? allItems.reduce((s, r) => s + (r.is_duty ? r.amount_krw : 0), 0) : 0
 
   // 신방식은 확정 공급가가 있으면 그 값을, 없으면 항목 합계를 기준으로 보여준다.
   const rawSupply = exclusive
-    ? data.importAmountKrw + shippingTotal + customsTotal + itemVatKrw - importVatKrw
+    ? data.importAmountKrw + shippingTotal + customsTotal - importVatKrw - dutyKrw
     : data.importAmountKrw + shippingTotal + customsTotal
   const supplyKrw = exclusive ? (data.supplyAmountKrw ?? rawSupply) : rawSupply
   const outputVatKrw = exclusive ? (data.outputVatKrw ?? computeVat(supplyKrw)) : 0
 
   const subTotal = exclusive
-    ? supplyKrw + outputVatKrw
+    ? supplyKrw + outputVatKrw + dutyKrw
     : data.importAmountKrw + shippingTotal + customsTotal + data.vatAmountKrw
   const showConfirmed = data.confirmedAmountKrw != null
   const confirmedDiff = showConfirmed ? data.confirmedAmountKrw! - subTotal : 0
@@ -49,12 +51,13 @@ export function interimSummary(data: InterimCostData) {
   ].join(' + ')
   const supplyFormula = [
     supplyParts,
-    ...(itemVatKrw !== 0 ? [`+ 항목 부가세 ${itemVatKrw.toLocaleString('ko-KR')}`] : []),
     ...(importVatKrw !== 0 ? [`− 수입부가세 ${importVatKrw.toLocaleString('ko-KR')}`] : []),
+    ...(dutyKrw !== 0 ? [`− 관세 ${dutyKrw.toLocaleString('ko-KR')}`] : []),
   ].join(' ')
 
   const subTotalFormula = exclusive
     ? `공급가 ${supplyKrw.toLocaleString('ko-KR')} + 부가세 ${outputVatKrw.toLocaleString('ko-KR')}`
+      + (dutyKrw !== 0 ? ` + 관세 ${dutyKrw.toLocaleString('ko-KR')}` : '')
     : [
         `수입금액 ${data.importAmountKrw.toLocaleString('ko-KR')}`,
         ...(shippingTotal !== 0 ? [`해상운임 ${shippingTotal.toLocaleString('ko-KR')}`] : []),
@@ -63,7 +66,7 @@ export function interimSummary(data: InterimCostData) {
       ].join(' + ')
 
   return {
-    exclusive, shippingTotal, customsTotal, importVatKrw, itemVatKrw,
+    exclusive, shippingTotal, customsTotal, importVatKrw, itemVatKrw, dutyKrw,
     supplyKrw, outputVatKrw, subTotal, showConfirmed, confirmedDiff, diffIsRounding,
     importFormula, vatFormula, supplyFormula, subTotalFormula,
   }

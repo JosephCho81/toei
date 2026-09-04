@@ -10,6 +10,8 @@ interface CostItem {
   is_vat_taxable: boolean
   vat_amount_krw: number
   is_import_vat: boolean
+  /** 관세 — 공급가 밖에서 합계에만 얹힌다 */
+  is_duty?: boolean
   group_type: string
 }
 

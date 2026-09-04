@@ -69,6 +69,7 @@ export interface CostItemRow {
   is_vat_taxable: boolean
   vat_amount_krw: number
   is_import_vat: boolean
+  is_duty: boolean
   group_type: string
   sort_order: number
   [key: string]: unknown

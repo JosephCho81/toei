@@ -35,7 +35,9 @@ test('규약대로 저장된 정산은 차액 0', () => {
   assert.equal(interimDiffKrw({ ...input, confirmedKrw: confirmed(input) }), 0)
 })
 
-test('항목 부가세가 있어도 차액 0 — 공급가에 포함하는 규약을 따른다', () => {
+// 2026-09-04 규약: 항목 부가세는 에이원 매입세액공제분이라 공급가에 넣지 않는다.
+// 따라서 과세 표시는 합계를 바꾸지 않는다 — 바뀌면 이중 청구다.
+test('항목 부가세 표시는 합계를 바꾸지 않는다', () => {
   const costItems: CostItem[] = [
     { amountKrw: 3_440_168 },
     { amountKrw: 18_000, isVatTaxable: true },
@@ -43,13 +45,30 @@ test('항목 부가세가 있어도 차액 0 — 공급가에 포함하는 규�
   ]
   const input = base({ costItems })
   assert.equal(interimDiffKrw({ ...input, confirmedKrw: confirmed(input) }), 0)
-  // 항목 부가세를 빠뜨리고 계산하면 차액이 생긴다 — 옛 대시보드 공식의 오류
-  const withoutItemVat = calculateInterim({
+
+  const withoutFlags = calculateInterim({
     importAmountUsd: 79200, customsExchangeRate: 1328.13, marginRatePct: 7,
     costItems: costItems.map((c) => ({ amountKrw: c.amountKrw })),
     roundingPolicy: 'floor_100', vatMode: 'exclusive',
   }).confirmedKrw
-  assert.notEqual(withoutItemVat, confirmed(input))
+  assert.equal(withoutFlags, confirmed(input))
+})
+
+// 관세는 반대다 — 플래그가 서야 공급가에서 빠지고 합계에 되얹힌다.
+test('관세 표시는 합계를 바꾼다 — 부가세만큼 줄어든다', () => {
+  const duty = 1_836_920
+  const withFlag = calculateInterim({
+    importAmountUsd: 79200, customsExchangeRate: 1328.13, marginRatePct: 7,
+    costItems: [{ amountKrw: 3_440_168 }, { amountKrw: duty, isDuty: true }],
+    roundingPolicy: 'floor_100', vatMode: 'exclusive',
+  }).confirmedKrw
+  const withoutFlag = calculateInterim({
+    importAmountUsd: 79200, customsExchangeRate: 1328.13, marginRatePct: 7,
+    costItems: [{ amountKrw: 3_440_168 }, { amountKrw: duty }],
+    roundingPolicy: 'floor_100', vatMode: 'exclusive',
+  }).confirmedKrw
+  // 관세에 매출부가세를 매기지 않으므로 딱 관세의 10% 만큼 적다 (절사 오차 100원 이내)
+  assert.ok(Math.abs((withoutFlag - withFlag) - duty * 0.1) < 100)
 })
 
 test('수입부가세는 공급가에서 빠진다 — 재계산도 같아야 차액 0', () => {

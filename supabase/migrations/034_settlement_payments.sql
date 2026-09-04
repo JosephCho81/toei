@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS settlement_payments (
 );
 
 COMMENT ON TABLE  settlement_payments IS '통장 입출금 한 줄 = 한 행. 차수는 여기 적지 않는다.';
-COMMENT ON COLUMN settlement_payments.direction IS 'out = 토에이→에이원 지급, in = 환급·상계 입금';
+COMMENT ON COLUMN settlement_payments.direction IS 'out = 에이원→토에이 지급, in = 토에이→에이원 환급·상계 입금. 대금은 에이원이 토에이에 낸다.';
 COMMENT ON COLUMN settlement_payments.bank_memo IS '통장 적요 원문. 묶음 지급의 배분 근거가 여기 적혀 있다.';
 
 CREATE INDEX IF NOT EXISTS idx_settlement_payments_paid_at
@@ -150,7 +150,7 @@ WITH alloc AS (
     a.confirmed,
     p.paid_at,
     p.direction,
-    -- 환급(in)은 지급액에서 차감한다. 클로징 환급이 그렇게 정산된다.
+    -- 환급(in = 토에이→에이원)은 지급액에서 차감한다. 클로징 환급이 그렇게 정산된다.
     CASE WHEN p.direction = 'in' THEN -a.amount_krw ELSE a.amount_krw END AS signed_krw
   FROM payment_allocations a
   JOIN settlement_payments p ON p.id = a.payment_id

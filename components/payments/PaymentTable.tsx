@@ -11,6 +11,10 @@ import { PAID_TOLERANCE_KRW, roundName, type Installment, type PaymentRow } from
 /**
  * 차수별 지급 현황.
  *
+ * **돈의 방향은 한국에이원 → 토에이산교다.** 청구액이 양수면 에이원이 토에이에 낼 돈이고,
+ * 음수(환급)일 때만 토에이가 에이원에 돌려준다. 그래서 같은 잔액을 토에이는 미수금으로,
+ * 에이원은 미지급금으로 읽는다 — 문장의 「들어오다/나가다」도 관점에 따라 뒤집는다.
+ *
  * 읽는 사람이 둘이다 — 양사 대표(한눈에 「얼마 남았나」)와 담당자(빨리 입력).
  * 그래서 기본은 차수당 한 줄이고, 줄을 누르면 그 차수의 지급 내역과 입력 버튼이 열린다.
  * 입력 모드를 따로 두지 않는다. 모드를 나누면 담당자가 매번 화면을 갈아타야 한다.
@@ -66,11 +70,11 @@ function statusText(r: PaymentRow): string {
   const d = r.delayDays
   switch (r.state) {
     case 'paid': return '완납'
-    case 'overpaid': return '초과 지급'
+    case 'overpaid': return '초과 수령'
     case 'no_record':
-    case 'overdue': return d != null ? `연체 ${d.toLocaleString('ko-KR')}일` : '연체'
+    case 'overdue': return d != null ? `기일 ${d.toLocaleString('ko-KR')}일 경과` : '기일 경과'
     case 'due_soon':
-    case 'upcoming': return d != null ? `기일 ${-d}일 남음` : '지급 예정'
+    case 'upcoming': return d != null ? `기일 ${-d}일 전` : '기일 미정'
     case 'unbilled': return r.paidKrw !== 0 ? '청구액 미등록' : '청구 전'
   }
 }
@@ -78,21 +82,24 @@ function statusText(r: PaymentRow): string {
 /**
  * 손대야 할 줄에만 붙는 한 문장. 붙지 않았으면 문제가 없다는 뜻이다.
  * 화면에서 빨강은 이 문장과 그 줄의 잔액, 두 곳뿐이다.
+ *
+ * 돈이 에이원에서 토에이로 가므로 「나가다/들어오다」는 보는 쪽에 따라 뒤집힌다.
  */
-function issueText(r: PaymentRow): string | null {
+function issueText(r: PaymentRow, toei: boolean): string | null {
   if (r.billedKrw == null) {
     return r.paidKrw !== 0
-      ? `지급 ${krw(r.paidKrw)}원이 나갔으나 청구액이 등록되지 않아 대조할 기준이 없습니다`
+      ? `${krw(r.paidKrw)}원이 ${toei ? '입금됐으나' : '지급됐으나'} 청구액이 등록되지 않아 대조할 기준이 없습니다`
       : null
   }
-  if (r.state === 'no_record') return '지급 기록이 없습니다'
+  if (r.state === 'no_record') return `${toei ? '입금' : '지급'} 기록이 없습니다`
   if (r.state === 'overdue') {
     const last = r.installments.at(-1)
-    return `${krw(r.balanceKrw)}원이 덜 나갔습니다`
-      + (last ? ` (마지막 지급 ${last.paidAt})` : '')
+    return `${krw(r.balanceKrw)}원이 ${toei ? '아직 들어오지 않았습니다' : '아직 나가지 않았습니다'}`
+      + (last ? ` (최근 ${toei ? '입금' : '지급'} ${last.paidAt})` : '')
   }
   if (r.state === 'overpaid') {
-    return `청구액보다 ${krw(-r.balanceKrw)}원 더 나갔습니다 — 상계 여부 확인이 필요합니다`
+    return `청구액보다 ${krw(-r.balanceKrw)}원 ${toei ? '더 들어왔습니다' : '더 나갔습니다'}`
+      + ' — 다음 차수 상계 여부를 확인해 주세요'
   }
   return null
 }
@@ -109,9 +116,10 @@ export function PaymentTable({
   view,
 }: {
   rows: PaymentRow[]
-  /** 같은 금액을 토에이는 미지급으로, 에이원은 미수로 읽는다 */
+  /** 같은 금액을 토에이는 미수금으로, 에이원은 미지급금으로 읽는다 */
   view: 'toei' | 'a1'
 }) {
+  const toei = view === 'toei'
   const router = useRouter()
   const [filter, setFilter] = useState<FilterKey>('all')
   const [open, setOpen] = useState<Set<string>>(new Set())
@@ -124,7 +132,8 @@ export function PaymentTable({
   )
   const visible = useMemo(() => rows.filter(FILTERS.find((f) => f.key === filter)!.test), [rows, filter])
 
-  const balanceLabel = view === 'toei' ? '미지급' : '미수'
+  const balanceLabel = toei ? '미수금' : '미지급금'
+  const paidLabel = toei ? '입금액' : '지급액'
 
   function toggle(id: string) {
     setOpen((prev) => {
@@ -136,7 +145,7 @@ export function PaymentTable({
   }
 
   async function remove(paymentId: string, label: string) {
-    if (!confirm(`${label} 지급 기록을 삭제합니다. 되돌릴 수 없습니다.`)) return
+    if (!confirm(`${label} ${toei ? '입금' : '지급'} 기록을 삭제합니다. 되돌릴 수 없습니다.`)) return
     setBusy(paymentId)
     const res = await fetch(`/api/payments/${paymentId}`, { method: 'DELETE' })
     setBusy(null)
@@ -170,7 +179,7 @@ export function PaymentTable({
           ))}
         </div>
         <p className="text-sm text-muted-foreground">
-          금액은 중간정산 기준입니다 · 차수를 누르면 지급 내역이 열리고, 거기서 바로 입력·수정합니다.
+          금액은 중간정산 기준입니다 · 차수를 누르면 {toei ? '입금' : '지급'} 내역이 열리고 그 자리에서 입력·수정합니다.
         </p>
       </div>
 
@@ -181,7 +190,7 @@ export function PaymentTable({
               <th className={cn(TH, CENTER, 'w-[8%]')}>차수</th>
               <th className={cn(TH, NUM, 'w-[13%]')}>수입금액 (USD)</th>
               <th className={cn(TH, NUM, 'w-[16%]')}>청구금액 (원)</th>
-              <th className={cn(TH, NUM, 'w-[16%]')}>지급액 (원)</th>
+              <th className={cn(TH, NUM, 'w-[16%]')}>{paidLabel} (원)</th>
               <th className={cn(TH, NUM, 'w-[14%]')}>{balanceLabel} (원)</th>
               <th className={cn(TH, CENTER, 'w-[11%]')}>기일</th>
               <th className={cn(TH, CENTER, 'w-[18%]')}>상태</th>
@@ -191,7 +200,7 @@ export function PaymentTable({
 
           {visible.map((r, i) => {
             const isOpen = open.has(r.transactionId)
-            const issue = issueText(r)
+            const issue = issueText(r, toei)
             const zebra = i % 2 === 1 ? 'bg-slate-50/60' : ''
 
             return (
@@ -239,8 +248,8 @@ export function PaymentTable({
                   <td className={cn(TD, CENTER, 'px-1')}>
                     <button
                       type="button"
-                      aria-label={`${roundName(r)} 지급 입력`}
-                      title="지급 입력"
+                      aria-label={`${roundName(r)} ${paidLabel.slice(0, 2)} 입력`}
+                      title={`${paidLabel.slice(0, 2)} 입력`}
                       onClick={(e) => { e.stopPropagation(); setDraft({ mode: 'create', row: r }) }}
                       className="rounded-sm border bg-white p-1 text-slate-500 opacity-0 transition-opacity hover:bg-slate-100 focus:opacity-100 group-hover:opacity-100"
                     >
@@ -267,6 +276,7 @@ export function PaymentTable({
                     <td colSpan={COLS} className="border-l-4 border-slate-300 bg-slate-100/70 px-6 py-3">
                       <RoundDetail
                         row={r}
+                        toei={toei}
                         onAdd={() => setDraft({ mode: 'create', row: r })}
                         onEdit={(inst) => setDraft({ mode: 'edit', row: r, installment: inst })}
                         onDelete={remove}
@@ -284,7 +294,7 @@ export function PaymentTable({
       <p className="mt-2 text-sm text-muted-foreground">
         차수 {rows.length}개를 최근 차수부터 보여줍니다 (맨 아래가 1차).
         「예상」이 붙은 청구금액은 아직 청구 전이라 시스템이 계산한 값입니다.
-        1,000원 미만 차이는 절사로 보아 완납으로 봅니다.
+        1,000원 미만의 차이는 절사로 보아 완납으로 처리합니다.
       </p>
 
       {draft && (
@@ -304,12 +314,14 @@ export function PaymentTable({
  */
 function RoundDetail({
   row,
+  toei,
   onAdd,
   onEdit,
   onDelete,
   busy,
 }: {
   row: PaymentRow
+  toei: boolean
   onAdd: () => void
   onEdit: (inst: Installment) => void
   onDelete: (paymentId: string, label: string) => void
@@ -323,18 +335,20 @@ function RoundDetail({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-semibold">{roundName(row)} 중간정산 지급 내역</span>
+        <span className="font-semibold">
+          {roundName(row)} 중간정산 {toei ? '입금' : '지급'} 내역
+        </span>
         <button
           type="button"
           onClick={onAdd}
           className="inline-flex items-center gap-1 rounded-md border bg-white px-2.5 py-1 hover:bg-slate-100"
         >
-          <Plus className="h-3.5 w-3.5" /> 지급 입력
+          <Plus className="h-3.5 w-3.5" /> {toei ? '입금' : '지급'} 입력
         </button>
       </div>
 
       {row.installments.length === 0 ? (
-        <p className="text-muted-foreground">아직 지급 기록이 없습니다.</p>
+        <p className="text-muted-foreground">아직 {toei ? '입금' : '지급'} 기록이 없습니다.</p>
       ) : (
         <table className="w-full max-w-2xl border-collapse">
           <tbody>
@@ -383,7 +397,7 @@ function RoundDetail({
 
       {unconfirmed > 0 && (
         <p className="text-muted-foreground">
-          이 중 {unconfirmed}건은 여러 차수를 한 번에 묶어 낸 이체입니다. 차수별로 얼마씩인지{' '}
+          이 중 {unconfirmed}건은 여러 차수를 한 번에 묶어 보낸 이체입니다. 차수별 금액은{' '}
           <Link href="/payments/ledger" className="underline underline-offset-2">통장 원장</Link>에서
           확인해 주세요.
         </p>
@@ -399,7 +413,7 @@ function RoundDetail({
                 : ` — 일치합니다 (절사 ${krw(Math.abs(row.billedKrw - row.paidKrw))}원)`)
             : (row.balanceKrw > 0
                 ? ` — ${krw(row.balanceKrw)}원 모자랍니다`
-                : ` — ${krw(-row.balanceKrw)}원 더 나갔습니다`)}
+                : ` — ${krw(-row.balanceKrw)}원 ${toei ? '더 들어왔습니다' : '더 나갔습니다'}`)}
         </p>
       )}
 
@@ -409,12 +423,13 @@ function RoundDetail({
         </p>
       )}
 
+      {/* 청구액 양수 = 에이원이 토에이에 낼 돈, 음수 = 토에이가 에이원에 돌려줄 환급이다. */}
       {row.closingBilledKrw != null && (
         <p className="text-slate-700">
           <span className="font-semibold">최종정산</span>
           {' · 청구 '}<b className="tabular-nums">{krw(Math.abs(row.closingBilledKrw))}</b>원
-          {row.closingBilledKrw < 0 ? ' (에이원이 토에이에 돌려줄 몫)' : ''}
-          {' · 지급 '}
+          {row.closingBilledKrw < 0 ? ' (토에이가 에이원에 돌려줄 환급)' : ''}
+          {` · ${toei ? '입금' : '지급'} `}
           <b className="tabular-nums">
             {row.closingInstallments.length === 0 ? '없음' : `${krw(Math.abs(row.closingPaidKrw))}원`}
           </b>
@@ -422,14 +437,16 @@ function RoundDetail({
           {Math.abs(row.closingBalanceKrw) < PAID_TOLERANCE_KRW
             ? '정산이 끝났습니다'
             : `${krw(Math.abs(row.closingBalanceKrw))}원이 `
-              + (row.closingBalanceKrw > 0 ? '아직 토에이에서 나가지 않았습니다' : '아직 에이원에서 돌아오지 않았습니다')}
+              + (row.closingBalanceKrw > 0
+                  ? (toei ? '아직 에이원에서 들어오지 않았습니다' : '아직 토에이로 나가지 않았습니다')
+                  : (toei ? '아직 에이원으로 돌아가지 않았습니다' : '아직 토에이에서 돌아오지 않았습니다'))}
         </p>
       )}
 
       {row.calcDiffKrw != null && Math.abs(row.calcDiffKrw) >= PAID_TOLERANCE_KRW && (
         <p className="text-muted-foreground">
           실제 청구액과 시스템 계산값({krw(row.confirmedKrw)}원)이 {krw(Math.abs(row.calcDiffKrw))}원 다릅니다.
-          미지급이 아니라 계산 차이이며{' '}
+          미결제가 아니라 계산 차이이며{' '}
           <Link href="/verification" className="underline underline-offset-2">검증 리포트</Link>에서 다룹니다.
         </p>
       )}

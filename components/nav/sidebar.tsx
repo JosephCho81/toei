@@ -4,11 +4,15 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, FileText, Building2, LogOut, ClipboardList, Package, Container, Wallet } from 'lucide-react'
+import { LayoutDashboard, FileText, Building2, LogOut, ClipboardList, Package, Container, Wallet, Scale } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const navItems = [
   { href: '/payments', label: '지급 현황', icon: Wallet, badge: null },
+  // 청구값·계산값·지불값 비교. 세 구분이 답하는 질문이 같아 나란히 둔다.
+  { href: '/settlements/interim', label: '중간정산', icon: Scale, badge: null },
+  { href: '/settlements/closing', label: '최종정산', icon: Scale, badge: null },
+  { href: '/settlements/penalty', label: '지체상금', icon: Scale, badge: null },
   { href: '/dashboard', label: '정산 현황', icon: LayoutDashboard, badge: null },
   { href: '/transactions', label: '거래 목록', icon: FileText, badge: null },
   { href: '/manufacturers', label: '제조사', icon: Building2, badge: null },

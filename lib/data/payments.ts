@@ -129,6 +129,19 @@ export interface PaymentSummary {
   /** 클로징(최종정산) 미정산 순액 */
   closingBalanceKrw: number
   closingOpenCount: number
+  /** 중간·최종·지체상금 한 줄 요약. 첫 화면이 「얼마 남았나」를 구분별로 답한다 */
+  byKind: KindTotals[]
+}
+
+export interface KindTotals {
+  kind: 'interim' | 'closing' | 'penalty'
+  label: string
+  href: string
+  billedKrw: number
+  paidKrw: number
+  balanceKrw: number
+  /** 잔액이 남은 차수 수 */
+  openCount: number
 }
 
 type StatusRow = {
@@ -173,6 +186,7 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
     { data: statusRows },
     { data: unallocRows },
     { data: holidayRows },
+    { data: penaltyRows },
   ] = await Promise.all([
     supabase
       .from('transactions')
@@ -190,6 +204,8 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
       .select('id, paid_at, direction, amount_krw, unallocated_krw, bank_memo, unconfirmed_count')
       .order('paid_at', { ascending: false }),
     supabase.from('holidays').select('date'),
+    // 지체상금은 산식이 없어 적힌 금액이 곧 청구액이다 (037).
+    supabase.from('settlement_penalties').select('transaction_id, amount_krw'),
   ])
 
   const holidays = new Set((holidayRows ?? []).map((h: { date: string }) => h.date))
@@ -211,9 +227,17 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
 
   const status = new Map<string, StatusRow>()
   const closingStatus = new Map<string, StatusRow>()
+  const penaltyStatus = new Map<string, StatusRow>()
   for (const s of (statusRows ?? []) as StatusRow[]) {
     if (s.kind === 'interim') status.set(s.transaction_id, s)
     else if (s.kind === 'closing') closingStatus.set(s.transaction_id, s)
+    else if (s.kind === 'penalty') penaltyStatus.set(s.transaction_id, s)
+  }
+
+  // 한 차수에 지체상금이 여러 건일 수 있어 차수 단위로 합친다.
+  const penaltyOf = new Map<string, number>()
+  for (const r of (penaltyRows ?? []) as { transaction_id: string; amount_krw: number | string }[]) {
+    penaltyOf.set(r.transaction_id, (penaltyOf.get(r.transaction_id) ?? 0) + num(r.amount_krw))
   }
 
   const rows: PaymentRow[] = ((txRows ?? []) as {
@@ -338,6 +362,32 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
   const planned = rows.filter((r) => r.plannedKrw != null)
   const calcDiff = rows.filter((r) => r.calcDiffKrw != null && Math.abs(r.calcDiffKrw) >= PAID_TOLERANCE_KRW)
 
+  // ── 구분별 한 줄 요약 ──
+  // 첫 화면은 「얼마 언제」만 답한다. 청구가 계산과 맞는지는 /settlements/* 가 답한다.
+  function totals(
+    kind: 'interim' | 'closing' | 'penalty',
+    label: string,
+    billedOf: Map<string, number>,
+    statusOf: Map<string, StatusRow>,
+  ): KindTotals {
+    let billedKrw = 0, paidKrw = 0, balanceKrw = 0, openCount = 0
+    for (const [txId, billed] of billedOf) {
+      const paid = num(statusOf.get(txId)?.paid_krw)
+      const bal = billed - paid
+      billedKrw += billed
+      paidKrw += paid
+      balanceKrw += bal
+      if (Math.abs(bal) >= PAID_TOLERANCE_KRW) openCount += 1
+    }
+    return { kind, label, href: `/settlements/${kind}`, billedKrw, paidKrw, balanceKrw, openCount }
+  }
+
+  const byKind: KindTotals[] = [
+    totals('interim', '중간정산', invoicedOf, status),
+    totals('closing', '최종정산', closingBilledOf, closingStatus),
+    totals('penalty', '지체상금', penaltyOf, penaltyStatus),
+  ]
+
   const summary: PaymentSummary = {
     billedKrw: billedRows.reduce((s, r) => s + (r.billedKrw ?? 0), 0),
     paidKrw: billedRows.reduce((s, r) => s + r.paidKrw, 0),
@@ -357,6 +407,7 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
     calcDiffKrw: calcDiff.reduce((s, r) => s + (r.calcDiffKrw ?? 0), 0),
     closingBalanceKrw,
     closingOpenCount,
+    byKind,
   }
 
   const unallocated: UnallocatedPayment[] = ((unallocRows ?? []) as {

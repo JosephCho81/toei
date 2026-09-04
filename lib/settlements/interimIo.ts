@@ -120,6 +120,7 @@ async function loadInvoicePrefill(
     is_vat_taxable: item.is_vat_taxable ?? false,
     vat_amount_krw: String(item.vat_amount_krw ?? '0'),
     is_import_vat: false,
+    is_duty: false,
   }))
 }
 
@@ -159,6 +160,7 @@ export async function saveInterimSettlement(
     item_name: r.item_name, group_type: grp,
     amount_krw: parseFloat(r.amount_krw) || 0, is_vat_taxable: r.is_vat_taxable,
     vat_amount_krw: parseFloat(r.vat_amount_krw) || 0, is_import_vat: r.is_import_vat,
+    is_duty: r.is_duty,
     sort_order: i,
   })
   const { error } = await supabase.rpc('save_interim_cost_items', {

@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
         is_vat_taxable,
         vat_amount_krw,
         is_import_vat,
+        is_duty,
         group_type,
         sort_order
       )
@@ -68,10 +69,11 @@ export async function GET(req: NextRequest) {
   const sortedItems = [...rawItems].sort((a, b) => ((a as { sort_order?: number }).sort_order ?? 0) - ((b as { sort_order?: number }).sort_order ?? 0))
 
   const costItems: CostItem[] = sortedItems.map((item) => {
-    const i = item as { amount_krw: number; is_import_vat?: boolean; is_vat_taxable?: boolean; vat_amount_krw?: number }
+    const i = item as { amount_krw: number; is_import_vat?: boolean; is_duty?: boolean; is_vat_taxable?: boolean; vat_amount_krw?: number }
     return {
       amountKrw: Number(i.amount_krw) || 0,
       isImportVat: Boolean(i.is_import_vat),
+      isDuty: Boolean(i.is_duty),
       isVatTaxable: Boolean(i.is_vat_taxable),
       vatAmountKrw: Number(i.vat_amount_krw) || 0,
     }
@@ -112,13 +114,14 @@ export async function GET(req: NextRequest) {
     costItems: sortedItems.map((item) => {
       const i = item as {
         item_name: string; amount_krw: number; group_type: string
-        is_import_vat?: boolean; is_vat_taxable?: boolean; vat_amount_krw?: number
+        is_import_vat?: boolean; is_duty?: boolean; is_vat_taxable?: boolean; vat_amount_krw?: number
       }
       return {
         itemName: String(i.item_name ?? ''),
         amountKrw: Number(i.amount_krw) || 0,
         groupType: String(i.group_type ?? 'customs'),
         isImportVat: Boolean(i.is_import_vat),
+        isDuty: Boolean(i.is_duty),
         isVatTaxable: Boolean(i.is_vat_taxable),
         vatAmountKrw: Number(i.vat_amount_krw) || 0,
       }

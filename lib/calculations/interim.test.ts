@@ -85,8 +85,8 @@ test('부가세는 반올림 정수', () => {
 })
 
 // 23차 실데이터. 오션마스터 인보이스는 공급가 2,147,152 + VAT 81,000 = 총액 2,228,152 로 청구된다.
-// 담당자 확인: 항목 부가세는 토에이 실지급액이라 공급가에 넣고, 세관 수입부가세만 뺀다.
-test('과세 항목의 부가세는 공급가에 포함한다 (23차)', () => {
+// 2026-09-04 규약: 항목 부가세(81,000)는 에이원이 매입세액으로 공제받으므로 공급가에 넣지 않는다.
+test('과세 항목의 부가세는 공급가에 넣지 않는다 (23차)', () => {
   const shipping: CostItem[] = [
     { amountKrw: 634709 }, { amountKrw: 291820 }, { amountKrw: 72955 }, { amountKrw: 210000 },
     { amountKrw: 50000 }, { amountKrw: 40000 }, { amountKrw: 8400 }, { amountKrw: 486 },
@@ -101,11 +101,43 @@ test('과세 항목의 부가세는 공급가에 포함한다 (23차)', () => {
     importAmountUsd: 83865, customsExchangeRate: 1467.1, marginRatePct: 5,
     costItems: [...shipping, ...customs], roundingPolicy: 'floor_100', vatMode: 'exclusive',
   })
+  // 부가세는 계속 집계한다 — 화면이 「별도 부가세가 붙은 항목」을 보여주는 데 쓴다.
   assert.equal(c.itemVatKrw, 81000)          // (220,000 + 590,000) × 10%
   assert.equal(c.importVatKrw, 12396480)
-  assert.equal(c.supplyAmountKrw, 131678000)
-  assert.equal(c.vatKrw, 13167800)
-  assert.equal(c.confirmedKrw, 144845800)
+  assert.equal(c.dutyKrw, 0)
+  // 구규약 131,678,000 에서 항목 부가세 81,000 이 빠졌다 (절사 후 100원 단위)
+  assert.equal(c.supplyAmountKrw, 131597000)
+  assert.equal(c.vatKrw, 13159700)
+  assert.equal(c.confirmedKrw, 144756700)
+  assert.equal(c.supplyAmountKrw + c.vatKrw, c.confirmedKrw)
+})
+
+// 43차 실데이터의 관세 1,836,920. 공급가 밖으로 빼고 부가세를 매긴 뒤 합계에 얹는다.
+test('관세는 공급가에서 빼고 합계에만 더한다', () => {
+  const c = calculateInterim({
+    importAmountUsd: 100, customsExchangeRate: 1000,
+    costItems: [{ amountKrw: 50000 }, { amountKrw: 1836920, isDuty: true }],
+    roundingPolicy: 'none', vatMode: 'exclusive',
+  })
+  assert.equal(c.dutyKrw, 1836920)
+  assert.equal(c.supplyAmountKrw, 150000)          // 관세가 빠졌다
+  assert.equal(c.vatKrw, 15000)                    // 관세에는 매출부가세를 매기지 않는다
+  assert.equal(c.confirmedKrw, 150000 + 15000 + 1836920)
+})
+
+test('관세에는 항목 부가세를 매기지 않는다', () => {
+  assert.equal(costItemVat({ amountKrw: 1836920, isDuty: true }), 0)
+  assert.equal(costItemVat({ amountKrw: 1836920, isDuty: true, isVatTaxable: true }), 0)
+})
+
+test('구방식(inclusive)은 관세도 종전대로 합산한다 — 스냅샷을 흔들지 않는다', () => {
+  const c = calculateInterim({
+    importAmountUsd: 100, customsExchangeRate: 1000,
+    costItems: [{ amountKrw: 50000 }, { amountKrw: 1836920, isDuty: true }],
+    roundingPolicy: 'none', vatMode: 'inclusive',
+  })
+  assert.equal(c.dutyKrw, 0)
+  assert.equal(c.confirmedKrw, 100000 + 50000 + 1836920)
 })
 
 test('수입부가세 항목에는 항목 부가세를 다시 매기지 않는다', () => {
