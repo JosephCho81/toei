@@ -10,6 +10,10 @@ import { KIND_LABEL, type CompareRow, type CompareSummary, type SettlementKind }
  * 「얼마나 더 내고 덜 냈는가」(청구 vs 계산)와 「앞으로 얼마를 더 내야 하는가」(청구 vs 지급)는
  * 같은 표에 섞으면 서로를 가린다. 여기서는 앞의 질문을 답하고,
  * 「언제 얼마」는 지급 현황이 답한다.
+ *
+ * 금액은 전부 **에이원 기준**이다 — 토에이/에이원 시점 토글은 없앴다(담당자 2026-09-05:
+ * 「에이원 자료이니 에이원 기준으로만 해도 상관없을거 같습니다」). 관점을 둘로 두면
+ * 화면마다 같은 금액에 다른 이름이 붙어 대화가 어긋난다.
  */
 
 const TABS: { kind: SettlementKind; href: string }[] = [
@@ -26,21 +30,23 @@ export function CompareScreen({
   kind,
   rows,
   summary,
-  view,
+  today,
   note,
   error,
 }: {
   kind: SettlementKind
   rows: CompareRow[]
   summary: CompareSummary
-  view: 'toei' | 'a1'
+  today: string
   note?: React.ReactNode
   /** 데이터를 못 읽었으면 빈 표 대신 이유를 띄운다 */
   error?: string | null
 }) {
-  const toei = view === 'toei'
-  const q = view === 'a1' ? '?view=a1' : ''
-
+  /**
+   * 카드 다섯 장이 담당자의 문장 하나를 그대로 답한다 —
+   * 「청구금액 기준으로는 68만 더 지급됐는데, 계산금액과 비교하면 덜 지급된 상태다」.
+   * 넷째·다섯째가 그 두 숫자다. 어제까지 다섯째가 없어 뒷문장을 화면에서 확인할 수 없었다.
+   */
   const cards = [
     {
       label: '청구 누계',
@@ -52,8 +58,8 @@ export function CompareScreen({
     {
       label: '계산 누계',
       value: summary.calcKrw,
-      sub: `같은 ${summary.billedCount}건을 현재 규약으로 다시 계산`
-        + (summary.legacyCount > 0 ? ` · 구방식 ${summary.legacyCount}건은 직접 비교 불가` : '')
+      sub: `청구된 차수를 현재 규약으로 다시 계산`
+        + (summary.excludedCount > 0 ? ` · 비교 불가 ${summary.excludedCount}건 제외` : '')
         + (summary.plannedCalcKrw !== 0
           ? ` · 청구 예정 ${krw(summary.plannedCalcKrw)}원 별도`
           : ''),
@@ -70,11 +76,29 @@ export function CompareScreen({
         : '없습니다',
       alert: summary.underBilledKrw > 0,
     },
+    // 아래 두 장은 **기일이 지난 차수의 순액**이다 — 초과 지급분이 상계되어 들어간다.
+    // 담당자 수기검산이 그렇게 낸다(「35차까지 68만 더 지급」). 그래서 지급 현황의
+    // 「미지급금」(초과 지급을 따로 세우는 대표용 숫자)과 이름을 나눠 둔다 —
+    // 같은 말에 다른 수가 붙으면 두 화면을 두고 하는 대화가 어긋난다.
     {
-      label: toei ? '미수금' : '미지급금',
-      value: summary.balanceKrw,
-      sub: `${toei ? '입금' : '지급'} 누계 ${krw(summary.paidKrw)}원`,
-      alert: false,
+      label: '청구 대비 차액',
+      value: Math.abs(summary.overdueBalanceKrw),
+      sub: `기일 지난 ${summary.overdueCount}건 순액 · `
+        + (summary.overdueBalanceKrw >= 0 ? '덜 지급' : '더 지급')
+        + (Math.abs(summary.notDueBalanceKrw) >= 1
+          ? ` · 기일 미도래 ${krw(summary.notDueBalanceKrw)}원 별도`
+          : ''),
+      alert: summary.overdueBalanceKrw > 0,
+    },
+    {
+      label: '계산 대비 차액',
+      value: Math.abs(summary.overdueCalcVsPaidKrw),
+      sub: '기일 지난 차수 순액 · '
+        + (summary.overdueCalcVsPaidKrw >= 0
+          ? '청구가 맞았다면 더 받았을 금액'
+          : '계산값보다 더 지급된 금액')
+        + (summary.excludedCount > 0 ? ` · 비교 불가 ${summary.excludedCount}건 제외` : ''),
+      alert: summary.overdueCalcVsPaidKrw > 0,
     },
   ]
 
@@ -84,24 +108,9 @@ export function CompareScreen({
         <div>
           <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>{KIND_LABEL[kind]}</h2>
           <p className="text-sm text-muted-foreground">
-            청구액 · 계산값 · {toei ? '입금액' : '지급액'}을 나란히 놓고 어디가 어긋났는지 봅니다 ·
-            {' '}대금은 한국에이원 → 토에이산교 방향입니다
+            청구액 · 계산값 · 지급액을 나란히 놓고 어디가 어긋났는지 봅니다 ·
+            {' '}한국에이원 기준이며 대금은 에이원 → 토에이산교 방향입니다
           </p>
-        </div>
-
-        <div className="inline-flex overflow-hidden rounded-md border text-sm">
-          {(['toei', 'a1'] as const).map((v) => (
-            <Link
-              key={v}
-              href={`/settlements/${kind}${v === 'a1' ? '?view=a1' : ''}`}
-              className={cn(
-                'px-3 py-1.5',
-                view === v ? 'bg-slate-800 font-semibold text-white' : 'hover:bg-muted',
-              )}
-            >
-              {v === 'toei' ? '토에이 시점' : '에이원 시점'}
-            </Link>
-          ))}
         </div>
       </div>
 
@@ -109,7 +118,7 @@ export function CompareScreen({
         {TABS.map((t) => (
           <Link
             key={t.kind}
-            href={`${t.href}${q}`}
+            href={t.href}
             className={cn(
               'border-l px-4 py-1.5 first:border-l-0',
               t.kind === kind ? 'bg-slate-800 font-semibold text-white' : 'hover:bg-muted',
@@ -120,7 +129,7 @@ export function CompareScreen({
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 lg:grid-cols-5">
         {cards.map((c) => (
           <div key={c.label} className="bg-card px-4 py-3">
             <div className="break-keep text-sm text-muted-foreground">{c.label}</div>
@@ -148,12 +157,7 @@ export function CompareScreen({
 
       {note}
 
-      <CompareTable rows={rows} kind={kind} view={view} />
-
-      <p className="text-sm text-muted-foreground">
-        「청구−계산」은 청구서가 어긋난 금액이고, 「{toei ? '미수금' : '미지급금'}」은 아직 오가지 않은 금액입니다 —
-        서로 다른 이야기라 열을 나눠 두었습니다. 1,000원 미만 차이는 절사로 보아 0으로 봅니다.
-      </p>
+      <CompareTable rows={rows} kind={kind} today={today} />
     </div>
   )
 }

@@ -12,8 +12,9 @@ import { PAID_TOLERANCE_KRW, roundName, type Installment, type PaymentRow } from
  * 차수별 지급 현황.
  *
  * **돈의 방향은 한국에이원 → 토에이산교다.** 청구액이 양수면 에이원이 토에이에 낼 돈이고,
- * 음수(환급)일 때만 토에이가 에이원에 돌려준다. 그래서 같은 잔액을 토에이는 미수금으로,
- * 에이원은 미지급금으로 읽는다 — 문장의 「들어오다/나가다」도 관점에 따라 뒤집는다.
+ * 음수(환급)일 때만 토에이가 에이원에 돌려준다. 화면은 **에이원 기준**으로 고정한다 —
+ * 시점 토글은 없앴다(담당자 2026-09-05). 관점을 둘로 두면 같은 금액에 이름이 둘 붙어
+ * 대화가 어긋난다.
  *
  * 읽는 사람이 둘이다 — 양사 대표(한눈에 「얼마 남았나」)와 담당자(빨리 입력).
  * 그래서 기본은 차수당 한 줄이고, 줄을 누르면 그 차수의 지급 내역과 입력 버튼이 열린다.
@@ -83,22 +84,22 @@ function statusText(r: PaymentRow): string {
  * 손대야 할 줄에만 붙는 한 문장. 붙지 않았으면 문제가 없다는 뜻이다.
  * 화면에서 빨강은 이 문장과 그 줄의 잔액, 두 곳뿐이다.
  *
- * 돈이 에이원에서 토에이로 가므로 「나가다/들어오다」는 보는 쪽에 따라 뒤집힌다.
+ * 돈은 에이원에서 토에이로 나간다 — 에이원 기준이라 「나갔다」로 적는다.
  */
-function issueText(r: PaymentRow, toei: boolean): string | null {
+function issueText(r: PaymentRow): string | null {
   if (r.billedKrw == null) {
     return r.paidKrw !== 0
-      ? `${krw(r.paidKrw)}원이 ${toei ? '입금됐으나' : '지급됐으나'} 청구액이 등록되지 않아 대조할 기준이 없습니다`
+      ? `${krw(r.paidKrw)}원이 지급됐으나 청구액이 등록되지 않아 대조할 기준이 없습니다`
       : null
   }
-  if (r.state === 'no_record') return `${toei ? '입금' : '지급'} 기록이 없습니다`
+  if (r.state === 'no_record') return '지급 기록이 없습니다'
   if (r.state === 'overdue') {
     const last = r.installments.at(-1)
-    return `${krw(r.balanceKrw)}원이 ${toei ? '아직 들어오지 않았습니다' : '아직 나가지 않았습니다'}`
-      + (last ? ` (최근 ${toei ? '입금' : '지급'} ${last.paidAt})` : '')
+    return `${krw(r.balanceKrw)}원이 아직 나가지 않았습니다`
+      + (last ? ` (최근 지급 ${last.paidAt})` : '')
   }
   if (r.state === 'overpaid') {
-    return `청구액보다 ${krw(-r.balanceKrw)}원 ${toei ? '더 들어왔습니다' : '더 나갔습니다'}`
+    return `청구액보다 ${krw(-r.balanceKrw)}원 더 나갔습니다`
       + ' — 다음 차수 상계 여부를 확인해 주세요'
   }
   return null
@@ -111,15 +112,7 @@ const TD = 'px-3 py-2.5 whitespace-nowrap align-middle'
 const NUM = 'text-right'
 const CENTER = 'text-center'
 
-export function PaymentTable({
-  rows,
-  view,
-}: {
-  rows: PaymentRow[]
-  /** 같은 금액을 토에이는 미수금으로, 에이원은 미지급금으로 읽는다 */
-  view: 'toei' | 'a1'
-}) {
-  const toei = view === 'toei'
+export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
   const router = useRouter()
   const [filter, setFilter] = useState<FilterKey>('all')
   const [open, setOpen] = useState<Set<string>>(new Set())
@@ -132,8 +125,8 @@ export function PaymentTable({
   )
   const visible = useMemo(() => rows.filter(FILTERS.find((f) => f.key === filter)!.test), [rows, filter])
 
-  const balanceLabel = toei ? '미수금' : '미지급금'
-  const paidLabel = toei ? '입금액' : '지급액'
+  const balanceLabel = '미지급금'
+  const paidLabel = '지급액'
 
   function toggle(id: string) {
     setOpen((prev) => {
@@ -145,7 +138,7 @@ export function PaymentTable({
   }
 
   async function remove(paymentId: string, label: string) {
-    if (!confirm(`${label} ${toei ? '입금' : '지급'} 기록을 삭제합니다. 되돌릴 수 없습니다.`)) return
+    if (!confirm(`${label} 지급 기록을 삭제합니다. 되돌릴 수 없습니다.`)) return
     setBusy(paymentId)
     const res = await fetch(`/api/payments/${paymentId}`, { method: 'DELETE' })
     setBusy(null)
@@ -179,7 +172,7 @@ export function PaymentTable({
           ))}
         </div>
         <p className="text-sm text-muted-foreground">
-          금액은 중간정산 기준입니다 · 차수를 누르면 {toei ? '입금' : '지급'} 내역이 열리고 그 자리에서 입력·수정합니다.
+          금액은 중간정산 기준입니다 · 차수를 누르면 지급 내역이 열리고 그 자리에서 입력·수정합니다.
         </p>
       </div>
 
@@ -200,7 +193,7 @@ export function PaymentTable({
 
           {visible.map((r, i) => {
             const isOpen = open.has(r.transactionId)
-            const issue = issueText(r, toei)
+            const issue = issueText(r)
             const zebra = i % 2 === 1 ? 'bg-slate-50/60' : ''
 
             return (
@@ -276,7 +269,6 @@ export function PaymentTable({
                     <td colSpan={COLS} className="border-l-4 border-slate-300 bg-slate-100/70 px-6 py-3">
                       <RoundDetail
                         row={r}
-                        toei={toei}
                         onAdd={() => setDraft({ mode: 'create', row: r })}
                         onEdit={(inst) => setDraft({ mode: 'edit', row: r, installment: inst })}
                         onDelete={remove}
@@ -314,14 +306,12 @@ export function PaymentTable({
  */
 function RoundDetail({
   row,
-  toei,
   onAdd,
   onEdit,
   onDelete,
   busy,
 }: {
   row: PaymentRow
-  toei: boolean
   onAdd: () => void
   onEdit: (inst: Installment) => void
   onDelete: (paymentId: string, label: string) => void
@@ -336,19 +326,19 @@ function RoundDetail({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="font-semibold">
-          {roundName(row)} 중간정산 {toei ? '입금' : '지급'} 내역
+          {roundName(row)} 중간정산 지급 내역
         </span>
         <button
           type="button"
           onClick={onAdd}
           className="inline-flex items-center gap-1 rounded-md border bg-white px-2.5 py-1 hover:bg-slate-100"
         >
-          <Plus className="h-3.5 w-3.5" /> {toei ? '입금' : '지급'} 입력
+          <Plus className="h-3.5 w-3.5" /> 지급 입력
         </button>
       </div>
 
       {row.installments.length === 0 ? (
-        <p className="text-muted-foreground">아직 {toei ? '입금' : '지급'} 기록이 없습니다.</p>
+        <p className="text-muted-foreground">아직 지급 기록이 없습니다.</p>
       ) : (
         <table className="w-full max-w-2xl border-collapse">
           <tbody>
@@ -413,7 +403,7 @@ function RoundDetail({
                 : ` — 일치합니다 (절사 ${krw(Math.abs(row.billedKrw - row.paidKrw))}원)`)
             : (row.balanceKrw > 0
                 ? ` — ${krw(row.balanceKrw)}원 모자랍니다`
-                : ` — ${krw(-row.balanceKrw)}원 ${toei ? '더 들어왔습니다' : '더 나갔습니다'}`)}
+                : ` — ${krw(-row.balanceKrw)}원 더 나갔습니다`)}
         </p>
       )}
 
@@ -429,7 +419,7 @@ function RoundDetail({
           <span className="font-semibold">최종정산</span>
           {' · 청구 '}<b className="tabular-nums">{krw(Math.abs(row.closingBilledKrw))}</b>원
           {row.closingBilledKrw < 0 ? ' (토에이가 에이원에 돌려줄 환급)' : ''}
-          {` · ${toei ? '입금' : '지급'} `}
+          {' · 지급 '}
           <b className="tabular-nums">
             {row.closingInstallments.length === 0 ? '없음' : `${krw(Math.abs(row.closingPaidKrw))}원`}
           </b>
@@ -438,8 +428,8 @@ function RoundDetail({
             ? '정산이 끝났습니다'
             : `${krw(Math.abs(row.closingBalanceKrw))}원이 `
               + (row.closingBalanceKrw > 0
-                  ? (toei ? '아직 에이원에서 들어오지 않았습니다' : '아직 토에이로 나가지 않았습니다')
-                  : (toei ? '아직 에이원으로 돌아가지 않았습니다' : '아직 토에이에서 돌아오지 않았습니다'))}
+                  ? '아직 토에이로 나가지 않았습니다'
+                  : '아직 토에이에서 돌아오지 않았습니다')}
         </p>
       )}
 

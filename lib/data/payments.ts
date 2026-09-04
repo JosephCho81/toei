@@ -106,9 +106,38 @@ export interface PaymentAlerts {
   total: number
 }
 
+/**
+ * 앞으로 한 달에 얼마씩 나가는가 — 담당자 요청(2026-09-05).
+ *
+ * 「지급 중(36차)이나 지급일이 돌아오지 않은 건은 미수로 잡지 않는 것이 좋아보입니다.
+ *   대신 각 월별 결제 예정금액을 한 3-4개월 정도 알 수 있도록.」
+ *
+ * 기일이 아직 오지 않은 돈은 **못 받은 돈이 아니라 받을 예정인 돈**이다.
+ * 미지급금과 한 칸에 합치면 지금처럼 잔액의 76%가 「아직 낼 때가 아닌 돈」으로 채워진다.
+ */
+export interface MonthlyDue {
+  /** 'YYYY-MM' */
+  month: string
+  /** 이미 청구된 차수의 남은 금액 */
+  billedKrw: number
+  /** 아직 청구 전이라 계산값으로 잡은 예상액 */
+  plannedKrw: number
+  totalKrw: number
+  rounds: {
+    transactionId: string
+    roundNo: number | null
+    roundLabel: string
+    dueDate: string
+    krw: number
+    /** 청구 전이라 예상액인가 */
+    planned: boolean
+  }[]
+}
+
 export interface PaymentSummary {
   billedKrw: number
   paidKrw: number
+  /** 청구 잔액 전체 — 기일 경과분과 미도래분을 합친 값이다. 화면에서 한 칸에 쓰지 않는다 */
   balanceKrw: number
   overdueKrw: number
   overdueCount: number
@@ -116,8 +145,14 @@ export interface PaymentSummary {
   /** 청구액보다 많이 나간 금액 (양수로 담는다) */
   overpaidKrw: number
   overpaidCount: number
-  next90Krw: number
-  next90Count: number
+  /** 기일이 아직 오지 않은 미지급 — 미지급금과 섞지 않는다 */
+  notDueKrw: number
+  notDueCount: number
+  /** 이번 달부터 4개월치 결제 예정 */
+  monthlyDue: MonthlyDue[]
+  /** 그 4개월 밖의 예정액 */
+  laterKrw: number
+  laterCount: number
   nextDue: PaymentRow | null
   lastPayment: { roundNo: number | null; roundLabel: string; paidAt: string; amountKrw: number } | null
   /** 아직 청구하지 않은 차수의 예상 청구액 합계 */
@@ -176,6 +211,56 @@ function daysBetween(from: string, to: string): number {
 
 function num(v: number | string | null | undefined): number {
   return v == null ? 0 : Number(v)
+}
+
+/** 'YYYY-MM' 에 n 개월을 더한다. */
+function addMonths(ym: string, n: number): string {
+  const total = Number(ym.slice(0, 4)) * 12 + (Number(ym.slice(5, 7)) - 1) + n
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`
+}
+
+/**
+ * 이번 달부터 4개월치 결제 예정.
+ *
+ * **기일이 지난 것은 넣지 않는다** — 그건 예정이 아니라 이미 밀린 돈이고 미지급금이 센다.
+ * 아직 청구 전인 차수는 계산값으로 잡되 「예상」임을 행마다 들고 간다.
+ */
+function buildSchedule(rows: PaymentRow[], today: string) {
+  const months = Array.from({ length: 4 }, (_, i) => addMonths(today.slice(0, 7), i))
+  const byMonth = new Map<string, MonthlyDue>(
+    months.map((m) => [m, { month: m, billedKrw: 0, plannedKrw: 0, totalKrw: 0, rounds: [] }]),
+  )
+  let laterKrw = 0
+  let laterCount = 0
+
+  for (const r of rows) {
+    if (r.dueDate == null || r.dueDate <= today) continue
+
+    const planned = r.billedKrw == null
+    const krw = planned ? (r.plannedKrw ?? 0) : r.balanceKrw
+    if (Math.abs(krw) < PAID_TOLERANCE_KRW) continue
+
+    const bucket = byMonth.get(r.dueDate.slice(0, 7))
+    if (!bucket) {
+      laterKrw += krw
+      laterCount += 1
+      continue
+    }
+    if (planned) bucket.plannedKrw += krw
+    else bucket.billedKrw += krw
+    bucket.totalKrw += krw
+    bucket.rounds.push({
+      transactionId: r.transactionId,
+      roundNo: r.roundNo,
+      roundLabel: r.roundLabel,
+      dueDate: r.dueDate,
+      krw,
+      planned,
+    })
+  }
+
+  for (const b of byMonth.values()) b.rounds.sort((a, c) => a.dueDate.localeCompare(c.dueDate))
+  return { monthlyDue: months.map((m) => byMonth.get(m)!), laterKrw, laterCount }
 }
 
 export async function loadPaymentsData(supabase: SupabaseClient, today: string) {
@@ -332,9 +417,7 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
   const open = billedRows.filter((r) => r.state !== 'paid')
   const overdue = open.filter((r) => r.state === 'no_record' || r.state === 'overdue')
   const overpaid = open.filter((r) => r.state === 'overpaid')
-  const next90 = open.filter(
-    (r) => r.dueDate != null && r.delayDays != null && r.delayDays <= 0 && r.delayDays > -90,
-  )
+  const notDue = open.filter((r) => r.state === 'due_soon' || r.state === 'upcoming')
   const upcoming = open
     .filter((r) => r.dueDate != null && r.delayDays != null && r.delayDays <= 0)
     .sort((a, b) => (b.delayDays ?? 0) - (a.delayDays ?? 0))
@@ -358,6 +441,8 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
       closingOpenCount += 1
     }
   }
+
+  const schedule = buildSchedule(rows, today)
 
   const planned = rows.filter((r) => r.plannedKrw != null)
   const calcDiff = rows.filter((r) => r.calcDiffKrw != null && Math.abs(r.calcDiffKrw) >= PAID_TOLERANCE_KRW)
@@ -397,8 +482,9 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
     maxDelayDays: overdue.reduce((m, r) => Math.max(m, r.delayDays ?? 0), 0),
     overpaidKrw: -overpaid.reduce((s, r) => s + r.balanceKrw, 0),
     overpaidCount: overpaid.length,
-    next90Krw: next90.reduce((s, r) => s + r.balanceKrw, 0),
-    next90Count: next90.length,
+    notDueKrw: notDue.reduce((s, r) => s + r.balanceKrw, 0),
+    notDueCount: notDue.length,
+    ...schedule,
     nextDue: upcoming[0] ?? null,
     lastPayment,
     plannedKrw: planned.reduce((s, r) => s + (r.plannedKrw ?? 0), 0),

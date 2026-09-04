@@ -9,17 +9,16 @@ import { roundName, type PaymentAlerts as Alerts } from '@/lib/data/payments'
  * 2차 미입금이 1,500일 넘게 잊힌 것이 「나중에 보자」의 결과였다.
  *
  * 문장은 대표가 그대로 읽을 수 있게 쓴다. 「배분」·「미배분」 같은 내부 용어를 쓰지 않는다.
- * 돈은 한국에이원 → 토에이산교로 가므로 「들어오다/나가다」는 보는 쪽에 따라 뒤집는다.
+ * 돈은 한국에이원 → 토에이산교로 가고, 화면은 에이원 기준이라 「나갔다」로 적는다.
  */
-export function PaymentAlerts({ alerts, view }: { alerts: Alerts; view: 'toei' | 'a1' }) {
-  const toei = view === 'toei'
+export function PaymentAlerts({ alerts }: { alerts: Alerts }) {
   const items: { text: string; href?: string; action?: string }[] = []
 
   for (const r of alerts.noRecord) {
     items.push({
       text: `${roundName(r)} ${r.balanceKrw.toLocaleString('ko-KR')}원이 기일에서 `
         + `${r.delayDays?.toLocaleString('ko-KR')}일 지나도록 `
-        + `${toei ? '들어온' : '나간'} 기록이 없습니다`,
+        + '나간 기록이 없습니다',
       href: `/transactions/${r.transactionId}`,
       action: '거래 보기',
     })
@@ -27,7 +26,7 @@ export function PaymentAlerts({ alerts, view }: { alerts: Alerts; view: 'toei' |
   if (alerts.overpaid.length > 0) {
     const sum = -alerts.overpaid.reduce((s, r) => s + r.balanceKrw, 0)
     items.push({
-      text: `청구액보다 많이 ${toei ? '들어온' : '나간'} 차수가 ${alerts.overpaid.length}개 있습니다 `
+      text: `청구액보다 많이 나간 차수가 ${alerts.overpaid.length}개 있습니다 `
         + `(${alerts.overpaid.map(roundName).join(', ')} · 합계 ${sum.toLocaleString('ko-KR')}원). `
         + '다음 차수에서 상계했는지 확인이 필요합니다',
     })
@@ -35,7 +34,7 @@ export function PaymentAlerts({ alerts, view }: { alerts: Alerts; view: 'toei' |
   for (const r of alerts.billedMissing) {
     items.push({
       text: `${roundName(r)}은 ${Math.round(r.paidKrw).toLocaleString('ko-KR')}원이 `
-        + `${toei ? '들어왔는데' : '나갔는데'} 청구액이 등록되어 있지 않아 대조할 수 없습니다`,
+        + '나갔는데 청구액이 등록되어 있지 않아 대조할 수 없습니다',
       href: `/transactions/${r.transactionId}`,
       action: '거래 보기',
     })

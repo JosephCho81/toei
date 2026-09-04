@@ -3,10 +3,10 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { loadPaymentsData, roundName } from '@/lib/data/payments'
 import { PaymentKpis } from '@/components/payments/PaymentKpis'
+import { PaymentSchedule } from '@/components/payments/PaymentSchedule'
 import { KindSummary } from '@/components/payments/KindSummary'
 import { PaymentAlerts } from '@/components/payments/PaymentAlerts'
 import { PaymentTable } from '@/components/payments/PaymentTable'
-import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = {
   title: '지급 현황',
@@ -20,17 +20,13 @@ export const metadata: Metadata = {
  * 음수(환급)일 때만 토에이가 에이원에 돌려준다. 리포트·PDF 의
  * 「한국에이원 → 토에이산교 지급」과 같은 규약이다. 라벨을 반대로 달지 말 것.
  *
- * ?view=a1 로 관점을 뒤집는다 — 같은 금액을 토에이는 미수금으로, 에이원은 미지급금으로 읽는다.
+ * 화면은 **에이원 기준 하나**다 — 토에이/에이원 시점 토글은 없앴다(담당자 2026-09-05:
+ * 「에이원 자료이니 에이원 기준으로만 해도 상관없을거 같습니다」).
+ *
  * 입력 모드는 두지 않는다. 담당자가 쓰려고 화면을 갈아타야 하면 결국 엑셀로 돌아간다 —
  * 표에서 차수를 펴면 그 자리에서 입력·수정한다.
  */
-export default async function PaymentsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ view?: string }>
-}) {
-  const view = (await searchParams).view === 'a1' ? 'a1' : 'toei'
-
+export default async function PaymentsPage() {
   const today = new Date().toISOString().slice(0, 10)
   const supabase = await createClient()
   const { rows, summary, alerts } = await loadPaymentsData(supabase, today)
@@ -39,45 +35,32 @@ export default async function PaymentsPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>지급 현황</h2>
-          <p className="text-sm text-muted-foreground">
-            {today} 기준 · 전체 {rows.length}차수 중 청구 완료 {billed}차수 ·
-            {' '}대금은 한국에이원 → 토에이산교 방향입니다
-          </p>
-        </div>
-
-        <div className="inline-flex overflow-hidden rounded-md border text-sm">
-          {(['toei', 'a1'] as const).map((v) => (
-            <Link
-              key={v}
-              href={`/payments?view=${v}`}
-              className={cn(
-                'px-3 py-1.5',
-                view === v ? 'bg-slate-800 font-semibold text-white' : 'hover:bg-muted',
-              )}
-            >
-              {v === 'toei' ? '토에이 시점' : '에이원 시점'}
-            </Link>
-          ))}
-        </div>
+      <div>
+        <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>지급 현황</h2>
+        <p className="text-sm text-muted-foreground">
+          {today} 기준 · 전체 {rows.length}차수 중 청구 완료 {billed}차수 ·
+          {' '}한국에이원 기준이며 대금은 에이원 → 토에이산교 방향입니다
+        </p>
       </div>
 
-      <PaymentAlerts alerts={alerts} view={view} />
+      <PaymentAlerts alerts={alerts} />
 
-      <PaymentKpis summary={summary} view={view} />
+      <PaymentKpis summary={summary} />
 
-      <KindSummary byKind={summary.byKind} view={view} />
+      <PaymentSchedule
+        months={summary.monthlyDue}
+        laterKrw={summary.laterKrw}
+        laterCount={summary.laterCount}
+      />
 
-      <PaymentTable rows={rows} view={view} />
+      <KindSummary byKind={summary.byKind} />
+
+      <PaymentTable rows={rows} />
 
       <div className="space-y-1.5 rounded-md border bg-slate-50 px-4 py-3 text-sm text-muted-foreground">
         {summary.lastPayment && (
           <p>
-            <span className="font-semibold text-foreground">
-              {view === 'toei' ? '최근 입금' : '최근 지급'}
-            </span>
+            <span className="font-semibold text-foreground">최근 지급</span>
             {' · '}{roundName(summary.lastPayment)}{' '}
             <span className="tabular-nums text-foreground">
               {Math.round(summary.lastPayment.amountKrw).toLocaleString('ko-KR')}원
@@ -94,9 +77,7 @@ export default async function PaymentsPage({
             {Math.abs(Math.round(summary.closingBalanceKrw)).toLocaleString('ko-KR')}원
           </span>
           {'은 '}
-          {summary.closingBalanceKrw >= 0
-            ? (view === 'toei' ? '토에이가 더 받을 금액입니다' : '에이원이 더 낼 금액입니다')
-            : (view === 'toei' ? '토에이가 돌려줄 금액입니다' : '에이원이 돌려받을 금액입니다')}
+          {summary.closingBalanceKrw >= 0 ? '에이원이 더 낼 금액입니다' : '에이원이 돌려받을 금액입니다'}
           {'. 창고 보관료 등 정산과 무관한 입출금은 '}
           <Link href="/payments/ledger" className="underline underline-offset-2">통장 원장</Link>
           에서 확인합니다.

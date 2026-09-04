@@ -11,15 +11,7 @@ import { PAID_TOLERANCE_KRW, type KindTotals } from '@/lib/data/payments'
  * 세 구분을 한 표에 세우는 이유는 합계를 보여주려는 게 아니라
  * **어느 쪽에 돈이 묶여 있는지**를 한눈에 가르기 위해서다.
  */
-export function KindSummary({
-  byKind,
-  view,
-}: {
-  byKind: KindTotals[]
-  view: 'toei' | 'a1'
-}) {
-  const toei = view === 'toei'
-  const q = view === 'a1' ? '?view=a1' : ''
+export function KindSummary({ byKind }: { byKind: KindTotals[] }) {
   const krw = (n: number) => Math.round(n).toLocaleString('ko-KR')
 
   // 아직 한 건도 없는 구분은 0 만 세 칸 늘어놓게 되므로 줄이되, 통째로 감추지는 않는다 —
@@ -33,8 +25,8 @@ export function KindSummary({
           <tr className="border-b bg-slate-50 text-slate-600">
             <th className="w-[22%] px-3 py-2 text-left font-semibold">구분</th>
             <th className="w-[22%] px-3 py-2 text-right font-semibold">청구액 (원)</th>
-            <th className="w-[22%] px-3 py-2 text-right font-semibold">{toei ? '입금액' : '지급액'} (원)</th>
-            <th className="w-[22%] px-3 py-2 text-right font-semibold">{toei ? '미수금' : '미지급금'} (원)</th>
+            <th className="w-[22%] px-3 py-2 text-right font-semibold">지급액 (원)</th>
+            <th className="w-[22%] px-3 py-2 text-right font-semibold">미지급금 (원)</th>
             <th className="w-[12%] px-3 py-2 text-center font-semibold">남은 차수</th>
           </tr>
         </thead>
@@ -45,7 +37,7 @@ export function KindSummary({
             return (
               <tr key={r.kind} className="border-b last:border-0 hover:bg-slate-50">
                 <td className="px-3 py-2">
-                  <Link href={`${r.href}${q}`} className="font-semibold underline underline-offset-2">
+                  <Link href={r.href} className="font-semibold underline underline-offset-2">
                     {r.label}
                   </Link>
                 </td>
@@ -64,7 +56,7 @@ export function KindSummary({
                       {Math.abs(r.balanceKrw) < PAID_TOLERANCE_KRW ? '0' : krw(Math.abs(r.balanceKrw))}
                       {r.balanceKrw < -PAID_TOLERANCE_KRW && (
                         <span className="ml-1 text-xs font-normal text-muted-foreground">
-                          {toei ? '돌려줄 몫' : '돌려받을 몫'}
+                          돌려받을 몫
                         </span>
                       )}
                     </td>

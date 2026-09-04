@@ -121,8 +121,8 @@ export function PaymentDialog({
                 onChange={(e) => setDirection(e.target.value as 'out' | 'in')}
                 className="h-9 rounded-md border bg-transparent px-3 text-sm"
               >
-                <option value="out">출금 (토에이 → 에이원)</option>
-                <option value="in">입금 (환급·상계)</option>
+                <option value="out">출금 (에이원 → 토에이 지급)</option>
+                <option value="in">입금 (토에이 → 에이원 환급·상계)</option>
               </select>
             </div>
           )}
