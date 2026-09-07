@@ -38,10 +38,12 @@ export default async function DashboardPage({
   const periodLabel = from === to ? `${from}년` : `${from}~${to}년`
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="space-y-2">
         <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>정산 현황</h2>
-        <p className="text-xs text-muted-foreground">LC 개설일 기준</p>
+        <p className="text-sm text-muted-foreground">
+          LC 개설일 기준 · 물류와 정산 일정이 어떻게 흘러갔는지 봅니다
+        </p>
         <PeriodFilterBar from={from} to={to} earliestYear={EARLIEST_YEAR} />
       </div>
 

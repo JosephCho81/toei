@@ -41,17 +41,18 @@ export function BlLink({ blNo, mblNo, carrierName }: {
   }
 
   return (
+    // 색으로 조회처를 말하지 않는다 — 어디로 가는지는 툴팁이 말한다.
+    // 표에서 색이 늘어나면 정작 손댈 곳의 빨강이 묻힌다.
     <a
       href={target.href}
       onClick={handleClick}
       title={title}
-      className="inline-flex items-center gap-1 font-mono text-xs hover:underline"
-      style={{ color: target.via === 'carrier' ? '#2E7D32' : '#B26A00' }}
+      className="inline-flex items-center gap-1 tabular-nums text-slate-700 hover:underline"
     >
       {blNo}
       {copied
-        ? <Check className="h-3 w-3 shrink-0 text-green-700" />
-        : <ExternalLink className="h-3 w-3 shrink-0" />}
+        ? <Check className="h-3.5 w-3.5 shrink-0" />
+        : <ExternalLink className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
     </a>
   )
 }

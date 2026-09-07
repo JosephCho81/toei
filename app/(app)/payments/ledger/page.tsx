@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
+import { TABLE, TABLE_WRAP, TH, TD, THEAD_ROW, CENTER, NUM, zebra } from '@/components/ui/table-style'
 
 export const metadata: Metadata = {
   title: '통장 원장',
@@ -78,12 +79,12 @@ export default async function LedgerPage({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>통장 원장</h2>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             전체 {all.length}건 · 배분이 끝나지 않은 {pending.length}건
             {unallocKrw > 0 && ` · 미배분 ${unallocKrw.toLocaleString('ko-KR')}원`}
           </p>
         </div>
-        <div className="flex gap-2 text-xs">
+        <div className="flex gap-2 text-sm">
           <Link
             href={showAll ? '/payments/ledger' : '/payments/ledger?all=1'}
             className="rounded-md border px-3 py-1.5 hover:bg-muted"
@@ -96,44 +97,44 @@ export default async function LedgerPage({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
+      <div className={TABLE_WRAP}>
+        <table className={TABLE}>
           <thead>
-            <tr className="bg-muted/60 text-muted-foreground">
-              <th className="px-3 py-2 text-left text-xs font-medium">날짜</th>
-              <th className="px-3 py-2 text-left text-xs font-medium">구분</th>
-              <th className="px-3 py-2 text-right text-xs font-medium">금액</th>
-              <th className="px-3 py-2 text-left text-xs font-medium">배분</th>
-              <th className="px-3 py-2 text-left text-xs font-medium">적요</th>
+            <tr className={THEAD_ROW}>
+              <th className={cn(TH, CENTER, 'w-28')}>날짜</th>
+              <th className={cn(TH, CENTER, 'w-20')}>구분</th>
+              <th className={cn(TH, NUM, 'w-36')}>금액 (원)</th>
+              <th className={TH}>배분</th>
+              <th className={TH}>적요</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((p) => {
+            {rows.map((p, i) => {
               const list = byPayment.get(p.id) ?? []
               const unalloc = n(p.unallocated_krw)
               return (
-                <tr key={p.id} className={cn('border-t', unalloc > 0 && 'bg-red-50',
-                  unalloc === 0 && Number(p.unconfirmed_count) > 0 && 'bg-amber-50')}>
-                  <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{p.paid_at}</td>
-                  <td className={cn('px-3 py-2 text-xs',
-                    p.direction === 'out' ? 'text-rose-800' : 'text-emerald-800')}>
+                // 손댈 줄은 왼쪽 세로선 하나로 표시한다 — 줄 전체를 칠하지 않는다
+                <tr key={p.id} className={cn('border-t', zebra(i),
+                  unalloc > 0 && 'border-l-4 border-l-red-600')}>
+                  <td className={cn(TD, CENTER, 'tabular-nums text-muted-foreground')}>{p.paid_at}</td>
+                  <td className={cn(TD, CENTER)}>
                     {p.direction === 'out' ? '출금' : '입금'}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">
+                  <td className={cn(TD, NUM, 'tabular-nums')}>
                     {n(p.amount_krw).toLocaleString('ko-KR')}
                   </td>
-                  <td className="px-3 py-2 text-xs">
+                  <td className="px-3 py-2.5 align-middle">
                     {unalloc > 0 && (
-                      <span className="mr-1 rounded-sm bg-red-600 px-1.5 py-0.5 font-semibold text-white">
+                      <span className="mr-1.5 font-semibold text-red-700">
                         미배분 {unalloc.toLocaleString('ko-KR')}원
                       </span>
                     )}
-                    {list.map((a, i) => {
+                    {list.map((a, j) => {
                       const t = Array.isArray(a.transactions) ? a.transactions[0] : a.transactions
                       return (
-                        <span key={i} className={cn(
-                          'mr-1 inline-block rounded-sm border px-1.5 py-0.5',
-                          a.confirmed ? 'bg-card' : 'border-amber-500 bg-amber-100 text-amber-900',
+                        <span key={j} className={cn(
+                          'mr-1 inline-block rounded-sm border bg-white px-1.5 py-0.5',
+                          !a.confirmed && 'text-muted-foreground',
                         )}>
                           {t?.round_label ?? KIND_LABEL[a.kind] ?? a.kind}
                           {' '}{n(a.amount_krw).toLocaleString('ko-KR')}
@@ -143,7 +144,7 @@ export default async function LedgerPage({
                     })}
                     {list.length === 0 && unalloc === 0 && <span className="text-muted-foreground">-</span>}
                   </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">{p.bank_memo ?? '-'}</td>
+                  <td className="px-3 py-2.5 align-middle text-muted-foreground">{p.bank_memo ?? '-'}</td>
                 </tr>
               )
             })}
@@ -156,7 +157,7 @@ export default async function LedgerPage({
         </table>
       </div>
 
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         「확인 대기」는 통장 적요에 적힌 배분을 그대로 옮겨 넣은 것으로, 담당자 확인을 아직 받지 않았습니다.
         차수별 배분을 고치는 화면은 다음 단계에서 붙입니다.
       </p>

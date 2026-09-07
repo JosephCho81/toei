@@ -5,9 +5,10 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
+import { cn } from '@/lib/utils'
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table'
+  TABLE, TABLE_WRAP, TH, THEAD_ROW, CENTER, zebra,
+} from '@/components/ui/table-style'
 import { Plus, Trash2, Download } from 'lucide-react'
 import { MasterTabs } from '@/components/masters/MasterTabs'
 import { GLOVE_TYPES } from '@/components/transactions/ItemDatalists'
@@ -74,7 +75,7 @@ export default function ProductsPage() {
       <MasterTabs />
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">품목 마스터</h2>
+          <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>품목 마스터</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             거래 입력 시 선택 목록으로 쓰이며, 선택하면 재질·색상·단위가 자동 입력됩니다.
           </p>
@@ -92,7 +93,7 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      <div className="rounded-md border bg-muted/40 px-4 py-3 text-xs text-muted-foreground space-y-1">
+      <div className="space-y-1 rounded-md border bg-slate-50 px-4 py-3 text-sm text-muted-foreground">
         <p className="font-medium text-foreground">품목 마스터 쓰는 법</p>
         <p>1. 여기에 자주 쓰는 품목을 등록해 둡니다 (품목명·재질·색상·단위·사이즈 순서).</p>
         <p>2. 거래 등록/수정의 품목 명세에서 <b>품목명 칸을 클릭</b>하면 등록한 목록이 뜨고, 고르면 재질·색상·단위가 자동으로 채워집니다.</p>
@@ -108,59 +109,59 @@ export default function ProductsPage() {
         <div className="rounded-md border bg-muted/50 px-4 py-2 text-sm text-muted-foreground">{message}</div>
       )}
 
-      <div className="border rounded-lg overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>품목명 *</TableHead>
-              <TableHead className="w-28">재질</TableHead>
-              <TableHead className="w-32">색상</TableHead>
-              <TableHead className="w-20">단위</TableHead>
-              <TableHead className="w-40">사이즈 순서</TableHead>
-              <TableHead className="w-16 text-center">사용</TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r._key}>
-                <TableCell className="p-1">
+      <div className={TABLE_WRAP}>
+        <table className={TABLE}>
+          <thead>
+            <tr className={THEAD_ROW}>
+              <th className={TH}>품목명 *</th>
+              <th className={cn(TH, 'w-28')}>재질</th>
+              <th className={cn(TH, 'w-32')}>색상</th>
+              <th className={cn(TH, 'w-20')}>단위</th>
+              <th className={cn(TH, 'w-40')}>사이즈 순서</th>
+              <th className={cn(TH, CENTER, 'w-16')}>사용</th>
+              <th className={cn(TH, 'w-10')} />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r._key} className={cn('border-t', zebra(i))}>
+                <td className="p-1">
                   <Input className="h-8 text-sm" value={r.name} onChange={(e) => upd(r._key, 'name', e.target.value)} />
-                </TableCell>
-                <TableCell className="p-1">
+                </td>
+                <td className="p-1">
                   <Input className="h-8 text-sm" list="dl-products-glove-type" value={r.glove_type}
                     onChange={(e) => upd(r._key, 'glove_type', e.target.value)} />
-                </TableCell>
-                <TableCell className="p-1">
+                </td>
+                <td className="p-1">
                   <Input className="h-8 text-sm" value={r.color} onChange={(e) => upd(r._key, 'color', e.target.value)} />
-                </TableCell>
-                <TableCell className="p-1">
+                </td>
+                <td className="p-1">
                   <Input className="h-8 text-sm" value={r.default_unit} onChange={(e) => upd(r._key, 'default_unit', e.target.value)} />
-                </TableCell>
-                <TableCell className="p-1">
+                </td>
+                <td className="p-1">
                   <Input className="h-8 text-sm" value={r.size_sequence} placeholder="XS, S, M, L"
                     onChange={(e) => upd(r._key, 'size_sequence', e.target.value)} />
-                </TableCell>
-                <TableCell className="p-1 text-center">
+                </td>
+                <td className="p-1 text-center">
                   <Checkbox checked={r.is_active} onCheckedChange={(v) => upd(r._key, 'is_active', !!v)} />
-                </TableCell>
-                <TableCell className="p-1">
+                </td>
+                <td className="p-1">
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"
                     onClick={() => { setRows((p) => p.filter((x) => x._key !== r._key)); setSaved(false) }}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
-                </TableCell>
-              </TableRow>
+                </td>
+              </tr>
             ))}
             {!rows.length && (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8 text-sm">
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">
                   등록된 품목이 없습니다. &lsquo;거래 데이터에서 가져오기&rsquo; 또는 &lsquo;행 추가&rsquo;로 등록하세요.
-                </TableCell>
-              </TableRow>
+                </td>
+              </tr>
             )}
-          </TableBody>
-        </Table>
+          </tbody>
+        </table>
       </div>
 
       <datalist id="dl-products-glove-type">

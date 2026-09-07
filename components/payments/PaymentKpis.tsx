@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils'
+import { StatCards } from '@/components/ui/StatCards'
 import type { PaymentSummary } from '@/lib/data/payments'
 
 /**
@@ -18,55 +18,42 @@ import type { PaymentSummary } from '@/lib/data/payments'
 export function PaymentKpis({ summary }: { summary: PaymentSummary }) {
   const krw = (n: number) => Math.round(n).toLocaleString('ko-KR')
 
-  const cards = [
-    {
-      label: '미지급금 (기일 경과)',
-      value: summary.overdueKrw,
-      sub: summary.overdueCount > 0
-        ? `${summary.overdueCount}개 차수 · 최장 ${summary.maxDelayDays.toLocaleString('ko-KR')}일 경과`
-        : '없습니다',
-      alert: summary.overdueKrw > 0,
-    },
-    {
-      label: '기일 미도래',
-      value: summary.notDueKrw,
-      sub: summary.notDueCount > 0
-        ? `${summary.notDueCount}개 차수 · 가장 이른 기일 ${summary.nextDue?.dueDate ?? '미정'}`
-        : '없습니다',
-      alert: false,
-    },
-    {
-      label: '청구 예정',
-      value: summary.plannedKrw,
-      sub: summary.plannedCount > 0 ? `${summary.plannedCount}개 차수 · 아직 청구 전` : '없습니다',
-      alert: false,
-    },
-    {
-      label: '지급 누계',
-      value: summary.paidKrw,
-      sub: `청구 누계 ${krw(summary.billedKrw)}원`
-        + (summary.overpaidCount > 0
-          ? ` · 초과 지급 ${summary.overpaidCount}개 차수 ${krw(summary.overpaidKrw)}원`
-          : ''),
-      alert: false,
-    },
-  ]
-
   return (
-    <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 lg:grid-cols-4">
-      {cards.map((c) => (
-        <div key={c.label} className="bg-card px-4 py-3">
-          <div className="break-keep text-sm text-muted-foreground">{c.label}</div>
-          <div className={cn(
-            'mt-1 text-xl font-semibold tabular-nums tracking-tight',
-            c.alert && 'text-red-700',
-          )}>
-            {krw(c.value)}
-            <span className="ml-0.5 text-sm font-normal text-muted-foreground">원</span>
-          </div>
-          <div className="mt-1 break-keep text-sm leading-snug text-muted-foreground">{c.sub}</div>
-        </div>
-      ))}
-    </div>
+    <StatCards
+      items={[
+        {
+          label: '미지급금 (기일 경과)',
+          value: krw(summary.overdueKrw),
+          unit: '원',
+          sub: summary.overdueCount > 0
+            ? `${summary.overdueCount}개 차수 · 최장 ${summary.maxDelayDays.toLocaleString('ko-KR')}일 경과`
+            : '없습니다',
+          alert: summary.overdueKrw > 0,
+        },
+        {
+          label: '기일 미도래',
+          value: krw(summary.notDueKrw),
+          unit: '원',
+          sub: summary.notDueCount > 0
+            ? `${summary.notDueCount}개 차수 · 가장 이른 기일 ${summary.nextDue?.dueDate ?? '미정'}`
+            : '없습니다',
+        },
+        {
+          label: '청구 예정',
+          value: krw(summary.plannedKrw),
+          unit: '원',
+          sub: summary.plannedCount > 0 ? `${summary.plannedCount}개 차수 · 아직 청구 전` : '없습니다',
+        },
+        {
+          label: '지급 누계',
+          value: krw(summary.paidKrw),
+          unit: '원',
+          sub: `청구 누계 ${krw(summary.billedKrw)}원`
+            + (summary.overpaidCount > 0
+              ? ` · 초과 지급 ${summary.overpaidCount}개 차수 ${krw(summary.overpaidKrw)}원`
+              : ''),
+        },
+      ]}
+    />
   )
 }

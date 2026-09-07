@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { StatCards, type Stat } from '@/components/ui/StatCards'
 import { CompareTable } from './CompareTable'
 import { KIND_LABEL, type CompareRow, type CompareSummary, type SettlementKind } from '@/lib/data/settlementCompare'
 
@@ -47,27 +48,28 @@ export function CompareScreen({
    * 「청구금액 기준으로는 68만 더 지급됐는데, 계산금액과 비교하면 덜 지급된 상태다」.
    * 넷째·다섯째가 그 두 숫자다. 어제까지 다섯째가 없어 뒷문장을 화면에서 확인할 수 없었다.
    */
-  const cards = [
+  const cards: Stat[] = [
     {
       label: '청구 누계',
-      value: summary.invoicedKrw,
+      value: krw(summary.invoicedKrw),
+      unit: '원',
       sub: `${summary.billedCount}건 청구`
         + (summary.unbilledCount > 0 ? ` · ${summary.unbilledCount}건 아직 청구 전` : ''),
-      alert: false,
     },
     {
       label: '계산 누계',
-      value: summary.calcKrw,
+      value: krw(summary.calcKrw),
+      unit: '원',
       sub: `청구된 차수를 현재 규약으로 다시 계산`
         + (summary.excludedCount > 0 ? ` · 비교 불가 ${summary.excludedCount}건 제외` : '')
         + (summary.plannedCalcKrw !== 0
           ? ` · 청구 예정 ${krw(summary.plannedCalcKrw)}원 별도`
           : ''),
-      alert: false,
     },
     {
       label: '덜 청구한 금액',
-      value: summary.underBilledKrw,
+      value: krw(summary.underBilledKrw),
+      unit: '원',
       sub: summary.underBilledCount > 0
         ? `${summary.underBilledCount}건`
           + (summary.overBilledCount > 0
@@ -82,7 +84,8 @@ export function CompareScreen({
     // 같은 말에 다른 수가 붙으면 두 화면을 두고 하는 대화가 어긋난다.
     {
       label: '청구 대비 차액',
-      value: Math.abs(summary.overdueBalanceKrw),
+      value: krw(Math.abs(summary.overdueBalanceKrw)),
+      unit: '원',
       sub: `기일 지난 ${summary.overdueCount}건 순액 · `
         + (summary.overdueBalanceKrw >= 0 ? '덜 지급' : '더 지급')
         + (Math.abs(summary.notDueBalanceKrw) >= 1
@@ -92,7 +95,8 @@ export function CompareScreen({
     },
     {
       label: '계산 대비 차액',
-      value: Math.abs(summary.overdueCalcVsPaidKrw),
+      value: krw(Math.abs(summary.overdueCalcVsPaidKrw)),
+      unit: '원',
       sub: '기일 지난 차수 순액 · '
         + (summary.overdueCalcVsPaidKrw >= 0
           ? '청구가 맞았다면 더 받았을 금액'
@@ -129,21 +133,7 @@ export function CompareScreen({
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 lg:grid-cols-5">
-        {cards.map((c) => (
-          <div key={c.label} className="bg-card px-4 py-3">
-            <div className="break-keep text-sm text-muted-foreground">{c.label}</div>
-            <div className={cn(
-              'mt-1 text-xl font-semibold tabular-nums tracking-tight',
-              c.alert && 'text-red-700',
-            )}>
-              {krw(c.value)}
-              <span className="ml-0.5 text-sm font-normal text-muted-foreground">원</span>
-            </div>
-            <div className="mt-1 break-keep text-sm leading-snug text-muted-foreground">{c.sub}</div>
-          </div>
-        ))}
-      </div>
+      <StatCards items={cards} />
 
       {error && (
         <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm">

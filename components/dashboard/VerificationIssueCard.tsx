@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Info } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
+import { TABLE, TABLE_WRAP, TH, TD, THEAD_ROW, CENTER, NUM, zebra } from '@/components/ui/table-style'
 
 export type VerRow = {
   id: string
@@ -33,6 +33,13 @@ function formatDiff(diff: number | null, roundLabel: string): string {
   return '계산값과 일치 (소수점 반올림 차이 이내)'
 }
 
+/**
+ * 확정금액과 계산값이 어긋난 차수.
+ *
+ * 주황 카드에 주황 표머리로 세워 두었던 것을 회색조로 내렸다 — 화면에 색이 셋(초록·주황·빨강)
+ * 있으면 어느 것이 급한지 알 수 없다. 여기 있는 것은 「확인이 필요한 것」이지
+ * 「지금 돈이 잘못 나가는 것」이 아니라, 빨강은 쓰지 않는다.
+ */
 export function VerificationIssueCard({ rows }: { rows: VerRow[] }) {
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const router = useRouter()
@@ -48,62 +55,59 @@ export function VerificationIssueCard({ rows }: { rows: VerRow[] }) {
   }
 
   return (
-    <Card style={{ borderColor: '#FFB74D' }}>
-      <CardHeader className="pb-2" style={{ backgroundColor: '#FFF3E0', borderRadius: '0.5rem 0.5rem 0 0' }}>
-        <CardTitle className="text-base flex items-center gap-2" style={{ color: '#E65100' }}>
-          ⚠️ 검증 이슈
-          <span className="text-xs font-normal text-orange-500">행 클릭 시 거래 상세로 이동</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="px-4 py-3 flex items-start gap-2 text-sm" style={{ backgroundColor: '#F0F7F0', borderBottom: '1px solid #A5D6A7' }}>
-          <Info className="h-4 w-4 mt-0.5 shrink-0" style={{ color: '#388E3C' }} />
-          <div style={{ color: '#1B5E20' }}>
-            <span className="font-semibold">중간정산 계산 기준</span>
-            <br />
-            확정금액 = &#123; (수입금액<sub>USD</sub> × 통관환율 × (1 + 마진율)) + 통관비용 합계 &#125; × 1.10
-            <br />
-            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ 해상운임 (부가세 별도 실비 청구)
-            <br />
-            <span className="text-xs" style={{ color: '#4CAF50' }}>
-              · 통관환율: 입고시 세관 신고 환율 기준<br />
-              · 해상운임은 부가세 별도 실비 청구 → 부가세(×1.10) 적용 제외<br />
-              · 클로징환율(BOK)은 클로징정산 환차손익 계산에 별도 적용
-            </span>
-          </div>
-        </div>
-        <table className="w-full text-sm">
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="font-semibold">
+          검증 이슈
+          <span className="ml-1.5 font-normal text-muted-foreground">{visible.length}건</span>
+        </h3>
+        <span className="text-sm text-muted-foreground">행을 누르면 거래 상세로 갑니다</span>
+      </div>
+
+      <div className="rounded-md border bg-slate-50 px-4 py-3 text-sm">
+        <p className="font-semibold">중간정산 계산 기준</p>
+        <p className="mt-1">
+          확정금액 = &#123; (수입금액<sub>USD</sub> × 통관환율 × (1 + 마진율)) + 통관비용 합계 &#125; × 1.10
+          {' '}+ 해상운임 (부가세 별도 실비 청구)
+        </p>
+        <ul className="mt-1 space-y-0.5 text-muted-foreground">
+          <li>· 통관환율은 입고 시 세관 신고 환율 기준입니다</li>
+          <li>· 해상운임은 부가세 별도 실비 청구라 ×1.10 에서 제외합니다</li>
+          <li>· 클로징환율(BOK)은 최종정산 환차손익에만 씁니다</li>
+        </ul>
+      </div>
+
+      <div className={TABLE_WRAP}>
+        <table className={TABLE}>
           <thead>
-            <tr style={{ backgroundColor: '#FFE0B2' }}>
-              <th className="text-center px-4 py-2 text-xs font-medium" style={{ color: '#E65100' }}>차수</th>
-              <th className="text-center px-4 py-2 text-xs font-medium" style={{ color: '#E65100' }}>확정금액</th>
-              <th className="text-center px-4 py-2 text-xs font-medium" style={{ color: '#E65100' }}>이슈 내용</th>
-              <th className="px-4 py-2"></th>
+            <tr className={THEAD_ROW}>
+              <th className={cn(TH, CENTER, 'w-[10%]')}>차수</th>
+              <th className={cn(TH, NUM, 'w-[16%]')}>확정금액 (원)</th>
+              <th className={TH}>이슈 내용</th>
+              <th className={cn(TH, 'w-[10%]')} />
             </tr>
           </thead>
           <tbody>
-            {visible.map((row) => (
+            {visible.map((row, i) => (
               <tr
                 key={row.id}
-                className="border-t cursor-pointer hover:bg-orange-50 transition-colors"
-                style={{ borderColor: '#FFE0B2' }}
+                className={cn('cursor-pointer border-t hover:bg-slate-100/70', zebra(i))}
                 onClick={() => router.push(`/transactions/${row.transaction_id}`)}
               >
-                <td className="px-4 py-2 font-semibold text-center" style={{ color: '#BF360C' }}>
-                  {row.round_label}
-                </td>
-                <td className="px-4 py-2 text-right font-mono text-xs">
+                <td className={cn(TD, CENTER, 'font-semibold')}>{row.round_label}</td>
+                <td className={cn(TD, NUM, 'tabular-nums')}>
                   {row.confirmed_amount_krw != null
-                    ? `${Number(row.confirmed_amount_krw).toLocaleString('ko-KR')}원`
+                    ? Number(row.confirmed_amount_krw).toLocaleString('ko-KR')
                     : '-'}
                 </td>
-                <td className="px-4 py-2 text-xs" style={{ color: '#6B7280' }}>
+                <td className="px-3 py-2.5 align-middle text-muted-foreground">
                   {formatDiff(row.diff, row.round_label)}
                 </td>
-                <td className="px-4 py-2 text-right">
+                <td className={cn(TD, CENTER)}>
                   <button
+                    type="button"
                     onClick={(e) => { e.stopPropagation(); void handleConfirm(row.id) }}
-                    className="text-xs text-green-700 border border-green-300 rounded px-2 py-1 hover:bg-green-50 whitespace-nowrap transition-colors"
+                    className="whitespace-nowrap rounded-md border bg-white px-2 py-1 hover:bg-slate-100"
                   >
                     확인했음
                   </button>
@@ -112,7 +116,7 @@ export function VerificationIssueCard({ rows }: { rows: VerRow[] }) {
             ))}
           </tbody>
         </table>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

@@ -38,13 +38,13 @@ export default async function TransactionsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <h2 className="text-2xl font-bold">거래 목록</h2>
-          <p className="text-xs text-muted-foreground">
-            품목·금액 대조와 오류 표시용. LC 개설일·ETD·정산 일정은{' '}
-            <Link href="/dashboard" className="underline hover:no-underline" style={{ color: '#2E7D32' }}>
+          <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>거래 목록</h2>
+          <p className="text-sm text-muted-foreground">
+            품목·금액 대조와 오류 표시용입니다. LC 개설일·ETD·정산 일정은{' '}
+            <Link href="/dashboard" className="underline underline-offset-2">
               정산 현황
             </Link>
-            에서 본다.
+            에서 봅니다.
           </p>
         </div>
         <div className="flex gap-2">

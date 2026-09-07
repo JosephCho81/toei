@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, ChevronRight, StickyNote } from 'lucide-react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { MemoField } from '@/components/ui/MemoField'
@@ -35,10 +35,7 @@ import { aggregate, type CompareRow, type CompareTotals, type SettlementKind } f
  * 「에이원 자료이니 에이원 기준으로만 해도 상관없다」
  */
 
-const TH = 'px-2.5 py-2.5 font-semibold whitespace-nowrap text-slate-600'
-const TD = 'px-2.5 py-2.5 whitespace-nowrap align-middle'
-const NUM = 'text-right'
-const CENTER = 'text-center'
+import { TABLE, TABLE_WRAP, TH_TIGHT as TH, TD_TIGHT as TD, THEAD_ROW, CENTER, NUM } from '@/components/ui/table-style'
 const COLS = 10
 
 type FilterKey = 'all' | 'billMismatch' | 'overdue' | 'open' | 'paid' | 'unbilled'
@@ -203,10 +200,10 @@ export function CompareTable({
         </div>
       )}
 
-      <div className="mt-2 overflow-x-auto rounded-md border">
-        <table className="w-full table-fixed border-collapse text-sm">
+      <div className={`mt-2 ${TABLE_WRAP}`}>
+        <table className={`table-fixed ${TABLE}`}>
           <thead>
-            <tr className="border-b bg-slate-50">
+            <tr className={THEAD_ROW}>
               <th className={cn(TH, CENTER, 'w-[3%]')}>
                 <input
                   type="checkbox"
@@ -216,15 +213,15 @@ export function CompareTable({
                   className="h-3.5 w-3.5 align-middle accent-slate-700"
                 />
               </th>
-              <th className={cn(TH, CENTER, 'w-[14%]')}>차수 · P/O No.</th>
-              <th className={cn(TH, NUM, 'w-[12%]')}>청구액 (원)</th>
-              <th className={cn(TH, NUM, 'w-[12%]')}>계산값 (원)</th>
-              <th className={cn(TH, NUM, 'w-[10%]')}>청구−계산</th>
-              <th className={cn(TH, NUM, 'w-[12%]')}>지급액 (원)</th>
-              <th className={cn(TH, NUM, 'w-[10%]')}>청구−지급</th>
-              <th className={cn(TH, NUM, 'w-[10%]')}>계산−지급</th>
-              <th className={cn(TH, CENTER, 'w-[12%]')}>기일 · 실지급일</th>
-              <th className={cn(TH, CENTER, 'w-[5%]')}>비고</th>
+              <th className={cn(TH, CENTER, 'w-[13%]')}>차수 · P/O No.</th>
+              <th className={cn(TH, NUM, 'w-[11%]')}>청구액 (원)</th>
+              <th className={cn(TH, NUM, 'w-[11%]')}>계산값 (원)</th>
+              <th className={cn(TH, NUM, 'w-[9%]')}>청구−계산</th>
+              <th className={cn(TH, NUM, 'w-[11%]')}>지급액 (원)</th>
+              <th className={cn(TH, NUM, 'w-[9%]')}>청구−지급</th>
+              <th className={cn(TH, NUM, 'w-[9%]')}>계산−지급</th>
+              <th className={cn(TH, CENTER, 'w-[11%]')}>기일 · 실지급일</th>
+              <th className={cn(TH, 'w-[13%]')}>비고 (금액 차이 사유)</th>
             </tr>
           </thead>
 
@@ -389,11 +386,8 @@ function GroupBody({
                 </span>
               </td>
 
-              <td className={cn(TD, CENTER, 'px-1')}>
-                <StickyNote
-                  className={cn('mx-auto h-4 w-4', r.note ? 'text-slate-700' : 'text-slate-300')}
-                  aria-label={r.note ? '메모 있음' : '메모 없음'}
-                />
+              <td className="px-2.5 py-2.5 align-middle">
+                <NoteCell note={r.note} />
               </td>
             </tr>
 
@@ -600,5 +594,24 @@ function Line({ label, value, note }: { label: string; value: number | null; not
       </td>
       <td className="py-1.5 text-muted-foreground">{note}</td>
     </tr>
+  )
+}
+
+/**
+ * 표에 보이는 비고 한 칸. 지급 현황의 것과 같은 규칙이다 —
+ * 첫 줄만 세우고 나머지는 개수로 말한다. 아이콘만 두면 메모가 있는지도 모르고 지나간다.
+ */
+function NoteCell({ note }: { note: string | null }) {
+  const lines = note ? note.split('\n').filter((l) => l.trim() !== '') : []
+  if (lines.length === 0) {
+    return <span className="text-muted-foreground">+ 메모</span>
+  }
+  return (
+    <span className="block truncate text-slate-700" title={lines.join('\n')}>
+      {lines[0]}
+      {lines.length > 1 && (
+        <span className="text-muted-foreground"> 외 {lines.length - 1}건</span>
+      )}
+    </span>
   )
 }

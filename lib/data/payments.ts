@@ -75,6 +75,10 @@ export interface PaymentRow {
   closingPaidKrw: number
   closingBalanceKrw: number
   closingInstallments: Installment[]
+  /** 금액 차이의 사유 — 사람이 적는다 (interim_settlements.notes) */
+  note: string | null
+  /** 메모를 저장할 중간정산 행. 정산이 아직 없으면 null */
+  interimSettlementId: string | null
 }
 
 export interface UnallocatedPayment {
@@ -279,7 +283,7 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
       .order('round_no', { ascending: false }),
     supabase
       .from('interim_settlements')
-      .select('transaction_id, invoiced_amount_krw, confirmed_amount_krw'),
+      .select('id, transaction_id, invoiced_amount_krw, confirmed_amount_krw, notes'),
     supabase
       .from('closing_settlements')
       .select('transaction_id, confirmed_amount_krw'),
@@ -299,11 +303,18 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
   // 확정값과의 차이는 「검산 차이」로 따로 보여준다. 둘을 섞으면 미지급처럼 보인다.
   const invoicedOf = new Map<string, number>()
   const confirmedOf = new Map<string, number>()
+  // 메모는 차수마다 하나뿐이라 중간정산 행에 붙여 둔다 — 정산 비교 화면이 쓰는 곳과 같다.
+  // 두 화면이 다른 곳에 적으면 같은 차수에 사유가 둘 생긴다.
+  const noteOf = new Map<string, string | null>()
+  const interimIdOf = new Map<string, string>()
   for (const r of (interimRows ?? []) as {
-    transaction_id: string; invoiced_amount_krw: number | null; confirmed_amount_krw: number | null
+    id: string; transaction_id: string
+    invoiced_amount_krw: number | null; confirmed_amount_krw: number | null; notes: string | null
   }[]) {
     if (r.invoiced_amount_krw != null) invoicedOf.set(r.transaction_id, Number(r.invoiced_amount_krw))
     if (r.confirmed_amount_krw != null) confirmedOf.set(r.transaction_id, Number(r.confirmed_amount_krw))
+    interimIdOf.set(r.transaction_id, r.id)
+    noteOf.set(r.transaction_id, r.notes)
   }
   const closingBilledOf = new Map<string, number>()
   for (const r of (closingRows ?? []) as { transaction_id: string; confirmed_amount_krw: number | null }[]) {
@@ -404,6 +415,8 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
       closingPaidKrw,
       closingBalanceKrw: closingBilledKrw == null ? 0 : closingBilledKrw - closingPaidKrw,
       closingInstallments,
+      note: noteOf.get(t.id) ?? null,
+      interimSettlementId: interimIdOf.get(t.id) ?? null,
     }
   })
 

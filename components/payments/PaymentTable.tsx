@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react'
 import { PaymentDialog, type PaymentDraft } from './PaymentDialog'
+import { MemoField } from '@/components/ui/MemoField'
+import { TABLE, TABLE_WRAP, TH, TD, THEAD_ROW, CENTER, NUM } from '@/components/ui/table-style'
+import { createClient } from '@/lib/supabase/client'
 import { PAID_TOLERANCE_KRW, roundName, type Installment, type PaymentRow } from '@/lib/data/payments'
 
 /**
@@ -26,10 +29,16 @@ import { PAID_TOLERANCE_KRW, roundName, type Installment, type PaymentRow } from
  *
  * 글자는 크기 하나(text-sm)·서체 하나(본문 sans)다. 위계는 굵기와 색으로 낸다.
  * 금액 자릿수는 등폭 서체가 아니라 tabular-nums 로 맞춘다.
+ *
+ * **비고는 표에 펼쳐 둔다** (담당자 2026-09-07: 「지급 현황 페이지에 메모 입력하는 게 안 보인다」).
+ * 아이콘만 두면 메모가 있는 줄인지도 모르고 지나간다 — 첫 줄을 그대로 띄우고,
+ * 빈 줄에는 「+ 메모」를 남겨 어디를 눌러야 적을 수 있는지 보이게 한다.
+ * 적는 곳은 정산 비교 화면과 같은 자리(interim_settlements.notes)다 —
+ * 두 화면이 다른 곳에 적으면 한 차수에 사유가 둘 생긴다.
  */
 
 /** 표의 열 수 — 펼친 상세가 가로로 다 차지하려면 이 값을 쓴다. */
-const COLS = 8
+const COLS = 9
 
 type FilterKey = 'all' | 'attention' | 'open' | 'paid' | 'unbilled' | 'closing'
 
@@ -105,12 +114,6 @@ function issueText(r: PaymentRow): string | null {
   return null
 }
 
-const TH = 'px-3 py-2.5 font-semibold whitespace-nowrap text-slate-600'
-const TD = 'px-3 py-2.5 whitespace-nowrap align-middle'
-
-/** 금액은 오른쪽으로 붙여야 자릿수가 세로로 선다. 글자 열은 가운데. */
-const NUM = 'text-right'
-const CENTER = 'text-center'
 
 export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
   const router = useRouter()
@@ -135,6 +138,21 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
       else next.add(id)
       return next
     })
+  }
+
+  /**
+   * 메모는 중간정산 행에 적는다 — 정산 비교 화면과 같은 칸이라 어느 화면에서 적어도 같이 보인다.
+   * 정산이 아직 없는 차수에는 적을 곳이 없어 상세에서 그 사실을 말해 준다.
+   */
+  async function saveNote(row: PaymentRow, note: string | null) {
+    if (!row.interimSettlementId) throw new Error('중간정산이 아직 없어 메모를 저장할 수 없습니다')
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('interim_settlements')
+      .update({ notes: note })
+      .eq('id', row.interimSettlementId)
+    if (error) throw new Error(error.message)
+    router.refresh()
   }
 
   async function remove(paymentId: string, label: string) {
@@ -176,17 +194,18 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
         </p>
       </div>
 
-      <div className="mt-2 overflow-x-auto rounded-md border">
-        <table className="w-full table-fixed border-collapse text-sm">
+      <div className={`mt-2 ${TABLE_WRAP}`}>
+        <table className={`table-fixed ${TABLE}`}>
           <thead>
-            <tr className="border-b bg-slate-50">
-              <th className={cn(TH, CENTER, 'w-[8%]')}>차수</th>
-              <th className={cn(TH, NUM, 'w-[13%]')}>수입금액 (USD)</th>
-              <th className={cn(TH, NUM, 'w-[16%]')}>청구금액 (원)</th>
-              <th className={cn(TH, NUM, 'w-[16%]')}>{paidLabel} (원)</th>
-              <th className={cn(TH, NUM, 'w-[14%]')}>{balanceLabel} (원)</th>
-              <th className={cn(TH, CENTER, 'w-[11%]')}>기일</th>
-              <th className={cn(TH, CENTER, 'w-[18%]')}>상태</th>
+            <tr className={THEAD_ROW}>
+              <th className={cn(TH, CENTER, 'w-[7%]')}>차수</th>
+              <th className={cn(TH, NUM, 'w-[11%]')}>수입금액 (USD)</th>
+              <th className={cn(TH, NUM, 'w-[14%]')}>청구금액 (원)</th>
+              <th className={cn(TH, NUM, 'w-[14%]')}>{paidLabel} (원)</th>
+              <th className={cn(TH, NUM, 'w-[12%]')}>{balanceLabel} (원)</th>
+              <th className={cn(TH, CENTER, 'w-[10%]')}>기일</th>
+              <th className={cn(TH, CENTER, 'w-[14%]')}>상태</th>
+              <th className={cn(TH, 'w-[14%]')}>비고 (금액 차이 사유)</th>
               <th className={cn(TH, 'w-[4%]')} />
             </tr>
           </thead>
@@ -238,6 +257,9 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
                       <span className="text-muted-foreground"> · {r.installments.length}회 분할</span>
                     )}
                   </td>
+                  <td className="px-3 py-2.5 align-middle">
+                    <NoteCell note={r.note} />
+                  </td>
                   <td className={cn(TD, CENTER, 'px-1')}>
                     <button
                       type="button"
@@ -269,6 +291,7 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
                     <td colSpan={COLS} className="border-l-4 border-slate-300 bg-slate-100/70 px-6 py-3">
                       <RoundDetail
                         row={r}
+                        onSaveNote={saveNote}
                         onAdd={() => setDraft({ mode: 'create', row: r })}
                         onEdit={(inst) => setDraft({ mode: 'edit', row: r, installment: inst })}
                         onDelete={remove}
@@ -306,12 +329,14 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
  */
 function RoundDetail({
   row,
+  onSaveNote,
   onAdd,
   onEdit,
   onDelete,
   busy,
 }: {
   row: PaymentRow
+  onSaveNote: (row: PaymentRow, note: string | null) => Promise<void>
   onAdd: () => void
   onEdit: (inst: Installment) => void
   onDelete: (paymentId: string, label: string) => void
@@ -441,11 +466,45 @@ function RoundDetail({
         </p>
       )}
 
+      {/* 금액 차이의 원인은 사람만 안다 — 최차장님께 설명할 문장을 여기 적어 둔다.
+          정산 비교 화면의 비고와 같은 칸이라 어느 쪽에서 적어도 둘 다에 뜬다. */}
+      <div className="max-w-2xl rounded-md border bg-white px-3 py-2">
+        <p className="mb-1 font-semibold">비고 — 금액 차이가 난 이유</p>
+        {row.interimSettlementId ? (
+          <MemoField notes={row.note} onSave={(next) => onSaveNote(row, next)} />
+        ) : (
+          <p className="text-muted-foreground">
+            이 차수는 중간정산이 아직 없어 메모를 저장할 곳이 없습니다.
+          </p>
+        )}
+      </div>
+
       <p>
         <Link href={`/transactions/${row.transactionId}`} className="underline underline-offset-2">
           {roundName(row)} 거래 상세 보기
         </Link>
       </p>
     </div>
+  )
+}
+
+/**
+ * 표에 보이는 비고 한 칸.
+ * 메모는 여러 줄이지만 표에는 첫 줄만 세우고 나머지는 개수로 말한다 —
+ * 줄 높이를 메모가 정하게 두면 44줄짜리 표가 들쭉날쭉해진다.
+ * 빈 칸에 「+ 메모」를 남겨 두는 이유는, 아이콘만 있으면 적을 수 있는 줄인 줄도 모르기 때문이다.
+ */
+function NoteCell({ note }: { note: string | null }) {
+  const lines = note ? note.split('\n').filter((l) => l.trim() !== '') : []
+  if (lines.length === 0) {
+    return <span className="text-muted-foreground">+ 메모</span>
+  }
+  return (
+    <span className="block truncate text-slate-700" title={lines.join('\n')}>
+      {lines[0]}
+      {lines.length > 1 && (
+        <span className="text-muted-foreground"> 외 {lines.length - 1}건</span>
+      )}
+    </span>
   )
 }

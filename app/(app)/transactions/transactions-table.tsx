@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, Fragment } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { TABLE, TABLE_WRAP, TH, TD, THEAD_ROW, CENTER, NUM, zebra } from '@/components/ui/table-style'
 
 import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
@@ -18,6 +17,13 @@ import type { TxFlag, TxAmountCheck } from '@/types/transaction'
 export type { TxRow } from '@/types/transaction'
 import type { TxRow } from '@/types/transaction'
 
+/**
+ * 거래 목록 — 품목·금액을 토에이 자료와 대조하는 표.
+ *
+ * 표 규칙은 지급 현황과 같은 것(`table-style`)을 쓴다. 색도 같은 규칙이다:
+ * **빨강은 손댈 곳에만**. 오류 표시가 붙은 줄은 왼쪽 세로선과 건수 글자만 빨갛고,
+ * 줄 전체를 빨갛게 칠하지 않는다 — 열 줄이 물들면 어느 것이 급한지 알 수 없다.
+ */
 export function TransactionTable({ rows, initialFlags = [], amountChecks = [] }: {
   rows: TxRow[]
   initialFlags?: TxFlag[]
@@ -28,28 +34,28 @@ export function TransactionTable({ rows, initialFlags = [], amountChecks = [] }:
   const { flagsOf, replaceFlagsOf, toggleError } = useTxFlags(initialFlags)
 
   return (
-    <div className="border rounded-lg overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-12 text-center">오류</TableHead>
-            <TableHead>회차</TableHead>
-            <TableHead>P/O No.</TableHead>
-            <TableHead>제조사</TableHead>
-            <TableHead>품목</TableHead>
-            <TableHead>ETA</TableHead>
-            <TableHead>상태</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+    <div className={TABLE_WRAP}>
+      <table className={TABLE}>
+        <thead>
+          <tr className={THEAD_ROW}>
+            <th className={cn(TH, CENTER, 'w-12')}>오류</th>
+            <th className={cn(TH, CENTER)}>회차</th>
+            <th className={TH}>P/O No.</th>
+            <th className={TH}>제조사</th>
+            <th className={TH}>품목</th>
+            <th className={cn(TH, CENTER)}>ETA</th>
+            <th className={cn(TH, CENTER)}>상태</th>
+          </tr>
+        </thead>
+        <tbody>
           {!rows.length && (
-            <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+            <tr>
+              <td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">
                 등록된 거래가 없습니다.
-              </TableCell>
-            </TableRow>
+              </td>
+            </tr>
           )}
-          {rows.map((t) => {
+          {rows.map((t, i) => {
             const done = t.settlement_status === 'closing_done'
             const eta = getEta(t.containers ?? [])
             const items = [...(t.transaction_items ?? [])].sort((a, b) => a.sort_order - b.sort_order)
@@ -64,89 +70,88 @@ export function TransactionTable({ rows, initialFlags = [], amountChecks = [] }:
             const hasError = openFlags.length > 0
             return (
               <Fragment key={t.id}>
-                <TableRow
+                <tr
                   className={cn(
-                    'cursor-pointer hover:bg-muted/50',
+                    'cursor-pointer border-t hover:bg-slate-100/70',
+                    zebra(i),
                     !hasError && checkStyle?.row,
-                    hasError && 'border-l-4 border-l-red-500 bg-red-50/60 hover:bg-red-50 dark:bg-red-950/20'
+                    hasError && 'border-l-4 border-l-red-600',
                   )}
                   onClick={() => router.push(`/transactions/${t.id}`)}
                 >
-                  <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                  <td className={cn(TD, CENTER)} onClick={(e) => e.stopPropagation()}>
                     <Checkbox
                       checked={hasError}
                       aria-label="오류 표시"
                       onCheckedChange={async (v) => { if (await toggleError(t.id, !!v)) setExpandedId(t.id) }}
                     />
-                  </TableCell>
-                  <TableCell className="font-medium whitespace-nowrap">
+                  </td>
+                  <td className={cn(TD, CENTER, 'font-semibold')}>
                     {t.round_label}
                     {hasError && (
-                      <span className="ml-1.5 text-xs text-red-600 font-normal">
-                        🔴 {openFlags.length}건
-                      </span>
+                      <span className="block font-normal text-red-700">오류 {openFlags.length}건</span>
                     )}
                     {checkStyle && (
                       <span
-                        className={cn('ml-1.5 text-xs font-normal', checkStyle.badge)}
+                        className={cn('block font-normal', checkStyle.badge)}
                         title="품목을 눌러 펼치면 어디가 다른지 볼 수 있습니다"
                       >
-                        {checkStyle.icon} {checkStyle.label} {checkSummary.entries.length}건
+                        {checkStyle.label} {checkSummary.entries.length}건
                       </span>
                     )}
-                  </TableCell>
-                  <TableCell className="text-sm whitespace-nowrap">{t.order_no ?? '-'}</TableCell>
-                  <TableCell className="text-sm whitespace-nowrap">{getMfr(t.manufacturers)}</TableCell>
-                  <TableCell
-                    className="text-sm"
+                  </td>
+                  <td className={TD}>{t.order_no ?? '-'}</td>
+                  <td className={TD}>{getMfr(t.manufacturers)}</td>
+                  <td
+                    className="px-3 py-2.5 align-middle"
                     onClick={(e) => {
                       e.stopPropagation()
                       setExpandedId(isExpanded ? null : t.id)
                     }}
                   >
-                    <div className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <div className="flex cursor-pointer select-none items-center gap-1.5">
                       <span>{summarizeItems(items)}</span>
                       {items.length > 0 && (
-                        <Badge variant="outline" className="text-xs px-1.5 py-0 font-normal">{items.length}건</Badge>
+                        <span className="text-muted-foreground">{items.length}건</span>
                       )}
                       {isExpanded
-                        ? <ChevronUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                        ? <ChevronUp className="h-4 w-4 shrink-0 text-slate-400" />
+                        : <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />}
                     </div>
-                  </TableCell>
-                  <TableCell className="text-sm whitespace-nowrap">{getEtaDisplay(eta, t.delivery_dates)}</TableCell>
-                  <TableCell>
-                    <Badge variant={done ? 'default' : 'secondary'}>{done ? '완료' : '진행중'}</Badge>
-                  </TableCell>
-                </TableRow>
+                  </td>
+                  <td className={cn(TD, CENTER, 'tabular-nums')}>{getEtaDisplay(eta, t.delivery_dates)}</td>
+                  <td className={cn(TD, CENTER, done ? 'text-muted-foreground' : 'text-slate-800')}>
+                    {done ? '완료' : '진행중'}
+                  </td>
+                </tr>
                 {isExpanded && (
-                  <TableRow className="bg-muted/30 hover:bg-muted/30" onClick={(e) => e.stopPropagation()}>
-                    <TableCell colSpan={7} className="pt-0 pb-3 px-6">
+                  <tr onClick={(e) => e.stopPropagation()}>
+                    <td colSpan={7} className="border-l-4 border-slate-300 bg-slate-100/70 px-6 py-3">
                       {items.length === 0
-                        ? <p className="text-xs text-muted-foreground py-2">품목 데이터가 없습니다.</p>
+                        ? <p className="text-sm text-muted-foreground">품목 데이터가 없습니다.</p>
                         : (
-                          <table className="w-full text-xs">
+                          <table className="w-full text-sm">
                             <thead>
                               <tr className="border-b">
                                 {['스펙', '색상', '사이즈'].map((h) => (
-                                  <th key={h} className="text-left py-1.5 pr-6 font-medium text-muted-foreground">{h}</th>
+                                  <th key={h} className="py-1.5 pr-6 text-left font-semibold text-slate-600">{h}</th>
                                 ))}
                                 {['단가(USD)', '수량'].map((h) => (
-                                  <th key={h} className="text-right py-1.5 pr-6 font-medium text-muted-foreground">{h}</th>
+                                  <th key={h} className="py-1.5 pr-6 text-right font-semibold text-slate-600">{h}</th>
                                 ))}
-                                <th className="text-left py-1.5 font-medium text-muted-foreground">단위</th>
+                                <th className="py-1.5 text-left font-semibold text-slate-600">단위</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {items.map((item, i) => (
-                                <tr key={i} className="border-b border-dashed last:border-0">
+                              {items.map((item, j) => (
+                                <tr key={j} className="border-b border-dashed last:border-0">
                                   <td className="py-1.5 pr-6">{item.spec || '-'}</td>
                                   <td className="py-1.5 pr-6">{item.color || '-'}</td>
                                   <td className="py-1.5 pr-6">{item.size || '-'}</td>
-                                  <td className="py-1.5 pr-6 text-right font-mono">
+                                  <td className={cn('py-1.5 pr-6 tabular-nums', NUM)}>
                                     {item.unit_price_usd != null ? `$${Number(item.unit_price_usd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                   </td>
-                                  <td className="py-1.5 pr-6 text-right">
+                                  <td className={cn('py-1.5 pr-6 tabular-nums', NUM)}>
                                     {item.quantity != null ? item.quantity.toLocaleString('ko-KR') : '-'}
                                   </td>
                                   <td className="py-1.5">{item.unit || '-'}</td>
@@ -161,14 +166,14 @@ export function TransactionTable({ rows, initialFlags = [], amountChecks = [] }:
                         flags={txFlags}
                         onChange={(next) => replaceFlagsOf(t.id, next)}
                       />
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 )}
               </Fragment>
             )
           })}
-        </TableBody>
-      </Table>
+        </tbody>
+      </table>
     </div>
   )
 }

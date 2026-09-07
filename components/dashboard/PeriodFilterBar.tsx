@@ -26,19 +26,12 @@ export function PeriodFilterBar({ from, to, earliestYear }: {
     { label: `${thisYear}년`, from: String(thisYear), to: String(thisYear) },
   ]
 
-  const selectStyle = {
-    border: '1.5px solid #4CAF50',
-    color: '#2E7D32',
-    backgroundColor: '#fff',
-  }
-
   return (
     <div className="flex flex-wrap items-center gap-2">
       <select
         value={from}
         onChange={(e) => go(e.target.value, e.target.value > to ? e.target.value : to)}
-        className="px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2"
-        style={selectStyle}
+        className="rounded-md border bg-white px-3 py-1.5 text-sm"
         aria-label="시작 연도"
       >
         {years.map((y) => <option key={y} value={y}>{y}년</option>)}
@@ -47,8 +40,7 @@ export function PeriodFilterBar({ from, to, earliestYear }: {
       <select
         value={to}
         onChange={(e) => go(e.target.value < from ? e.target.value : from, e.target.value)}
-        className="px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2"
-        style={selectStyle}
+        className="rounded-md border bg-white px-3 py-1.5 text-sm"
         aria-label="종료 연도"
       >
         {years.map((y) => <option key={y} value={y}>{y}년</option>)}
@@ -63,12 +55,9 @@ export function PeriodFilterBar({ from, to, earliestYear }: {
               type="button"
               onClick={() => go(p.from, p.to)}
               className={cn(
-                'px-2.5 py-1 text-xs rounded border transition-colors',
-                active ? 'font-semibold' : 'hover:bg-green-50'
+                'rounded-md border px-2.5 py-1 text-sm transition-colors',
+                active ? 'bg-slate-800 font-semibold text-white' : 'bg-white hover:bg-muted',
               )}
-              style={active
-                ? { backgroundColor: '#4CAF50', borderColor: '#388E3C', color: '#fff' }
-                : { borderColor: '#C8E6C9', color: '#388E3C' }}
             >
               {p.label}
             </button>

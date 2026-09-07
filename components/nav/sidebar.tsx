@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
 const navItems = [
   { href: '/payments', label: '지급 현황', icon: Wallet, match: ['/payments'] },
   // 중간·최종·지체상금은 CompareScreen 의 탭이 가른다
-  { href: '/settlements/interim', label: '정산 대사', icon: Scale, match: ['/settlements'] },
+  { href: '/settlements/interim', label: '정산 비교', icon: Scale, match: ['/settlements'] },
   { href: '/dashboard', label: '정산 현황', icon: LayoutDashboard, match: ['/dashboard'] },
   { href: '/transactions', label: '거래 목록', icon: FileText, match: ['/transactions'] },
   // 제조사·품목 마스터는 MasterTabs 가 가른다

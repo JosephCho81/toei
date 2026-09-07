@@ -6,9 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table'
+import { cn } from '@/lib/utils'
+import { TABLE, TABLE_WRAP, TH, TD, THEAD_ROW, CENTER, zebra } from '@/components/ui/table-style'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { MasterTabs } from '@/components/masters/MasterTabs'
 
@@ -85,7 +84,7 @@ export default function ManufacturersPage() {
     <div className="space-y-4 max-w-3xl">
       <MasterTabs />
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">제조사 관리</h2>
+        <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>제조사 관리</h2>
         <Button size="sm" onClick={openNew}><Plus className="h-4 w-4 mr-1" />추가</Button>
       </div>
 
@@ -125,45 +124,55 @@ export default function ManufacturersPage() {
         </Card>
       )}
 
-      <div className="border rounded-lg overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>이름</TableHead>
-              <TableHead>국가</TableHead>
-              <TableHead>별칭</TableHead>
-              <TableHead>메모</TableHead>
-              <TableHead className="w-20"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {manufacturers.map((m) => (
-              <TableRow key={m.id}>
-                <TableCell className="font-medium">{m.name}</TableCell>
-                <TableCell>{m.country}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{m.name_aliases.join(', ')}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{m.notes ?? '-'}</TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(m)}>
+      <div className={TABLE_WRAP}>
+        <table className={TABLE}>
+          <thead>
+            <tr className={THEAD_ROW}>
+              <th className={TH}>이름</th>
+              <th className={TH}>국가</th>
+              <th className={TH}>별칭</th>
+              <th className={TH}>메모</th>
+              <th className={cn(TH, 'w-20')} />
+            </tr>
+          </thead>
+          <tbody>
+            {manufacturers.map((m, i) => (
+              <tr key={m.id} className={cn('border-t', zebra(i))}>
+                <td className={cn(TD, 'font-semibold')}>{m.name}</td>
+                <td className={TD}>{m.country}</td>
+                <td className={cn(TD, 'text-muted-foreground')}>{m.name_aliases.join(', ')}</td>
+                <td className="px-3 py-2.5 align-middle text-muted-foreground">{m.notes ?? '-'}</td>
+                <td className={cn(TD, CENTER)}>
+                  <span className="inline-flex gap-1">
+                    <button
+                      type="button"
+                      aria-label="수정"
+                      onClick={() => openEdit(m)}
+                      className="rounded-sm border bg-white p-1 text-slate-500 hover:bg-slate-100"
+                    >
                       <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(m.id)}>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="삭제"
+                      onClick={() => handleDelete(m.id)}
+                      className="rounded-sm border bg-white p-1 text-red-700 hover:bg-red-50"
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
+                    </button>
+                  </span>
+                </td>
+              </tr>
             ))}
             {!manufacturers.length && (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+              <tr>
+                <td colSpan={5} className="px-3 py-8 text-center text-sm text-muted-foreground">
                   등록된 제조사가 없습니다.
-                </TableCell>
-              </TableRow>
+                </td>
+              </tr>
             )}
-          </TableBody>
-        </Table>
+          </tbody>
+        </table>
       </div>
     </div>
   )
