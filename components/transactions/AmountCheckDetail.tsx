@@ -33,7 +33,6 @@ export const usd = (v: number) => `$${v.toLocaleString('en-US', { minimumFractio
 /** 확장 행에 펼쳐지는 '어디가 어떻게 다른지' 상세 */
 export function AmountCheckDetail({ summary }: { summary: AmountCheckSummary }) {
   if (summary.level === 'none') return null
-  const style = CHECK_STYLES[summary.level]
   return (
     <div className={cn('mt-3 rounded-md border bg-white px-3 py-2 text-sm',
       summary.level === 'mismatch' && 'border-red-300')}>

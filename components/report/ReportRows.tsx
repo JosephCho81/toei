@@ -13,7 +13,7 @@ export function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex text-sm py-1 border-b last:border-0">
       <span className="w-48 text-muted-foreground shrink-0 font-medium">{label}</span>
-      <span className="font-mono">{value}</span>
+      <span className="tabular-nums">{value}</span>
     </div>
   )
 }
@@ -25,9 +25,9 @@ export function AmountRow({ label, value, color, bold, formula }: {
     <div className="py-0.5">
       <div className="flex justify-between text-sm">
         <span className="text-muted-foreground">{label}</span>
-        <span className={`font-mono ${bold ? 'font-semibold' : 'font-medium'} ${color ?? ''}`}>{value}</span>
+        <span className={`tabular-nums ${bold ? 'font-semibold' : 'font-medium'} ${color ?? ''}`}>{value}</span>
       </div>
-      {formula && <p className="text-xs text-gray-400 mt-0.5 font-mono">{formula}</p>}
+      {formula && <p className="text-sm text-gray-400 mt-0.5 tabular-nums">{formula}</p>}
     </div>
   )
 }
@@ -38,7 +38,7 @@ export function FeeTable({ title, items, footerLabel, footerValue }: {
   if (!items.length) return null
   return (
     <div className="mb-3">
-      <p className="text-xs font-semibold text-muted-foreground mb-1">{title}</p>
+      <p className="text-sm font-semibold text-muted-foreground mb-1">{title}</p>
       <Table>
         <TableHeader>
           <TableRow>
@@ -50,12 +50,12 @@ export function FeeTable({ title, items, footerLabel, footerValue }: {
           {items.map((f, i) => (
             <TableRow key={i}>
               <TableCell className="text-sm">{f.item_name}</TableCell>
-              <TableCell className="text-right text-sm font-mono">{f.amount_krw.toLocaleString('ko-KR')}</TableCell>
+              <TableCell className="text-right text-sm tabular-nums">{f.amount_krw.toLocaleString('ko-KR')}</TableCell>
             </TableRow>
           ))}
           <TableRow className="bg-muted/50 font-semibold">
             <TableCell className="text-sm">{footerLabel}</TableCell>
-            <TableCell className="text-right text-sm font-mono">{footerValue.toLocaleString('ko-KR')}</TableCell>
+            <TableCell className="text-right text-sm tabular-nums">{footerValue.toLocaleString('ko-KR')}</TableCell>
           </TableRow>
         </TableBody>
       </Table>

@@ -9,9 +9,9 @@ import { formatDiffUsd, type AmountDiff, type AmountDiffStatus } from '@/lib/cal
 import type { CheckRow } from '@/lib/data/transactionItems'
 
 export const DIFF_STYLES: Record<AmountDiffStatus, { row: string; text: string; icon: string }> = {
-  match: { row: 'bg-emerald-50/60 dark:bg-emerald-950/20', text: 'text-emerald-600', icon: '✅' },
-  minor: { row: 'bg-amber-50/60 dark:bg-amber-950/20', text: 'text-amber-600', icon: '⚠️' },
-  mismatch: { row: 'bg-red-50/70 dark:bg-red-950/20', text: 'text-red-600 font-semibold', icon: '🔴' },
+  match: { row: '', text: 'text-slate-600', icon: '일치' },
+  minor: { row: '', text: 'text-slate-600', icon: '소액차이' },
+  mismatch: { row: 'border-l-4 border-l-red-600', text: 'font-semibold text-red-700', icon: '불일치' },
   empty: { row: '', text: 'text-muted-foreground', icon: '' },
 }
 
@@ -42,7 +42,7 @@ export function AmountCheckRow({ check, diff, isLocked, onUpdate, onRemove }: {
       <TableCell colSpan={4} className="p-1">
         {isLocked
           ? <span className="text-sm px-2">{check.label}</span>
-          : <Input className="h-7 text-xs" value={check.label} placeholder="예: 토에이 입력금액"
+          : <Input className="h-7 text-sm" value={check.label} placeholder="예: 토에이 입력금액"
               onChange={(e) => onUpdate('label', e.target.value)} />}
       </TableCell>
       <TableCell className="p-1" colSpan={2}>
@@ -50,10 +50,10 @@ export function AmountCheckRow({ check, diff, isLocked, onUpdate, onRemove }: {
           ? <span className="text-sm px-2 block text-right">
               {check.amount_usd ? usdLabel(parseFloat(check.amount_usd)) : '-'}
             </span>
-          : <NumberInput className="h-7 text-xs text-right font-mono" value={check.amount_usd}
+          : <NumberInput className="h-7 text-sm text-right tabular-nums" value={check.amount_usd}
               placeholder="금액 입력(USD)" onValueChange={(v) => onUpdate('amount_usd', v)} />}
       </TableCell>
-      <TableCell className="text-xs text-muted-foreground">USD</TableCell>
+      <TableCell className="text-sm text-muted-foreground">USD</TableCell>
       <TableCell className={cn('text-right text-sm pr-3 whitespace-nowrap', style.text)}>
         {diffLabel(diff)}
       </TableCell>
@@ -80,11 +80,11 @@ export function AmountCheckNoteRow({ check, diff, isLocked, colSpan, onUpdate }:
     <TableRow className={cn('border-t-0', DIFF_STYLES[diff.status].row)}>
       <TableCell colSpan={colSpan} className="px-3 pb-2 pt-0">
         {isLocked ? (
-          <p className="text-xs text-muted-foreground">차액 사유: {check.note}</p>
+          <p className="text-sm text-muted-foreground">차액 사유: {check.note}</p>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground shrink-0">차액 사유</span>
-            <Input className="h-6 text-xs" value={check.note}
+            <span className="text-sm text-muted-foreground shrink-0">차액 사유</span>
+            <Input className="h-6 text-sm" value={check.note}
               placeholder="차이가 나는 이유 / 검토 결과 입력"
               onChange={(e) => onUpdate('note', e.target.value)} />
           </div>

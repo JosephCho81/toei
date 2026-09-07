@@ -83,17 +83,17 @@ export default function TransactionEditForm({
             </Select>
           </F>
           <F label="차수 번호 *">
-            <Input className="font-mono text-right" inputMode="numeric" {...register('round_no')} />
-            {errors.round_no && <p className="text-xs text-destructive">{errors.round_no.message}</p>}
+            <Input className="tabular-nums text-right" inputMode="numeric" {...register('round_no')} />
+            {errors.round_no && <p className="text-sm text-destructive">{errors.round_no.message}</p>}
           </F>
           <div className="col-span-2">
             <F label="차수 라벨 *">
               <Input {...register('round_label')} />
-              {errors.round_label && <p className="text-xs text-destructive">{errors.round_label.message}</p>}
+              {errors.round_label && <p className="text-sm text-destructive">{errors.round_label.message}</p>}
             </F>
           </div>
           <F label="발주번호"><Input {...register('order_no')} /></F>
-          <F label="수입금액 (USD)"><NumberInput className="font-mono text-right" {...numberField('import_amount_usd')} /></F>
+          <F label="수입금액 (USD)"><NumberInput className="tabular-nums text-right" {...numberField('import_amount_usd')} /></F>
           <F label="LC 번호"><Input {...register('lc_no')} /></F>
           <F label="LC 개설일"><Input type="date" {...register('lc_open_date')} /></F>
           <F label="A1 지불일"><Input type="date" {...register('a1_payment_date')} /></F>
@@ -106,7 +106,7 @@ export default function TransactionEditForm({
               onValueChange={(v) => setValue('customs_exchange_rate', v, { shouldDirty: true })}
             />
           </F>
-          <F label="마진율 (%)"><NumberInput className="font-mono text-right" {...numberField('margin_rate_pct')} /></F>
+          <F label="마진율 (%)"><NumberInput className="tabular-nums text-right" {...numberField('margin_rate_pct')} /></F>
           <StatusFields
             values={{ lc_status: ls, logistics_status: lgs, document_status: ds }}
             onChange={(k, v) => setValue(k, v, { shouldDirty: true })}
@@ -117,7 +117,7 @@ export default function TransactionEditForm({
           <div className="col-span-2 space-y-1">
             <div className="flex items-center justify-between">
               <Label className="text-sm">납기일</Label>
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addDeliveryDate}>
+              <Button type="button" size="sm" variant="outline" className="h-7 text-sm" onClick={addDeliveryDate}>
                 <Plus className="h-3 w-3 mr-1" />추가
               </Button>
             </div>

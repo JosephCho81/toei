@@ -26,7 +26,7 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">사용자 관리</h2>
+        <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>사용자 관리</h2>
         <Link href="/audit-logs" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
           감사 로그
         </Link>

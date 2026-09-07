@@ -39,7 +39,7 @@ export function AuditLogFilter({
       className="flex flex-wrap gap-3 items-end p-4 bg-muted/30 rounded-lg border"
     >
       <div className="space-y-1">
-        <Label className="text-xs">거래 차수</Label>
+        <Label className="text-sm">거래 차수</Label>
         <Select name="round" defaultValue={initialValues.round || '__all__'}>
           <SelectTrigger className="w-28 h-8 text-sm">
             <SelectValue placeholder="전체" />
@@ -54,7 +54,7 @@ export function AuditLogFilter({
       </div>
 
       <div className="space-y-1">
-        <Label className="text-xs">변경 유형</Label>
+        <Label className="text-sm">변경 유형</Label>
         <Select name="action" defaultValue={initialValues.action || '__all__'}>
           <SelectTrigger className="w-28 h-8 text-sm">
             <SelectValue placeholder="전체" />
@@ -69,7 +69,7 @@ export function AuditLogFilter({
       </div>
 
       <div className="space-y-1">
-        <Label className="text-xs">테이블명</Label>
+        <Label className="text-sm">테이블명</Label>
         <Input
           name="table"
           className="w-44 h-8 text-sm"
@@ -79,12 +79,12 @@ export function AuditLogFilter({
       </div>
 
       <div className="space-y-1">
-        <Label className="text-xs">시작일</Label>
+        <Label className="text-sm">시작일</Label>
         <Input name="from" type="date" className="w-36 h-8 text-sm" defaultValue={initialValues.from} />
       </div>
 
       <div className="space-y-1">
-        <Label className="text-xs">종료일</Label>
+        <Label className="text-sm">종료일</Label>
         <Input name="to" type="date" className="w-36 h-8 text-sm" defaultValue={initialValues.to} />
       </div>
 

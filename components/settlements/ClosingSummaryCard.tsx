@@ -31,7 +31,7 @@ function SummaryRow({ label, value, bold }: { label: string; value: string; bold
   return (
     <div className={`flex justify-between ${bold ? 'font-semibold' : ''}`}>
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-mono">{value}</span>
+      <span className="tabular-nums">{value}</span>
     </div>
   )
 }
@@ -59,7 +59,7 @@ export function ClosingSummaryCard({
             {calc && (
               <div className="space-y-1">
                 <Label>시스템 계산값</Label>
-                <p className={`text-xl font-mono font-bold ${calc.roundedFinalKrw >= 0 ? '' : 'text-red-600'}`}>
+                <p className={`text-xl tabular-nums font-bold ${calc.roundedFinalKrw >= 0 ? '' : 'text-red-600'}`}>
                   {formatKrw(calc.roundedFinalKrw)}
                 </p>
               </div>
@@ -87,7 +87,7 @@ export function ClosingSummaryCard({
               value={formatNumberForInput(confirmedAmount)}
               onChange={(e) => onConfirmedChange(parseNumberInput(e.target.value))}
               disabled={isLocked}
-              className="font-mono text-lg max-w-xs"
+              className="tabular-nums text-lg max-w-xs"
             />
           </div>
           {calc && (
@@ -103,22 +103,22 @@ export function ClosingSummaryCard({
       </Card>
 
       {calc && interimIsLocked && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
-          <p className="text-sm font-bold text-blue-800">최종 종합 정산 (중간 + 클로징)</p>
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2">
+          <p className="text-sm font-bold text-slate-700">최종 종합 정산 (중간 + 클로징)</p>
           <div className="flex justify-between text-sm">
-            <span className="text-blue-700">중간정산 확정금액</span>
-            <span className="font-mono text-blue-700">{formatKrw(calc.interimConfirmedKrw)}</span>
+            <span className="text-slate-700">중간정산 확정금액</span>
+            <span className="tabular-nums text-slate-700">{formatKrw(calc.interimConfirmedKrw)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-blue-700">클로징 정산액</span>
-            <span className="font-mono text-blue-700">{calc.roundedFinalKrw >= 0 ? '+' : ''}{formatKrw(calc.roundedFinalKrw)}</span>
+            <span className="text-slate-700">클로징 정산액</span>
+            <span className="tabular-nums text-slate-700">{calc.roundedFinalKrw >= 0 ? '+' : ''}{formatKrw(calc.roundedFinalKrw)}</span>
           </div>
-          <Separator className="border-blue-200" />
+          <Separator className="border-slate-200" />
           <div className="flex justify-between font-bold">
-            <span className="text-blue-900">최종 합계</span>
-            <span className="font-mono text-blue-900 text-lg">{formatKrw(calc.grandTotalKrw)}</span>
+            <span className="text-slate-800">최종 합계</span>
+            <span className="tabular-nums text-slate-800 text-lg">{formatKrw(calc.grandTotalKrw)}</span>
           </div>
-          <p className="text-xs text-blue-600">
+          <p className="text-sm text-slate-600">
             {calc.grandTotalKrw >= 0 ? '한국에이원 → 토에이산교 지급' : '토에이산교 → 한국에이원 지급'}
           </p>
         </div>

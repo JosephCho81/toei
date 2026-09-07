@@ -13,7 +13,7 @@ function ForwarderCell({ row, rowSpan }: { row: QuoteRow; rowSpan?: number }) {
   return (
     <TableCell rowSpan={rowSpan} className="align-top text-sm px-3 py-2 border-r">
       <div className="font-medium">{row.forwarder_name}</div>
-      <div className="text-xs text-muted-foreground mt-0.5">{row.quote_date || '-'}</div>
+      <div className="text-sm text-muted-foreground mt-0.5">{row.quote_date || '-'}</div>
     </TableCell>
   )
 }
@@ -38,34 +38,34 @@ export function ForwardingQuoteReadOnly({ rows }: { rows: QuoteRow[] }) {
                 {r.items.map((item, idx) => (
                   <TableRow key={item._key}>
                     {idx === 0 && <ForwarderCell row={r} rowSpan={r.items.length + 1} />}
-                    <TableCell className="px-3 py-1 text-xs text-left">
+                    <TableCell className="px-3 py-1 text-sm text-left">
                       <span className="text-muted-foreground mr-1.5">[{ITEM_TYPE_LABELS[item.item_type]}]</span>
                       <span className="font-medium">{item.item_name || '-'}</span>
                       {item.currency && item.currency !== 'KRW' && item.amount_cur != null && (
-                        <span className="text-muted-foreground ml-1.5 text-[10px]">
+                        <span className="text-muted-foreground ml-1.5 text-sm">
                           {item.currency} {item.amount_cur.toLocaleString('ko-KR')}
                         </span>
                       )}
-                      {item.is_vat_taxable && <span className="text-blue-500 text-[10px] ml-1">VAT</span>}
+                      {item.is_vat_taxable && <span className="text-slate-500 text-sm ml-1">VAT</span>}
                     </TableCell>
-                    <TableCell className="text-right text-xs font-mono px-3 py-1">
+                    <TableCell className="text-right text-sm tabular-nums px-3 py-1">
                       {item.amount_krw ? formatKrw(Number(item.amount_krw)) : '-'}
                     </TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/30">
                   {r.items.length === 0 && <ForwarderCell row={r} />}
-                  <TableCell className="px-3 py-1.5 text-xs text-muted-foreground">
+                  <TableCell className="px-3 py-1.5 text-sm text-muted-foreground">
                     합계 (견적 {formatKrw(quote)} / 실청구 {formatKrw(actual)})
                   </TableCell>
-                  <TableCell className="text-right text-sm font-semibold font-mono px-3 py-1.5">
+                  <TableCell className="text-right text-sm font-semibold tabular-nums px-3 py-1.5">
                     {formatKrw(actual || quote)}
                   </TableCell>
                 </TableRow>
                 {r.notes && (
                   <TableRow className="border-t-0">
                     <TableCell colSpan={COL_SPAN} className="px-3 pb-2 pt-0">
-                      <p className="text-xs text-muted-foreground">메모: {r.notes}</p>
+                      <p className="text-sm text-muted-foreground">메모: {r.notes}</p>
                     </TableCell>
                   </TableRow>
                 )}

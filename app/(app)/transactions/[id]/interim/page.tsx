@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ShippingCostItems, type CostRow, DEFAULT_SHIPPING } from '@/components/settlements/ShippingCostItems'
 import { CustomsCostItems, DEFAULT_CUSTOMS } from '@/components/settlements/CustomsCostItems'
@@ -116,9 +115,9 @@ export default function InterimSettlementPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">중간정산</h2>
+        <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>중간정산</h2>
         <div className="flex items-center gap-2">
-          {isLocked && <Badge variant="outline">🔒 확정</Badge>}
+          {isLocked && <span className="text-muted-foreground">확정 · 잠금</span>}
           {isLocked && sid && <UnlockButton table="interim_settlements" settlementId={sid} onUnlocked={() => setIsLocked(false)} />}
           {sid && (
             <DeleteSettlementButton
@@ -133,15 +132,15 @@ export default function InterimSettlementPage() {
         <CardContent className="grid grid-cols-3 gap-4">
           <div className="space-y-1">
             <Label>수입금액 (USD)</Label>
-            <Input value={tx.import_amount_usd ? formatUsd(Number(tx.import_amount_usd)) : '-'} readOnly className="bg-muted font-mono text-right" />
+            <Input value={tx.import_amount_usd ? formatUsd(Number(tx.import_amount_usd)) : '-'} readOnly className="bg-muted tabular-nums text-right" />
           </div>
           <div className="space-y-1">
             <Label>통관환율 (원/$)</Label>
-            <NumberInput value={customsRate} onValueChange={setCustomsRate} disabled={isLocked} className="font-mono text-right" />
+            <NumberInput value={customsRate} onValueChange={setCustomsRate} disabled={isLocked} className="tabular-nums text-right" />
           </div>
           <div className="space-y-1">
             <Label>원화 환산</Label>
-            <Input value={calc ? formatKrw(calc.importAmountKrw) : '-'} readOnly className="bg-muted font-mono" />
+            <Input value={calc ? formatKrw(calc.importAmountKrw) : '-'} readOnly className="bg-muted tabular-nums" />
           </div>
         </CardContent>
       </Card>

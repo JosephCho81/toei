@@ -49,9 +49,9 @@ export function ReportForwardingSection({ rows }: { rows: QuoteRow[] }) {
                 <TableRow key={i}>
                   <TableCell className="text-sm">{r.forwarder_name ?? '-'}</TableCell>
                   <TableCell className="text-sm">{formatDate(r.quote_date)}</TableCell>
-                  <TableCell className="text-right text-sm font-mono">{krw(r.quote_amount_krw)}</TableCell>
-                  <TableCell className="text-right text-sm font-mono">{krw(r.actual_amount_krw)}</TableCell>
-                  <TableCell className={`text-right text-sm font-mono ${diff == null ? '' : diff > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  <TableCell className="text-right text-sm tabular-nums">{krw(r.quote_amount_krw)}</TableCell>
+                  <TableCell className="text-right text-sm tabular-nums">{krw(r.actual_amount_krw)}</TableCell>
+                  <TableCell className={`text-right text-sm tabular-nums ${diff == null ? '' : diff > 0 ? 'text-red-600' : 'text-slate-600'}`}>
                     {diff == null ? '-' : diffLabel(diff)}
                   </TableCell>
                   <TableCell className="text-sm">{r.notes ?? '-'}</TableCell>
@@ -60,9 +60,9 @@ export function ReportForwardingSection({ rows }: { rows: QuoteRow[] }) {
             })}
             <TableRow className="bg-muted/50 font-semibold">
               <TableCell colSpan={2} className="text-sm">합계</TableCell>
-              <TableCell className="text-right text-sm font-mono">{krw(totalQuote)}</TableCell>
-              <TableCell className="text-right text-sm font-mono">{krw(totalActual)}</TableCell>
-              <TableCell className={`text-right text-sm font-mono ${totalDiff > 0 ? 'text-red-600' : totalDiff < 0 ? 'text-green-600' : ''}`}>
+              <TableCell className="text-right text-sm tabular-nums">{krw(totalQuote)}</TableCell>
+              <TableCell className="text-right text-sm tabular-nums">{krw(totalActual)}</TableCell>
+              <TableCell className={`text-right text-sm tabular-nums ${totalDiff > 0 ? 'text-red-600' : totalDiff < 0 ? 'text-slate-600' : ''}`}>
                 {totalDiff !== 0 ? diffLabel(totalDiff) : '0원'}
               </TableCell>
               <TableCell />

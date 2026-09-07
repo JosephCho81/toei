@@ -58,7 +58,7 @@ export function CustomsRateField({ customsDate, value, onValueChange }: {
   return (
     <div className="space-y-1.5">
       <div className="flex gap-2 items-center">
-        <NumberInput className="font-mono text-right flex-1" value={value} onValueChange={onValueChange} />
+        <NumberInput className="tabular-nums text-right flex-1" value={value} onValueChange={onValueChange} />
         <Button
           type="button" variant="outline" size="sm" className="shrink-0"
           disabled={!customsDate || loading}
@@ -71,11 +71,11 @@ export function CustomsRateField({ customsDate, value, onValueChange }: {
         </Button>
       </div>
 
-      {error && <p className="text-xs text-amber-700">{error}</p>}
+      {error && <p className="text-sm text-slate-700">{error}</p>}
 
       {official && (
         mismatch ? (
-          <div className="text-xs rounded border border-red-300 bg-red-50 px-2 py-1.5 text-red-800 space-y-1">
+          <div className="text-sm rounded border border-red-300 bg-red-50 px-2 py-1.5 text-red-800 space-y-1">
             <p className="flex items-center gap-1 font-medium">
               <AlertTriangle className="h-3.5 w-3.5" />
               입력값 {entered.toLocaleString('ko-KR')} ≠ 관세청 고시 {official.rate.toLocaleString('ko-KR')}
@@ -93,7 +93,7 @@ export function CustomsRateField({ customsDate, value, onValueChange }: {
             </button>
           </div>
         ) : (
-          <p className="text-xs rounded border border-green-200 bg-green-50 px-2 py-1.5 text-green-800 flex items-center gap-1">
+          <p className="text-sm rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-slate-700 flex items-center gap-1">
             <Check className="h-3.5 w-3.5" />
             관세청 고시환율과 일치{official.from && ` (${official.from} 적용개시)`}
           </p>

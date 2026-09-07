@@ -3,15 +3,15 @@ import { formatKrw, formatDiff } from '@/lib/utils/format'
 import type { CompRow, RoundResult } from '@/lib/verification/compare'
 
 const ICON: Record<CompRow['status'], string> = {
-  ok: '✅', minor: '⚠️', bad: '🔴', src_only: '←', db_only: '→',
+  ok: '일치', minor: '소액차이', bad: '불일치', src_only: 'DB미입력', db_only: 'DB전용',
 }
 
 const ROW_BG: Record<CompRow['status'], string> = {
   ok: '',
-  minor: 'bg-amber-50/60 dark:bg-amber-950/20',
-  bad: 'bg-red-50/70 dark:bg-red-950/20',
-  src_only: 'bg-sky-50/50 dark:bg-sky-950/20',
-  db_only: 'bg-muted/30',
+  minor: '',
+  bad: 'border-l-4 border-l-red-600',
+  src_only: 'bg-slate-50',
+  db_only: 'bg-slate-50',
 }
 
 function Amount({ value }: { value: number | null }) {
@@ -25,22 +25,25 @@ function CompRows({ rows }: { rows: CompRow[] }) {
     <>
       {rows.map((row, i) => (
         <tr key={i} className={cn('border-t', ROW_BG[row.status])}>
-          <td className="px-3 py-1.5 font-mono whitespace-nowrap">{row.name}</td>
-          <td className="px-3 py-1.5 text-right font-mono tabular-nums whitespace-nowrap">
+          <td className="px-3 py-1.5 whitespace-nowrap">{row.name}</td>
+          <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">
             <Amount value={row.srcAmt} />
           </td>
-          <td className="px-3 py-1.5 text-right font-mono tabular-nums whitespace-nowrap">
+          <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">
             <Amount value={row.dbAmt} />
           </td>
           <td className={cn(
-            'px-3 py-1.5 text-right font-mono tabular-nums whitespace-nowrap',
-            row.status === 'bad' ? 'text-red-600 font-semibold'
-              : row.status === 'minor' ? 'text-amber-600'
+            'px-3 py-1.5 text-right tabular-nums whitespace-nowrap',
+            row.status === 'bad' ? 'font-semibold text-red-700'
+              : row.status === 'minor' ? 'text-slate-600'
               : 'text-muted-foreground',
           )}>
             {row.diff !== null ? formatDiff(row.diff) : '-'}
           </td>
-          <td className="px-3 py-1.5 text-center">{ICON[row.status]}</td>
+          <td className={cn('px-3 py-1.5 text-center',
+            row.status === 'bad' ? 'text-red-700' : 'text-muted-foreground')}>
+            {ICON[row.status]}
+          </td>
         </tr>
       ))}
     </>
@@ -50,7 +53,7 @@ function CompRows({ rows }: { rows: CompRow[] }) {
 function GroupHeader({ label }: { label: string }) {
   return (
     <tr>
-      <td colSpan={5} className="px-3 py-1 text-xs font-semibold text-muted-foreground bg-muted/20 border-t">
+      <td colSpan={5} className="px-3 py-1 text-sm font-semibold text-muted-foreground bg-muted/20 border-t">
         {label}
       </td>
     </tr>
@@ -74,33 +77,33 @@ function summaryLabel(round: RoundResult): string {
 }
 
 export function RoundAccordion({ round }: { round: RoundResult }) {
-  const icon = round.badCount > 0 || round.srcOnlyCount > 0 ? '🔴'
-    : round.minorCount > 0 || round.customsParseFailed ? '⚠️'
-    : '✅'
+  const needsFix = round.badCount > 0 || round.srcOnlyCount > 0
 
   return (
-    <details className="group border rounded-lg overflow-hidden">
+    <details className="group overflow-hidden rounded-md border">
       <summary className={cn(
-        'flex items-center gap-2 px-4 py-2.5 cursor-pointer hover:bg-muted/40',
+        'flex cursor-pointer items-center gap-2 px-4 py-2.5 hover:bg-slate-100/70',
         'select-none list-none [&::-webkit-details-marker]:hidden',
       )}>
-        <span className="text-xs text-muted-foreground w-8 shrink-0 tabular-nums">{round.roundNo}차</span>
-        <span className="text-sm font-medium">{icon} {summaryLabel(round)}</span>
+        <span className="text-sm text-muted-foreground w-8 shrink-0 tabular-nums">{round.roundNo}차</span>
+        <span className={cn('text-sm font-medium', needsFix && 'text-red-700')}>
+          {summaryLabel(round)}
+        </span>
         {round.dbOnlyCount > 0 && (
-          <span className="ml-auto text-xs text-muted-foreground">DB전용 {round.dbOnlyCount}개</span>
+          <span className="ml-auto text-sm text-muted-foreground">DB전용 {round.dbOnlyCount}개</span>
         )}
       </summary>
 
       <div className="overflow-x-auto border-t">
-        <table className="w-full text-xs">
+        <table className="w-full text-sm">
           <thead>
-            <tr className="bg-muted/30 text-left">
+            <tr className="border-b bg-slate-50 text-left">
               {['항목명', '원본문서값', 'DB 입력값', '차이'].map((h, i) => (
-                <th key={h} className={cn('px-3 py-1.5 font-medium whitespace-nowrap', i > 0 && 'text-right')}>
+                <th key={h} className={cn('px-3 py-1.5 font-semibold whitespace-nowrap text-slate-600', i > 0 && 'text-right')}>
                   {h}
                 </th>
               ))}
-              <th className="px-3 py-1.5 font-medium text-center w-10">상태</th>
+              <th className="w-24 px-3 py-1.5 text-center font-semibold text-slate-600">상태</th>
             </tr>
           </thead>
           <tbody>
@@ -111,7 +114,7 @@ export function RoundAccordion({ round }: { round: RoundResult }) {
 
             <GroupHeader label="[통관 항목]" />
             {round.customsParseFailed
-              ? <EmptyRow text="통관서 파싱불가" className="text-amber-600 font-medium" />
+              ? <EmptyRow text="통관서 파싱불가" className="text-slate-600 font-medium" />
               : round.customsRows.length > 0
                 ? <CompRows rows={round.customsRows} />
                 : <EmptyRow text="항목 없음" />}

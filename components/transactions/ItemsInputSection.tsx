@@ -51,7 +51,7 @@ export function ItemsInputSection({ items, onChange }: Props) {
     <div className="space-y-2">
       <ItemDatalists products={products} />
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full text-sm">
           <thead>
             <tr className="border-b">
               {['품목','종류','색상/g','사이즈','단가(USD)','수량','단위','소계',''].map((h, i) => (
@@ -67,38 +67,38 @@ export function ItemsInputSection({ items, onChange }: Props) {
               return (
                 <tr key={r._key} className="border-b border-dashed">
                   <td className="py-1 pr-1">
-                    <Input className="h-7 text-xs w-40" list={ITEM_DATALIST.spec}
+                    <Input className="h-7 text-sm w-40" list={ITEM_DATALIST.spec}
                       placeholder="선택 또는 입력"
                       value={r.spec} onChange={(e) => upd(r._key, 'spec', e.target.value)}
                       {...cellProps(rowIndex, 0)} />
                   </td>
                   <td className="py-1 pr-1">
-                    <Input className="h-7 text-xs w-20" list={ITEM_DATALIST.gloveType}
+                    <Input className="h-7 text-sm w-20" list={ITEM_DATALIST.gloveType}
                       value={r.glove_type} onChange={(e) => upd(r._key, 'glove_type', e.target.value)}
                       {...cellProps(rowIndex, 1)} />
                   </td>
                   <td className="py-1 pr-1">
-                    <Input className="h-7 text-xs w-24" list={lists.color}
+                    <Input className="h-7 text-sm w-24" list={lists.color}
                       value={r.color} onChange={(e) => upd(r._key, 'color', e.target.value)}
                       {...cellProps(rowIndex, 2)} />
                   </td>
                   <td className="py-1 pr-1">
-                    <Input className="h-7 text-xs w-16" list={lists.size}
+                    <Input className="h-7 text-sm w-16" list={lists.size}
                       value={r.size} onChange={(e) => upd(r._key, 'size', e.target.value)}
                       {...cellProps(rowIndex, 3)} />
                   </td>
                   <td className="py-1 pr-1">
-                    <NumberInput className="h-7 text-xs text-right w-24" value={r.unit_price_usd}
+                    <NumberInput className="h-7 text-sm text-right w-24" value={r.unit_price_usd}
                       onValueChange={(v) => upd(r._key, 'unit_price_usd', v)}
                       {...cellProps(rowIndex, 4)} />
                   </td>
                   <td className="py-1 pr-1">
-                    <NumberInput className="h-7 text-xs text-right w-24" value={r.quantity}
+                    <NumberInput className="h-7 text-sm text-right w-24" value={r.quantity}
                       onValueChange={(v) => upd(r._key, 'quantity', v)}
                       {...cellProps(rowIndex, 5)} />
                   </td>
                   <td className="py-1 pr-1">
-                    <Input className="h-7 text-xs w-14" value={r.unit}
+                    <Input className="h-7 text-sm w-14" value={r.unit}
                       onChange={(e) => upd(r._key, 'unit', e.target.value)}
                       {...cellProps(rowIndex, 6)} />
                   </td>
@@ -120,7 +120,7 @@ export function ItemsInputSection({ items, onChange }: Props) {
         <Button type="button" variant="outline" size="sm" onClick={addRow}>
           <Plus className="h-4 w-4 mr-1" />품목 추가
         </Button>
-        <span className="text-xs text-muted-foreground">↑·↓ 로 위아래 칸 이동, Tab 으로 오른쪽 이동</span>
+        <span className="text-sm text-muted-foreground">↑·↓ 로 위아래 칸 이동, Tab 으로 오른쪽 이동</span>
       </div>
     </div>
   )

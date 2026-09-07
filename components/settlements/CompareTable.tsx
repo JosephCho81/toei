@@ -425,7 +425,7 @@ function Gap({ value }: { value: number | null }) {
   return (
     <>
       {krw(Math.abs(value))}
-      {value < 0 && <span className="ml-1 text-xs font-normal text-muted-foreground">초과</span>}
+      {value < 0 && <span className="ml-1 text-sm font-normal text-muted-foreground">초과</span>}
     </>
   )
 }
@@ -453,7 +453,7 @@ function TotalsRow({
       <td className={cls}>
         {krw(totals.calcKrw)}
         {totals.excludedCount > 0 && (
-          <span className="block text-xs font-normal text-muted-foreground">
+          <span className="block text-sm font-normal text-muted-foreground">
             {totals.excludedCount}건 제외
           </span>
         )}

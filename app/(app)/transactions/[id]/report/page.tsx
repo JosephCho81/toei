@@ -60,13 +60,13 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
       {/* I. 거래 개요 */}
       <ReportSection title="I. 거래 개요">
-        <div className="border border-green-200 rounded-lg overflow-hidden text-sm">
+        <div className="border border-slate-200 rounded-lg overflow-hidden text-sm">
           {sectionIRows.map(([l1, v1, l2, v2], i) => (
-            <div key={i} className={`flex ${i > 0 ? 'border-t border-green-200' : ''}`}>
-              <div className="w-28 px-3 py-2 text-muted-foreground font-medium bg-green-50/50 border-r border-green-200 shrink-0">{l1}</div>
-              <div className="flex-1 px-3 py-2 font-mono border-r border-green-200">{v1}</div>
-              <div className="w-28 px-3 py-2 text-muted-foreground font-medium bg-green-50/50 border-r border-green-200 shrink-0">{l2}</div>
-              <div className="flex-1 px-3 py-2 font-mono">{v2}</div>
+            <div key={i} className={`flex ${i > 0 ? 'border-t border-slate-200' : ''}`}>
+              <div className="w-28 px-3 py-2 text-muted-foreground font-medium bg-slate-50 border-r border-slate-200 shrink-0">{l1}</div>
+              <div className="flex-1 px-3 py-2 tabular-nums border-r border-slate-200">{v1}</div>
+              <div className="w-28 px-3 py-2 text-muted-foreground font-medium bg-slate-50 border-r border-slate-200 shrink-0">{l2}</div>
+              <div className="flex-1 px-3 py-2 tabular-nums">{v2}</div>
             </div>
           ))}
         </div>
@@ -141,7 +141,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         <>
           <div className="flex items-center gap-3 my-6">
             <Separator className="flex-1" />
-            <span className="text-sm font-bold text-green-700 whitespace-nowrap px-2">
+            <span className="text-sm font-bold text-slate-700 whitespace-nowrap px-2">
               V. 클로징정산 내역
             </span>
             <Separator className="flex-1" />

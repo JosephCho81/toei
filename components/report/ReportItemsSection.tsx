@@ -77,7 +77,7 @@ export function ReportItemsSection({ items, importAmountUsd, marginRatePct }: Pr
       {salesAmountUsd != null && (
         <div className="flex justify-between text-sm font-semibold bg-muted/30 px-3 py-2 rounded-md">
           <span>총판매금액 (수입금액 × (1 + {marginRatePct}%))</span>
-          <span className="font-mono">{usd(salesAmountUsd)}</span>
+          <span className="tabular-nums">{usd(salesAmountUsd)}</span>
         </div>
       )}
     </ReportSection>

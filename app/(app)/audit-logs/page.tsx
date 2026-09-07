@@ -41,7 +41,7 @@ export default async function AuditLogsPage({
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold">감사 로그</h2>
+      <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>감사 로그</h2>
       <AuditLogFilter
         roundLabels={(txList ?? []).map((t) => t.round_label)}
         initialValues={{ table, action, from, to, round }}

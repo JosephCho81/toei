@@ -15,7 +15,7 @@ function Field({ label, hint, children }: { label: string; hint: string; childre
     <div className="space-y-1">
       <Label>{label}</Label>
       {children}
-      <p className="text-xs text-muted-foreground">{hint}</p>
+      <p className="text-sm text-muted-foreground">{hint}</p>
     </div>
   )
 }
@@ -79,7 +79,7 @@ export function ClosingBasicInfoCard(p: {
         <Field label="클로징 환율 (원/$)" hint="클로징일 기준 한국은행 최초 고시 환율을 직접 입력합니다.">
           <NumberInput
             value={p.bokRate} onValueChange={p.onBokRateChange} disabled={p.isLocked}
-            className="font-mono text-right" placeholder="1,391.5"
+            className="tabular-nums text-right" placeholder="1,391.5"
           />
         </Field>
         <Field
@@ -91,7 +91,7 @@ export function ClosingBasicInfoCard(p: {
         >
           <NumberInput
             value={p.lcPaymentUsd} onValueChange={p.onLcPaymentUsdChange} disabled={p.isLocked}
-            className="font-mono text-right" placeholder="0.00"
+            className="tabular-nums text-right" placeholder="0.00"
           />
         </Field>
         <Field
@@ -100,23 +100,23 @@ export function ClosingBasicInfoCard(p: {
         >
           <NumberInput
             value={p.advanceUsd} onValueChange={p.onAdvanceUsdChange} disabled={p.isLocked}
-            className="font-mono text-right" placeholder="0.00"
+            className="tabular-nums text-right" placeholder="0.00"
           />
         </Field>
         <Field label="선지급 환율 (원/$)" hint={advanceHint(p.lcPayment, p.bokRateNum)}>
           <NumberInput
             value={p.advanceRate} onValueChange={p.onAdvanceRateChange}
             disabled={p.isLocked || !hasAdvancePayment(p.lcPayment)}
-            className="font-mono text-right" placeholder="1,156.4"
+            className="tabular-nums text-right" placeholder="1,156.4"
           />
         </Field>
         <div className="space-y-1">
           <Label>LC 번호</Label>
-          <div className="rounded-md border bg-muted/40 px-3 py-2 font-mono text-sm min-h-9">
+          <div className="rounded-md border bg-muted/40 px-3 py-2 tabular-nums text-sm min-h-9">
             {p.lcNo || <span className="font-sans text-muted-foreground">거래 기본정보에 미입력</span>}
           </div>
           {p.containerLcNumbers.length > 0 && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               컨테이너 기재: {p.containerLcNumbers.join(', ')}
             </p>
           )}

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { cn } from '@/lib/utils'
+import { StatCards } from '@/components/ui/StatCards'
 import { loadVerification } from '@/lib/verification/load'
 import { RoundAccordion } from '@/components/verification/RoundAccordion'
 
@@ -16,21 +16,16 @@ export default async function VerificationPage() {
 
   return (
     <div className="space-y-5 max-w-5xl">
-      <h2 className="text-2xl font-bold">원본문서 vs DB 항목별 검증</h2>
+      <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>원본문서 vs DB 항목별 검증</h2>
 
-      <div className="flex gap-3">
-        {summary.map((card) => (
-          <div key={card.label} className="rounded-lg border bg-card px-5 py-3 min-w-28">
-            <p className="text-xs text-muted-foreground">{card.label}</p>
-            <p className={cn(
-              'text-2xl font-bold tabular-nums',
-              card.value > 0 ? 'text-red-600' : 'text-green-600',
-            )}>
-              {card.value}
-            </p>
-          </div>
-        ))}
-      </div>
+      <StatCards
+        items={summary.map((card) => ({
+          label: card.label,
+          value: card.value.toLocaleString('ko-KR'),
+          unit: '건',
+          alert: card.value > 0,
+        }))}
+      />
 
       <div className="space-y-1">
         {rounds.length === 0 && (
@@ -41,12 +36,12 @@ export default async function VerificationPage() {
         {rounds.map((round) => <RoundAccordion key={round.roundNo} round={round} />)}
       </div>
 
-      <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 pt-2 border-t">
-        <span>✅ 일치</span>
-        <span>⚠️ 소액차이 (≤100원)</span>
-        <span>🔴 불일치 (&gt;100원)</span>
-        <span>← DB미입력 (원본만 존재)</span>
-        <span>→ DB전용 (DB만 존재)</span>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 border-t pt-2 text-sm text-muted-foreground">
+        <span>일치</span>
+        <span>소액차이 (≤100원)</span>
+        <span className="text-red-700">불일치 (&gt;100원)</span>
+        <span>DB미입력 (원본만 존재)</span>
+        <span>DB전용 (DB만 존재)</span>
       </div>
     </div>
   )

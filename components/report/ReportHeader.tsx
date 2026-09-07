@@ -34,12 +34,12 @@ export function ReportHeader({
   return (
     <div className="flex items-start justify-between mb-8 print:hidden">
       <div>
-        <p className="text-xs text-muted-foreground mb-1">
+        <p className="text-sm text-muted-foreground mb-1">
           <Link href={`/transactions/${transactionId}`} className="hover:underline">
             ← 거래 상세로 돌아가기
           </Link>
         </p>
-        <h2 className="text-2xl font-bold">{roundLabel} 정산 리포트</h2>
+        <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>{roundLabel} 정산 리포트</h2>
         {orderNo && <p className="text-sm text-muted-foreground mt-0.5">{orderNo}</p>}
       </div>
       <div className="flex gap-2 shrink-0 flex-wrap justify-end">

@@ -28,20 +28,20 @@ export function ReportBanner({ roundLabel, manufacturerName, orderNo }: {
 }) {
   return (
     <>
-      <div className="border border-green-200 rounded-lg px-6 py-5 flex items-center justify-between bg-white">
+      <div className="border border-slate-200 rounded-lg px-6 py-5 flex items-center justify-between bg-white">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/CI_a1korea.png" alt="한국에이원" style={{ height: '48px', objectFit: 'contain' }} />
         <div className="text-center">
-          <h1 className="text-lg font-bold text-green-800">토에이산교 ↔ 한국에이원</h1>
-          <p className="text-base font-semibold text-green-700 mt-0.5">정산 리포트</p>
-          <p className="text-xs text-muted-foreground mt-1">
+          <h1 className="text-lg font-bold text-slate-700">토에이산교 ↔ 한국에이원</h1>
+          <p className="text-base font-semibold text-slate-700 mt-0.5">정산 리포트</p>
+          <p className="text-sm text-muted-foreground mt-1">
             {roundLabel}{manufacturerName ? ` | ${manufacturerName}` : ''}{orderNo ? ` | ${orderNo}` : ''}
           </p>
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/CI_toei.png" alt="토에이산교" style={{ height: '48px', objectFit: 'contain' }} />
       </div>
-      <p className="text-xs text-right mb-4 mt-1" style={{ color: '#666666' }}>
+      <p className="text-sm text-right mb-4 mt-1" style={{ color: '#666666' }}>
         ※ 모든 금액은 부가세 별도 기준입니다.
       </p>
     </>

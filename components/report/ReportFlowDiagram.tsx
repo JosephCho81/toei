@@ -28,7 +28,7 @@ function FlowRow({ label, value, color, indent }: {
   return (
     <div className={`flex justify-between items-center py-0.5 text-sm ${indent ? 'pl-6' : ''}`}>
       <span className="text-muted-foreground">{label}</span>
-      <span className={`font-mono font-medium ${color ?? ''}`}>{value}</span>
+      <span className={`tabular-nums font-medium ${color ?? ''}`}>{value}</span>
     </div>
   )
 }
@@ -37,13 +37,13 @@ function FlowTotal({ label, value, colorClass }: { label: string; value: string;
   return (
     <div className={`flex justify-between items-center px-3 py-2 rounded-md font-bold text-sm ${colorClass}`}>
       <span>{label}</span>
-      <span className="font-mono">{value}</span>
+      <span className="tabular-nums">{value}</span>
     </div>
   )
 }
 
 function Arrow() {
-  return <div className="text-center text-muted-foreground text-xs my-0.5">↓</div>
+  return <div className="text-center text-muted-foreground text-sm my-0.5">↓</div>
 }
 
 export function ReportFlowDiagram(props: Props) {
@@ -58,7 +58,7 @@ export function ReportFlowDiagram(props: Props) {
 
   return (
     <div className="mb-4 break-inside-avoid">
-      <p className="text-xs font-semibold text-muted-foreground mb-2">계산 플로우</p>
+      <p className="text-sm font-semibold text-muted-foreground mb-2">계산 플로우</p>
       <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-0.5">
         {/* 중간정산 계산 */}
         <FlowRow label="수입원가 (USD × 통관환율)" value={`${fmt(importAmountKrw)}원`} />
@@ -68,7 +68,7 @@ export function ReportFlowDiagram(props: Props) {
         <FlowTotal
           label="= 중간정산 확정금액"
           value={`${fmt(interimConfirmedKrw)}원`}
-          colorClass="bg-green-100 text-green-800"
+          colorClass="bg-slate-100 text-slate-700"
         />
         <Arrow />
 
@@ -77,7 +77,7 @@ export function ReportFlowDiagram(props: Props) {
         <FlowRow
           label={`- 환율차액 (환차${fxIsGain ? '익' : '손'})`}
           value={signed(fxGainLossKrw) + '원'}
-          color={fxIsGain ? 'text-blue-600' : 'text-red-600'}
+          color={fxIsGain ? 'text-slate-600' : 'text-red-600'}
           indent
         />
         <FlowRow
@@ -102,7 +102,7 @@ export function ReportFlowDiagram(props: Props) {
         <FlowTotal
           label="= 클로징 정산금액"
           value={`${signed(closingConfirmedKrw)}원`}
-          colorClass={closingConfirmedKrw < 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}
+          colorClass={closingConfirmedKrw < 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'}
         />
         <Arrow />
 
@@ -113,7 +113,7 @@ export function ReportFlowDiagram(props: Props) {
         <FlowTotal
           label="= 종합정산액"
           value={`${fmt(grandTotalKrw)}원`}
-          colorClass="bg-green-100 text-green-800 text-base"
+          colorClass="bg-slate-100 text-slate-700 text-base"
         />
       </div>
     </div>

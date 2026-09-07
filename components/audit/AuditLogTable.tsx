@@ -20,10 +20,10 @@ function getChangedFields(
 
 function ActionBadge({ action }: { action: string }) {
   if (action === 'INSERT')
-    return <Badge className="text-xs bg-green-600 hover:bg-green-700">INSERT</Badge>
+    return <Badge className="text-sm bg-slate-700 hover:bg-slate-800">INSERT</Badge>
   if (action === 'DELETE')
-    return <Badge variant="destructive" className="text-xs">DELETE</Badge>
-  return <Badge variant="secondary" className="text-xs">UPDATE</Badge>
+    return <Badge variant="destructive" className="text-sm">DELETE</Badge>
+  return <Badge variant="secondary" className="text-sm">UPDATE</Badge>
 }
 
 function formatAt(at: string): string {
@@ -55,12 +55,12 @@ export function AuditLogTable({
 
   return (
     <>
-      <p className="text-xs text-muted-foreground">전체 {total.toLocaleString('ko-KR')}건 · 행 클릭 시 diff 상세 확인</p>
+      <p className="text-sm text-muted-foreground">전체 {total.toLocaleString('ko-KR')}건 · 행 클릭 시 diff 상세 확인</p>
 
       <div className="border rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b text-muted-foreground text-xs bg-muted/30">
+            <tr className="border-b text-muted-foreground text-sm bg-muted/30">
               <th className="text-left px-4 py-2 font-medium whitespace-nowrap">일시</th>
               <th className="text-left px-4 py-2 font-medium">거래차수</th>
               <th className="text-left px-4 py-2 font-medium">테이블</th>
@@ -89,11 +89,11 @@ export function AuditLogTable({
                   }`}
                   onClick={() => setSelected(log)}
                 >
-                  <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                  <td className="px-4 py-2.5 text-sm text-muted-foreground whitespace-nowrap">
                     {formatAt(log.changed_at)}
                   </td>
                   <td className="px-4 py-2.5 font-semibold">{roundLabel}</td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
+                  <td className="px-4 py-2.5 tabular-nums text-sm text-muted-foreground">
                     {log.table_name}
                   </td>
                   <td className="px-4 py-2.5 text-center">
@@ -105,19 +105,19 @@ export function AuditLogTable({
                         {changed.slice(0, 5).map((f) => (
                           <span
                             key={f}
-                            className="bg-amber-100 text-amber-800 rounded px-1 py-0.5 font-mono text-xs"
+                            className="bg-slate-100 text-slate-700 rounded px-1 py-0.5 tabular-nums text-sm"
                           >
                             {f}
                           </span>
                         ))}
                         {changed.length > 5 && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-sm text-muted-foreground">
                             +{changed.length - 5}개
                           </span>
                         )}
                       </span>
                     ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
+                      <span className="text-sm text-muted-foreground">-</span>
                     )}
                   </td>
                 </tr>

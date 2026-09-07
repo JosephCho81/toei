@@ -2,9 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { fetchInterimSettlement, fetchClosingSettlement } from '@/lib/data/queries'
 import { buttonVariants } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
 import { formatDate, formatUsd, formatExchangeRate } from '@/lib/utils/format'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
@@ -58,15 +56,17 @@ export default async function TransactionDetailPage({ params }: { params: Promis
   const roundingLabel = interim?.rounding_policy ? (ROUNDING_LABELS[interim.rounding_policy] ?? interim.rounding_policy) : null
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">{t.round_label}</h2>
-          {t.order_no && <p className="text-muted-foreground text-sm">{t.order_no}</p>}
+          <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>{t.round_label}</h2>
+          <p className="text-sm text-muted-foreground">
+            {t.order_no ? `${t.order_no} · ` : ''}
+            {STATUS_LABELS[t.settlement_status] ?? t.settlement_status}
+            {t.is_locked && ' · 잠금 (수정하려면 잠금을 풀어야 합니다)'}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge>{STATUS_LABELS[t.settlement_status] ?? t.settlement_status}</Badge>
-          {t.is_locked && <Badge variant="outline">🔒 잠금</Badge>}
           <Link
             href={`/transactions/${id}/report`}
             className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}

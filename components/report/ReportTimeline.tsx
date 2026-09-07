@@ -21,20 +21,20 @@ export function ReportTimeline({ lcOpenDate, customsDate, closingDate, customsRa
 
   return (
     <div className="border border-gray-100 rounded-lg p-4 mt-3 bg-gray-50/70 overflow-x-auto break-inside-avoid">
-      <p className="text-xs font-semibold text-muted-foreground mb-3">거래 타임라인</p>
+      <p className="text-sm font-semibold text-muted-foreground mb-3">거래 타임라인</p>
       <div className="relative flex items-start justify-between min-w-[380px]">
         {/* LC개설 */}
         <div className="flex flex-col items-center w-28">
-          <div className="w-3 h-3 rounded-full bg-green-400 mb-1 shrink-0" />
-          <p className="text-xs font-semibold text-green-800">LC개설</p>
-          <p className="text-xs font-mono text-muted-foreground mt-0.5">{formatDate(lcOpenDate)}</p>
+          <div className="w-3 h-3 rounded-full bg-slate-400 mb-1 shrink-0" />
+          <p className="text-sm font-semibold text-slate-700">LC개설</p>
+          <p className="text-sm tabular-nums text-muted-foreground mt-0.5">{formatDate(lcOpenDate)}</p>
         </div>
 
         {/* Phase 1 connector */}
         <div className="flex-1 flex flex-col items-center pt-1.5">
-          <div className="w-full h-0.5 bg-green-300 relative">
+          <div className="w-full h-0.5 bg-slate-300 relative">
             {phase1 != null && (
-              <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground whitespace-nowrap bg-gray-50 px-1">
+              <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-sm text-muted-foreground whitespace-nowrap bg-gray-50 px-1">
                 {phase1}일
               </span>
             )}
@@ -43,19 +43,19 @@ export function ReportTimeline({ lcOpenDate, customsDate, closingDate, customsRa
 
         {/* 통관/입고 */}
         <div className="flex flex-col items-center w-28">
-          <div className="w-3 h-3 rounded-full bg-amber-400 mb-1 shrink-0" />
-          <p className="text-xs font-semibold text-amber-700">통관/입고</p>
-          <p className="text-xs font-mono text-muted-foreground mt-0.5">{formatDate(customsDate)}</p>
+          <div className="w-3 h-3 rounded-full bg-slate-400 mb-1 shrink-0" />
+          <p className="text-sm font-semibold text-slate-700">통관/입고</p>
+          <p className="text-sm tabular-nums text-muted-foreground mt-0.5">{formatDate(customsDate)}</p>
           {customsRate != null && (
-            <p className="text-[10px] text-blue-600 mt-0.5">{customsRate.toLocaleString('ko-KR')}원/$</p>
+            <p className="text-sm text-slate-600 mt-0.5">{customsRate.toLocaleString('ko-KR')}원/$</p>
           )}
         </div>
 
         {/* Phase 2 connector */}
         <div className="flex-1 flex flex-col items-center pt-1.5">
-          <div className="w-full h-0.5 bg-green-300 relative">
+          <div className="w-full h-0.5 bg-slate-300 relative">
             {phase2 != null && (
-              <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground whitespace-nowrap bg-gray-50 px-1">
+              <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-sm text-muted-foreground whitespace-nowrap bg-gray-50 px-1">
                 {phase2}일
               </span>
             )}
@@ -64,16 +64,16 @@ export function ReportTimeline({ lcOpenDate, customsDate, closingDate, customsRa
 
         {/* LC결제 */}
         <div className="flex flex-col items-center w-28">
-          <div className="w-3 h-3 rounded-full bg-blue-400 mb-1 shrink-0" />
-          <p className="text-xs font-semibold text-blue-800">LC결제</p>
-          <p className="text-xs font-mono text-muted-foreground mt-0.5">{formatDate(closingDate)}</p>
+          <div className="w-3 h-3 rounded-full bg-slate-400 mb-1 shrink-0" />
+          <p className="text-sm font-semibold text-slate-700">LC결제</p>
+          <p className="text-sm tabular-nums text-muted-foreground mt-0.5">{formatDate(closingDate)}</p>
           {bokRate != null && (
-            <p className="text-[10px] text-blue-600 mt-0.5">{bokRate.toLocaleString('ko-KR')}원/$</p>
+            <p className="text-sm text-slate-600 mt-0.5">{bokRate.toLocaleString('ko-KR')}원/$</p>
           )}
         </div>
       </div>
       {total != null && (
-        <p className="text-xs text-center text-muted-foreground mt-3">
+        <p className="text-sm text-center text-muted-foreground mt-3">
           총 소요기간: <span className="font-semibold text-gray-700">{total}일</span>
         </p>
       )}

@@ -15,7 +15,7 @@ function CalcRow({ label, value, bold }: { label: string; value: string; bold?: 
   return (
     <div className={`flex justify-between ${bold ? 'font-semibold' : ''}`}>
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-mono">{value}</span>
+      <span className="tabular-nums">{value}</span>
     </div>
   )
 }
@@ -64,7 +64,7 @@ export function ClosingLcFeeCard({
         </CardHeader>
         <CardContent className="space-y-2">
           {usdRowsNeedRate && (
-            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+            <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700   ">
               달러로 기재한 항목이 있습니다. 클로징 환율을 먼저 입력해야 원화로 환산됩니다.
             </p>
           )}
@@ -83,7 +83,7 @@ export function ClosingLcFeeCard({
                   disabled={isLocked}
                 />
                 <select
-                  className="h-9 rounded-md border bg-transparent px-2 text-xs disabled:opacity-50"
+                  className="h-9 rounded-md border bg-transparent px-2 text-sm disabled:opacity-50"
                   value={row.currency}
                   onChange={(e) => patchCurrency(i, e.target.value as FeeRow['currency'])}
                   disabled={isLocked}
@@ -94,7 +94,7 @@ export function ClosingLcFeeCard({
                 </select>
                 {isUsd ? (
                   <NumberInput
-                    className="w-32 font-mono text-sm text-right"
+                    className="w-32 tabular-nums text-sm text-right"
                     value={row.amount_usd}
                     onValueChange={(v) => patch(i, { amount_usd: v })}
                     disabled={isLocked}
@@ -102,14 +102,14 @@ export function ClosingLcFeeCard({
                   />
                 ) : (
                   <NumberInput
-                    className="w-32 font-mono text-sm text-right"
+                    className="w-32 tabular-nums text-sm text-right"
                     value={row.amount_krw}
                     onValueChange={(v) => patch(i, { amount_krw: v })}
                     disabled={isLocked}
                     placeholder="0"
                   />
                 )}
-                <span className="w-32 shrink-0 text-right font-mono text-xs text-muted-foreground">
+                <span className="w-32 shrink-0 text-right tabular-nums text-sm text-muted-foreground">
                   {isUsd ? (rowRate > 0 ? formatKrw(convertedKrw ?? 0) : '환율 필요') : ''}
                 </span>
                 {!isLocked && i >= DEFAULT_LC_FEE_ROWS.length && (
@@ -119,7 +119,7 @@ export function ClosingLcFeeCard({
                 )}
               </div>
               {isUsd && (
-                <div className="flex items-center gap-2 pl-2 text-xs">
+                <div className="flex items-center gap-2 pl-2 text-sm">
                   <label className="flex items-center gap-1.5 text-muted-foreground">
                     <input
                       type="checkbox"
@@ -133,7 +133,7 @@ export function ClosingLcFeeCard({
                   {row.use_custom_rate ? (
                     <>
                       <NumberInput
-                        className="h-7 w-28 font-mono text-xs text-right"
+                        className="h-7 w-28 tabular-nums text-sm text-right"
                         value={row.exchange_rate}
                         onValueChange={(v) => patch(i, { exchange_rate: v })}
                         disabled={isLocked}
@@ -157,7 +157,7 @@ export function ClosingLcFeeCard({
           {calc && (
             <div className="flex justify-between pt-2 text-sm font-semibold">
               <span>LC 수수료 합계</span>
-              <span className="font-mono">{formatKrw(calc.lcFeeTotalKrw)}</span>
+              <span className="tabular-nums">{formatKrw(calc.lcFeeTotalKrw)}</span>
             </div>
           )}
         </CardContent>
@@ -188,7 +188,7 @@ export function ClosingLcFeeCard({
                 bold={calc.vatMode === 'exclusive'}
               />
               {calc.vatMode === 'exclusive'
-                ? <p className="pt-1 text-xs text-muted-foreground">부가세는 클로징 추가비용까지 더한 공급가에 한 번에 적용된다</p>
+                ? <p className="pt-1 text-sm text-muted-foreground">부가세는 클로징 추가비용까지 더한 공급가에 한 번에 적용된다</p>
                 : <CalcRow label="에이원 부담분 + VAT" value={`${calc.a1BurdenWithVatKrw >= 0 ? '+' : ''}${formatKrw(calc.a1BurdenWithVatKrw)}`} bold />}
             </div>
           )}

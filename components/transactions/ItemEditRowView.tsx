@@ -30,7 +30,7 @@ export function ItemEditRowView({ row, rowIndex, isLocked, datalists, cellProps,
         <TableCell key={f} className="p-1">
           {isLocked
             ? <span className="text-sm px-2">{row[f] || '-'}</span>
-            : <Input className="h-7 text-xs" value={row[f]} list={datalists[f]}
+            : <Input className="h-7 text-sm" value={row[f]} list={datalists[f]}
                 onChange={(e) => onUpdate(f, e.target.value)}
                 {...cellProps(rowIndex, colIndex)} />}
         </TableCell>
@@ -39,7 +39,7 @@ export function ItemEditRowView({ row, rowIndex, isLocked, datalists, cellProps,
         <TableCell key={f} className="p-1">
           {isLocked
             ? <span className="text-sm px-2 block text-right">{row[f] || '-'}</span>
-            : <NumberInput className="h-7 text-xs text-right w-24" value={row[f]}
+            : <NumberInput className="h-7 text-sm text-right w-24" value={row[f]}
                 onValueChange={(v) => onUpdate(f, v)}
                 {...cellProps(rowIndex, 4 + i)} />}
         </TableCell>
@@ -47,7 +47,7 @@ export function ItemEditRowView({ row, rowIndex, isLocked, datalists, cellProps,
       <TableCell className="p-1">
         {isLocked
           ? <span className="text-sm px-2">{row.unit}</span>
-          : <Input className="h-7 text-xs w-14" value={row.unit}
+          : <Input className="h-7 text-sm w-14" value={row.unit}
               onChange={(e) => onUpdate('unit', e.target.value)}
               {...cellProps(rowIndex, 6)} />}
       </TableCell>

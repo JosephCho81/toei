@@ -117,7 +117,7 @@ export function ForwardingRowsCard({ forwardings, onChange }: {
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td className="pt-2 text-muted-foreground text-xs">소계</td>
+                    <td className="pt-2 text-muted-foreground text-sm">소계</td>
                     <td className="pt-2 px-2 text-right font-medium">{quoteTotal.toLocaleString()}</td>
                     <td className="pt-2 px-2 text-right font-medium">{actualTotal.toLocaleString()}</td>
                     <td colSpan={2} />
@@ -125,7 +125,7 @@ export function ForwardingRowsCard({ forwardings, onChange }: {
                 </tfoot>
               </table>
 
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => addForwardingDetail(r._key)}>
+              <Button type="button" size="sm" variant="outline" className="h-7 text-sm" onClick={() => addForwardingDetail(r._key)}>
                 <Plus className="h-3 w-3 mr-1" />항목 추가
               </Button>
             </div>

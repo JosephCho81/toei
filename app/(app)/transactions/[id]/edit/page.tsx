@@ -20,7 +20,7 @@ export default async function TransactionEditPage({ params }: { params: Promise<
   return (
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center gap-3">
-        <h2 className="text-2xl font-bold">{t.round_label} 수정</h2>
+        <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>{t.round_label} 수정</h2>
         <Badge variant="outline">차수 {t.round_no}</Badge>
       </div>
       <TransactionEditForm

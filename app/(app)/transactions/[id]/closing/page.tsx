@@ -9,7 +9,6 @@ import { useClosingForm } from '@/lib/settlements/useClosingForm'
 import { saveClosingSettlement, validateClosingInput } from '@/lib/settlements/closingSave'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { MemoField } from '@/components/ui/MemoField'
 import { ClosingFxCard } from '@/components/settlements/ClosingFxCard'
 import { ClosingLcFeeCard } from '@/components/settlements/ClosingLcFeeCard'
@@ -108,9 +107,9 @@ export default function ClosingSettlementPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">클로징정산</h2>
+        <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>클로징정산</h2>
         <div className="flex items-center gap-2">
-          {isLocked && <Badge variant="outline">🔒 확정</Badge>}
+          {isLocked && <span className="text-muted-foreground">확정 · 잠금</span>}
           {isLocked && settlementId && (
             <UnlockButton
               table="closing_settlements" settlementId={settlementId}

@@ -140,7 +140,7 @@ export function CompareScreen({
           <p className="font-semibold text-red-800">데이터를 읽지 못했습니다 — 아래 표는 비어 있는 것이 아닙니다.</p>
           <p className="mt-1 text-red-900">{error}</p>
           <p className="mt-1 text-red-900">
-            마이그레이션 <span className="font-mono">036·037·038</span> 이 아직 적용되지 않았을 수 있습니다.
+            마이그레이션 <span className="tabular-nums">036·037·038</span> 이 아직 적용되지 않았을 수 있습니다.
           </p>
         </div>
       )}

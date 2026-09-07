@@ -78,8 +78,8 @@ export function CostItemsGroup({
         )}
       </CardHeader>
       <CardContent>
-        {hint && <p className="text-xs text-blue-600 mb-2">{hint}</p>}
-        <div className="grid grid-cols-12 gap-2 text-xs text-muted-foreground px-1 pb-1">
+        {hint && <p className="text-sm text-slate-600 mb-2">{hint}</p>}
+        <div className="grid grid-cols-12 gap-2 text-sm text-muted-foreground px-1 pb-1">
           <span className={nameCls}>항목명</span>
           <span className={amountCls}>금액(원)</span>
           {exclusive
@@ -95,9 +95,9 @@ export function CostItemsGroup({
         </div>
         {rows.map((r, i) => (
           <div key={i} className="grid grid-cols-12 gap-2 items-center mb-1">
-            <Input className={`${nameCls} h-7 text-xs`} value={r.item_name}
+            <Input className={`${nameCls} h-7 text-sm`} value={r.item_name}
               onChange={(e) => upd(i, 'item_name', e.target.value)} disabled={isLocked} />
-            <Input className={`${amountCls} h-7 text-xs font-mono`} inputMode="decimal"
+            <Input className={`${amountCls} h-7 text-sm tabular-nums`} inputMode="decimal"
               value={formatNumberForInput(r.amount_krw)}
               onChange={(e) => upd(i, 'amount_krw', parseNumberInput(e.target.value))} disabled={isLocked} />
             {exclusive ? (
@@ -123,7 +123,7 @@ export function CostItemsGroup({
                   <input type="checkbox" checked={r.is_vat_taxable}
                     onChange={(e) => upd(i, 'is_vat_taxable', e.target.checked)} disabled={isLocked} className="h-4 w-4" />
                 </div>
-                <Input className="col-span-2 h-7 text-xs font-mono" inputMode="decimal"
+                <Input className="col-span-2 h-7 text-sm tabular-nums" inputMode="decimal"
                   value={r.is_vat_taxable ? formatNumberForInput(computeVat(parseFloat(r.amount_krw) || 0)) : formatNumberForInput(r.vat_amount_krw)}
                   readOnly={r.is_vat_taxable}
                   onChange={(e) => upd(i, 'vat_amount_krw', parseNumberInput(e.target.value))} disabled={isLocked} />
@@ -139,7 +139,7 @@ export function CostItemsGroup({
         ))}
         <div className="flex justify-between pt-2 text-sm font-semibold border-t mt-1">
           <span>소계</span>
-          <span className="font-mono">
+          <span className="tabular-nums">
             {subtotal.toLocaleString('ko-KR')}원
             {exclusive
               ? (importVatTotal > 0 || dutyTotal > 0) && (

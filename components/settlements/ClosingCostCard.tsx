@@ -35,12 +35,12 @@ export function ClosingCostCard({ closingCostRows, onCostChange, isLocked, calc 
               disabled={isLocked}
             />
             <NumberInput
-              className="w-36 font-mono text-sm text-right"
+              className="w-36 tabular-nums text-sm text-right"
               value={row.amount_krw}
               onValueChange={(v) => onCostChange(closingCostRows.map((r, j) => j === i ? { ...r, amount_krw: v } : r))}
               disabled={isLocked}
             />
-            <label className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+            <label className="flex items-center gap-1 text-sm text-muted-foreground shrink-0">
               <input
                 type="checkbox"
                 checked={row.includes_vat}
@@ -54,7 +54,7 @@ export function ClosingCostCard({ closingCostRows, onCostChange, isLocked, calc 
         {calc && (
           <div className="flex justify-between pt-2 text-sm font-semibold">
             <span>소계</span>
-            <span className="font-mono">{formatKrw(calc.closingCostsTotalKrw)}</span>
+            <span className="tabular-nums">{formatKrw(calc.closingCostsTotalKrw)}</span>
           </div>
         )}
       </CardContent>

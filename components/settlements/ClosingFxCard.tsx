@@ -10,9 +10,9 @@ function CalcRow({ label, value, sub }: { label: string; value: string; sub?: st
   return (
     <div className="flex justify-between">
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-mono">
+      <span className="tabular-nums">
         {value}
-        {sub && <span className="ml-2 text-xs text-muted-foreground">{sub}</span>}
+        {sub && <span className="ml-2 text-sm text-muted-foreground">{sub}</span>}
       </span>
     </div>
   )
@@ -71,10 +71,10 @@ export function ClosingFxCard({
         )}
         <Separator />
         <div className="flex justify-between font-semibold">
-          <span>환차손익 <span className="text-xs font-normal text-muted-foreground">(원금×통관환율 − LC결제비용)</span></span>
-          <span className={`font-mono ${calc.fxGainLossKrw >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <span>환차손익 <span className="text-sm font-normal text-muted-foreground">(원금×통관환율 − LC결제비용)</span></span>
+          <span className={`tabular-nums ${calc.fxGainLossKrw >= 0 ? 'text-slate-600' : 'text-red-600'}`}>
             {calc.fxGainLossKrw >= 0 ? '+' : ''}{formatKrw(calc.fxGainLossKrw)}
-            <span className="text-xs ml-1">{calc.fxGainLossKrw >= 0 ? '(환차익)' : '(환차손)'}</span>
+            <span className="text-sm ml-1">{calc.fxGainLossKrw >= 0 ? '(환차익)' : '(환차손)'}</span>
           </span>
         </div>
       </CardContent>

@@ -74,12 +74,12 @@ export function InterimResultsCard({
                 <SelectItem value="none">{ROUNDING_LABELS.none}</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">공급가에 적용 — 합계는 공급가+부가세로 맞춘다</p>
+            <p className="text-sm text-muted-foreground">공급가에 적용 — 합계는 공급가+부가세로 맞춘다</p>
           </div>
           {systemSupply > 0 && (
             <div className="space-y-1">
               <Label className="text-sm">시스템 계산 공급가</Label>
-              <p className="text-lg font-mono font-bold">{formatKrw(systemSupply)}</p>
+              <p className="text-lg tabular-nums font-bold">{formatKrw(systemSupply)}</p>
             </div>
           )}
         </div>
@@ -88,7 +88,7 @@ export function InterimResultsCard({
             <Label>{exclusive ? '확정 공급가 (원)' : '확정 금액 (원)'}</Label>
             <Input inputMode="decimal" value={formatNumberForInput(supplyAmount)}
               onChange={(e) => onSupplyChange(parseNumberInput(e.target.value))}
-              disabled={isLocked} className="font-mono text-lg max-w-xs" />
+              disabled={isLocked} className="tabular-nums text-lg max-w-xs" />
           </div>
           <OverrideMismatchNotice
             systemValue={systemSupply}
@@ -113,8 +113,8 @@ export function InterimResultsCard({
 function Row({ label, value, bold, muted }: { label: string; value: string; bold?: boolean; muted?: boolean }) {
   return (
     <div className={`flex justify-between ${bold ? 'font-semibold' : ''}`}>
-      <span className={muted ? 'text-muted-foreground text-xs' : 'text-muted-foreground'}>{label}</span>
-      <span className={`font-mono ${muted ? 'text-muted-foreground text-xs' : ''}`}>{value}</span>
+      <span className={muted ? 'text-muted-foreground text-sm' : 'text-muted-foreground'}>{label}</span>
+      <span className={`tabular-nums ${muted ? 'text-muted-foreground text-sm' : ''}`}>{value}</span>
     </div>
   )
 }

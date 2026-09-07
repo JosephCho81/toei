@@ -69,11 +69,11 @@ export function UserManagement({ initialUsers }: Props) {
         <CardHeader><CardTitle className="text-base">사용자 초대</CardTitle></CardHeader>
         <CardContent className="flex gap-3 flex-wrap items-end">
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">이메일</label>
+            <label className="text-sm text-muted-foreground">이메일</label>
             <Input className="w-64" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="user@example.com" />
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">역할</label>
+            <label className="text-sm text-muted-foreground">역할</label>
             <Select value={inviteRole} onValueChange={v => v && setInviteRole(v)}>
               <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
               <SelectContent>{ROLES.map(([v,l])=><SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
@@ -103,13 +103,13 @@ export function UserManagement({ initialUsers }: Props) {
                   <TableCell className="text-sm">{u.user_metadata?.company ?? '-'}</TableCell>
                   <TableCell>
                     <Select value={u.user_metadata?.role ?? ''} onValueChange={v => v && updateRole(u.id, v)}>
-                      <SelectTrigger className="h-7 text-xs w-28"><SelectValue placeholder="미설정" /></SelectTrigger>
+                      <SelectTrigger className="h-7 text-sm w-28"><SelectValue placeholder="미설정" /></SelectTrigger>
                       <SelectContent>{ROLES.map(([v,l])=><SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
                     </Select>
                   </TableCell>
-                  <TableCell><Badge variant={isBanned ? 'secondary' : 'default'} className="text-xs">{isBanned ? '비활성' : '활성'}</Badge></TableCell>
+                  <TableCell><Badge variant={isBanned ? 'secondary' : 'default'} className="text-sm">{isBanned ? '비활성' : '활성'}</Badge></TableCell>
                   <TableCell>
-                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => toggleBan(u.id, !isBanned)}>
+                    <Button size="sm" variant="ghost" className="h-7 text-sm" onClick={() => toggleBan(u.id, !isBanned)}>
                       {isBanned ? '활성화' : '비활성화'}
                     </Button>
                   </TableCell>

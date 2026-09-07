@@ -65,7 +65,7 @@ export default function NewTransactionPage() {
 
   return (
     <div className="max-w-3xl space-y-4">
-      <h2 className="text-2xl font-bold">새 거래 등록</h2>
+      <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>새 거래 등록</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Card>
           <CardHeader><CardTitle className="text-base">기본 정보</CardTitle></CardHeader>
@@ -88,7 +88,7 @@ export default function NewTransactionPage() {
               </Select>
             </Field>
             <Field label="수입금액 (USD)">
-              <NumberInput className="font-mono text-right" value={form.import_amount_usd} onValueChange={(v) => set('import_amount_usd', v)} />
+              <NumberInput className="tabular-nums text-right" value={form.import_amount_usd} onValueChange={(v) => set('import_amount_usd', v)} />
             </Field>
             <Field label="LC 번호">
               <Input value={form.lc_no} onChange={(e) => set('lc_no', e.target.value)} />
@@ -100,7 +100,7 @@ export default function NewTransactionPage() {
               <Input type="date" value={form.customs_date} onChange={(e) => set('customs_date', e.target.value)} />
             </Field>
             <Field label="통관환율 (원/$)">
-              <NumberInput className="font-mono text-right" value={form.customs_exchange_rate} onValueChange={(v) => set('customs_exchange_rate', v)} />
+              <NumberInput className="tabular-nums text-right" value={form.customs_exchange_rate} onValueChange={(v) => set('customs_exchange_rate', v)} />
             </Field>
             <div className="col-span-2">
               <Field label="메모">
@@ -111,7 +111,7 @@ export default function NewTransactionPage() {
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">납기일</label>
                 <Button
-                  type="button" size="sm" variant="outline" className="h-7 text-xs"
+                  type="button" size="sm" variant="outline" className="h-7 text-sm"
                   onClick={() => setDeliveryDates((p) => [...p, { _key: crypto.randomUUID(), date: '' }])}
                 >
                   <Plus className="h-3 w-3 mr-1" />추가

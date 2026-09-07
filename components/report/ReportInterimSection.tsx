@@ -36,8 +36,8 @@ const krw = (n: number) => `${n.toLocaleString('ko-KR')}원`
 
 function GroupHeaderRow({ label }: { label: string }) {
   return (
-    <TableRow className="bg-green-50/60">
-      <TableCell colSpan={3} className="text-xs font-semibold text-green-800 py-1.5">{label}</TableCell>
+    <TableRow className="bg-slate-50">
+      <TableCell colSpan={3} className="text-sm font-semibold text-slate-700 py-1.5">{label}</TableCell>
     </TableRow>
   )
 }
@@ -51,8 +51,8 @@ function ItemRow({ item, exclusive }: { item: CostItem; exclusive: boolean }) {
   return (
     <TableRow className="bg-muted/20">
       <TableCell className="pl-6 text-muted-foreground text-sm">{item.item_name}</TableCell>
-      <TableCell className="text-xs text-gray-400 font-mono">{note}</TableCell>
-      <TableCell className={`text-right font-mono text-sm ${exclusive && item.is_import_vat ? 'text-gray-400 line-through' : ''}`}>
+      <TableCell className="text-sm text-gray-400 tabular-nums">{note}</TableCell>
+      <TableCell className={`text-right tabular-nums text-sm ${exclusive && item.is_import_vat ? 'text-gray-400 line-through' : ''}`}>
         {krw(item.amount_krw)}
       </TableCell>
     </TableRow>
@@ -64,8 +64,8 @@ function GroupSubtotalRow({ label, items }: { label: string; items: CostItem[] }
   return (
     <TableRow className="bg-muted/40 border-t border-dashed">
       <TableCell className="pl-6 text-sm font-semibold">{label}</TableCell>
-      <TableCell className="text-xs text-gray-400">위 {items.length}개 항목 합계</TableCell>
-      <TableCell className="text-right font-mono text-sm font-semibold">{krw(total)}</TableCell>
+      <TableCell className="text-sm text-gray-400">위 {items.length}개 항목 합계</TableCell>
+      <TableCell className="text-right tabular-nums text-sm font-semibold">{krw(total)}</TableCell>
     </TableRow>
   )
 }
@@ -81,19 +81,19 @@ export function ReportInterimSection({ data }: { data: InterimCostData }) {
     <ReportSection title="III. 중간정산 내역">
       <Table>
         <TableHeader>
-          <TableRow className="bg-green-50">
-            <TableHead className="text-green-800 font-bold w-[30%]">항목</TableHead>
-            <TableHead className="text-green-800 font-bold">계산식</TableHead>
-            <TableHead className="text-right text-green-800 font-bold w-[22%]">금액 (KRW)</TableHead>
+          <TableRow className="bg-slate-50">
+            <TableHead className="text-slate-700 font-bold w-[30%]">항목</TableHead>
+            <TableHead className="text-slate-700 font-bold">계산식</TableHead>
+            <TableHead className="text-right text-slate-700 font-bold w-[22%]">금액 (KRW)</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           <TableRow>
             <TableCell className="font-medium">수입금액 (원화환산)</TableCell>
-            <TableCell className="text-muted-foreground text-xs font-mono leading-relaxed">
+            <TableCell className="text-muted-foreground text-sm tabular-nums leading-relaxed">
               {importFormula}
             </TableCell>
-            <TableCell className="text-right font-mono">{krw(data.importAmountKrw)}</TableCell>
+            <TableCell className="text-right tabular-nums">{krw(data.importAmountKrw)}</TableCell>
           </TableRow>
 
           {data.shippingItems.length > 0 && (
@@ -116,24 +116,24 @@ export function ReportInterimSection({ data }: { data: InterimCostData }) {
             <>
               <TableRow className="border-t">
                 <TableCell className="font-medium">공급가 (부가세 별도)</TableCell>
-                <TableCell className="text-xs text-gray-400 font-mono">{supplyFormula}</TableCell>
-                <TableCell className="text-right font-mono font-semibold">{krw(supplyKrw)}</TableCell>
+                <TableCell className="text-sm text-gray-400 tabular-nums">{supplyFormula}</TableCell>
+                <TableCell className="text-right tabular-nums font-semibold">{krw(supplyKrw)}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">부가세</TableCell>
-                <TableCell className="text-xs text-gray-400 font-mono">
+                <TableCell className="text-sm text-gray-400 tabular-nums">
                   공급가 {supplyKrw.toLocaleString('ko-KR')} x 10%
                 </TableCell>
-                <TableCell className="text-right font-mono">{krw(outputVatKrw)}</TableCell>
+                <TableCell className="text-right tabular-nums">{krw(outputVatKrw)}</TableCell>
               </TableRow>
             </>
           ) : data.vatAmountKrw > 0 && (
             <TableRow>
               <TableCell className="font-medium">부가세 (운송·용역분)</TableCell>
-              <TableCell className="text-xs text-gray-400 font-mono">
+              <TableCell className="text-sm text-gray-400 tabular-nums">
                 {vatFormula} = {data.vatAmountKrw.toLocaleString('ko-KR')}
               </TableCell>
-              <TableCell className="text-right font-mono">{krw(data.vatAmountKrw)}</TableCell>
+              <TableCell className="text-right tabular-nums">{krw(data.vatAmountKrw)}</TableCell>
             </TableRow>
           )}
 
@@ -141,38 +141,38 @@ export function ReportInterimSection({ data }: { data: InterimCostData }) {
             <>
               <TableRow className="bg-muted/10 border-t border-dashed">
                 <TableCell className="text-muted-foreground text-sm">
-                  소계 <span className="text-xs">(시스템 계산)</span>
+                  소계 <span className="text-sm">(시스템 계산)</span>
                 </TableCell>
-                <TableCell className="text-xs text-gray-400 font-mono">{subTotalFormula}</TableCell>
-                <TableCell className="text-right font-mono text-sm text-muted-foreground">{krw(subTotal)}</TableCell>
+                <TableCell className="text-sm text-gray-400 tabular-nums">{subTotalFormula}</TableCell>
+                <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{krw(subTotal)}</TableCell>
               </TableRow>
-              <TableRow className="bg-green-100 font-bold border-t-2 border-green-200">
-                <TableCell className="text-green-800 text-base">중간정산 확정금액{exclusive ? ' (공급가+부가세)' : ''}</TableCell>
-                <TableCell className="text-xs">
+              <TableRow className="bg-slate-100 font-bold border-t-2 border-slate-200">
+                <TableCell className="text-slate-700 text-base">중간정산 확정금액{exclusive ? ' (공급가+부가세)' : ''}</TableCell>
+                <TableCell className="text-sm">
                   {Math.abs(confirmedDiff) > 0 && (
-                    <div className={diffIsRounding ? 'text-muted-foreground' : 'text-orange-600'}>
+                    <div className={diffIsRounding ? 'text-muted-foreground' : 'text-slate-600'}>
                       {diffIsRounding
                         ? `※ 100원 단위 절사 (소계 대비 ${confirmedDiff.toLocaleString('ko-KR')}원)`
                         : `※ 시스템 대비 ${confirmedDiff > 0 ? '+' : ''}${confirmedDiff.toLocaleString('ko-KR')}원 차이`}
                     </div>
                   )}
                 </TableCell>
-                <TableCell className="text-right font-mono text-green-800 text-base">
+                <TableCell className="text-right tabular-nums text-slate-700 text-base">
                   {krw(data.confirmedAmountKrw!)}
                 </TableCell>
               </TableRow>
             </>
           ) : (
-            <TableRow className="bg-green-50 font-semibold border-t-2 border-green-200">
-              <TableCell className="text-green-800">소계</TableCell>
-              <TableCell className="text-xs text-gray-400 font-mono">{subTotalFormula}</TableCell>
-              <TableCell className="text-right font-mono text-green-800">{krw(subTotal)}</TableCell>
+            <TableRow className="bg-slate-50 font-semibold border-t-2 border-slate-200">
+              <TableCell className="text-slate-700">소계</TableCell>
+              <TableCell className="text-sm text-gray-400 tabular-nums">{subTotalFormula}</TableCell>
+              <TableCell className="text-right tabular-nums text-slate-700">{krw(subTotal)}</TableCell>
             </TableRow>
           )}
         </TableBody>
       </Table>
       {data.interimDirection && (
-        <div className="mt-2 inline-flex items-center bg-green-100 text-green-800 rounded px-3 py-1">
+        <div className="mt-2 inline-flex items-center bg-slate-100 text-slate-700 rounded px-3 py-1">
           <span className="text-sm font-semibold">{data.interimDirection}</span>
         </div>
       )}

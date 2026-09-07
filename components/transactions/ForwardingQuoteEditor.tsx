@@ -33,12 +33,12 @@ export function ForwardingQuoteEditor({ row, onChange, onRemove }: {
     <div className="border rounded-md p-3 space-y-3">
       <div className="flex gap-2 items-end">
         <div className="flex-1 space-y-1">
-          <Label className="text-xs text-muted-foreground">포워더명</Label>
+          <Label className="text-sm text-muted-foreground">포워더명</Label>
           <Input className="h-8 text-sm" value={row.forwarder_name}
             onChange={(e) => setField('forwarder_name', e.target.value)} />
         </div>
         <div className="w-40 space-y-1">
-          <Label className="text-xs text-muted-foreground">견적일</Label>
+          <Label className="text-sm text-muted-foreground">견적일</Label>
           <Input type="date" className="h-8 text-sm" value={row.quote_date}
             onChange={(e) => setField('quote_date', e.target.value)} />
         </div>
@@ -60,7 +60,7 @@ export function ForwardingQuoteEditor({ row, onChange, onRemove }: {
         <tbody>
           {row.items.length === 0 && (
             <tr>
-              <td colSpan={5} className="py-2 text-xs text-muted-foreground">
+              <td colSpan={5} className="py-2 text-sm text-muted-foreground">
                 항목이 없습니다. 아래 &lsquo;항목 추가&rsquo; 버튼을 누르세요.
               </td>
             </tr>
@@ -70,7 +70,7 @@ export function ForwardingQuoteEditor({ row, onChange, onRemove }: {
               <td className="py-1 pr-2">
                 <Select value={it.item_type}
                   onValueChange={(v) => setItem(it._key, 'item_type', (v as ItemType) ?? 'quote')}>
-                  <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-7 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {(Object.keys(ITEM_TYPE_LABELS) as ItemType[]).map((t) => (
                       <SelectItem key={t} value={t}>{ITEM_TYPE_LABELS[t]}</SelectItem>
@@ -82,13 +82,13 @@ export function ForwardingQuoteEditor({ row, onChange, onRemove }: {
                 <Input className="h-7 text-sm" value={it.item_name} placeholder="항목명 입력"
                   onChange={(e) => setItem(it._key, 'item_name', e.target.value)} />
                 {it.currency && it.currency !== 'KRW' && it.amount_cur != null && (
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-sm text-muted-foreground">
                     {it.currency} {it.amount_cur.toLocaleString('ko-KR')}
                   </span>
                 )}
               </td>
               <td className="py-1 px-2">
-                <NumberInput className="h-7 text-sm text-right font-mono" value={it.amount_krw}
+                <NumberInput className="h-7 text-sm text-right tabular-nums" value={it.amount_krw}
                   onValueChange={(v) => setItem(it._key, 'amount_krw', v)} />
               </td>
               <td className="py-1 px-2 text-center">
@@ -106,8 +106,8 @@ export function ForwardingQuoteEditor({ row, onChange, onRemove }: {
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={2} className="pt-2 text-muted-foreground text-xs">소계</td>
-            <td className="pt-2 px-2 text-right font-medium text-xs">
+            <td colSpan={2} className="pt-2 text-muted-foreground text-sm">소계</td>
+            <td className="pt-2 px-2 text-right font-medium text-sm">
               견적 {quote.toLocaleString('ko-KR')} / 실청구 {actual.toLocaleString('ko-KR')}
             </td>
             <td colSpan={2} />
@@ -115,14 +115,14 @@ export function ForwardingQuoteEditor({ row, onChange, onRemove }: {
         </tfoot>
       </table>
 
-      <Button type="button" size="sm" variant="outline" className="h-7 text-xs"
+      <Button type="button" size="sm" variant="outline" className="h-7 text-sm"
         onClick={() => onChange({ ...row, items: [...row.items, blankQuoteItem()] })}>
         <Plus className="h-3 w-3 mr-1" />항목 추가
       </Button>
 
       <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground shrink-0">메모</span>
-        <Input className="h-7 text-xs" value={row.notes} placeholder="메모 입력"
+        <span className="text-sm text-muted-foreground shrink-0">메모</span>
+        <Input className="h-7 text-sm" value={row.notes} placeholder="메모 입력"
           onChange={(e) => setField('notes', e.target.value)} />
       </div>
     </div>

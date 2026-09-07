@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -36,36 +35,42 @@ export function SettlementCard({
       <CardContent className="pt-4 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold">{label}</p>
-          {isLocked
-            ? <Badge variant="default" className="text-xs">완료</Badge>
-            : <Badge variant="secondary" className="text-xs">미정산</Badge>}
+          <span className={isLocked ? 'text-muted-foreground' : 'text-slate-800'}>
+            {isLocked ? '완료' : '미정산'}
+          </span>
         </div>
 
         {grandTotal != null ? (
           <>
             <div>
-              <p className="text-xs text-muted-foreground">종합정산액</p>
-              <p className="text-xl font-bold font-mono">{grandTotal.toLocaleString('ko-KR')}원</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-sm text-muted-foreground">종합정산액</p>
+              <p className="text-xl font-semibold tabular-nums tracking-tight">
+                {grandTotal.toLocaleString('ko-KR')}
+                <span className="ml-0.5 text-sm font-normal text-muted-foreground">원</span>
+              </p>
+              <p className="text-sm text-muted-foreground mt-0.5">
                 (중간 {interimConfirmedKrw!.toLocaleString('ko-KR')} + 클로징 {amount!.toLocaleString('ko-KR')})
               </p>
             </div>
             <Separator />
             <div>
-              <p className="text-xs text-muted-foreground">클로징 정산금액</p>
-              <p className={`text-base font-bold font-mono ${amount! < 0 ? 'text-red-600' : ''}`}>
+              <p className="text-sm text-muted-foreground">클로징 정산금액</p>
+              <p className={`text-base font-semibold tabular-nums ${amount! < 0 ? 'text-red-700' : ''}`}>
                 {amount!.toLocaleString('ko-KR')}원
               </p>
               {closingDirection && (
-                <p className="text-xs text-muted-foreground mt-0.5">{closingDirection}</p>
+                <p className="text-sm text-muted-foreground mt-0.5">{closingDirection}</p>
               )}
             </div>
           </>
         ) : amount != null ? (
-          <p className="text-xl font-bold font-mono">{amount.toLocaleString('ko-KR')}원</p>
+          <p className="text-xl font-semibold tabular-nums tracking-tight">
+            {amount.toLocaleString('ko-KR')}
+            <span className="ml-0.5 text-sm font-normal text-muted-foreground">원</span>
+          </p>
         ) : null}
 
-        {date && <p className="text-xs text-muted-foreground">{formatDate(date)}</p>}
+        {date && <p className="text-sm text-muted-foreground">{formatDate(date)}</p>}
         <div className="flex gap-2 pt-1">
           <SettlementPdfButton type={pdfType} settlementId={settlementId} isLocked={isLocked} />
           {!txLocked && (

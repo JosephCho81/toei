@@ -15,11 +15,11 @@ export function InterimSummaryCard({ interim }: { interim: InterimSummary | null
           <div className="flex items-center gap-6">
             <div>
               <span className="text-muted-foreground">확정금액</span>
-              <p className="font-bold text-lg font-mono">{krw(interim.confirmed_amount_krw)}</p>
+              <p className="font-bold text-lg tabular-nums">{krw(interim.confirmed_amount_krw)}</p>
             </div>
             <div>
               <span className="text-muted-foreground">통관환율</span>
-              <p className="font-mono">{interim.customs_exchange_rate?.toLocaleString('ko-KR')}원/$</p>
+              <p className="tabular-nums">{interim.customs_exchange_rate?.toLocaleString('ko-KR')}원/$</p>
             </div>
             {interim.updated_at && (
               <div>
@@ -27,10 +27,10 @@ export function InterimSummaryCard({ interim }: { interim: InterimSummary | null
                 <p>{new Date(interim.updated_at).toLocaleDateString('ko-KR')}</p>
               </div>
             )}
-            <Badge variant="default" className="text-xs">완료</Badge>
+            <Badge variant="default" className="text-sm">완료</Badge>
           </div>
         ) : (
-          <Badge variant="destructive" className="text-xs">중간정산 미완료</Badge>
+          <Badge variant="destructive" className="text-sm">중간정산 미완료</Badge>
         )}
       </CardContent>
     </Card>
@@ -55,12 +55,12 @@ export function CustomsDetailCard({ items }: { items: { item_name: string; amoun
             {items.map((item, i) => (
               <TableRow key={i}>
                 <TableCell className="text-sm">{item.item_name}</TableCell>
-                <TableCell className="text-right font-mono text-sm">{krw(item.amount_krw)}</TableCell>
+                <TableCell className="text-right tabular-nums text-sm">{krw(item.amount_krw)}</TableCell>
               </TableRow>
             ))}
             <TableRow className="font-semibold">
               <TableCell className="text-sm">합계</TableCell>
-              <TableCell className="text-right font-mono text-sm">
+              <TableCell className="text-right tabular-nums text-sm">
                 {krw(items.reduce((s, i) => s + i.amount_krw, 0))}
               </TableCell>
             </TableRow>
@@ -88,8 +88,8 @@ export function ForwardingDetailCard({ rows }: { rows: ForwardingRow[] }) {
             {rows.length > 0 ? rows.map((r, i) => (
               <TableRow key={i}>
                 <TableCell className="text-sm">{r.forwarder_name}</TableCell>
-                <TableCell className="text-right font-mono text-sm">{krw(r.quote_amount_krw)}</TableCell>
-                <TableCell className="text-right font-mono text-sm">{krw(r.actual_amount_krw)}</TableCell>
+                <TableCell className="text-right tabular-nums text-sm">{krw(r.quote_amount_krw)}</TableCell>
+                <TableCell className="text-right tabular-nums text-sm">{krw(r.actual_amount_krw)}</TableCell>
               </TableRow>
             )) : (
               <TableRow>

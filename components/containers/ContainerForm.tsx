@@ -35,7 +35,7 @@ function empty(d?: C | null, defaultLcNumber?: string | null): FV {
   }
 }
 function F({ l, c }: { l: string; c: React.ReactNode }) {
-  return <div className="space-y-1"><Label className="text-xs">{l}</Label>{c}</div>
+  return <div className="space-y-1"><Label className="text-sm">{l}</Label>{c}</div>
 }
 interface Props {
   transactionId: string
@@ -138,7 +138,7 @@ export function ContainerForm({ transactionId, open, onOpenChange, initialData, 
           <button
             type="button"
             onClick={() => setShowDetail(v => !v)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
           >
             {showDetail ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             상세 정보 (컨테이너 번호·선박·카톤수)
@@ -149,7 +149,7 @@ export function ContainerForm({ transactionId, open, onOpenChange, initialData, 
               <div className="col-span-2">
                 <F l="컨테이너 번호" c={
                   <div className="flex gap-2 items-center">
-                    <Input className="font-mono" maxLength={11} value={form.container_no}
+                    <Input className="tabular-nums" maxLength={11} value={form.container_no}
                       onChange={e => set('container_no', e.target.value.toUpperCase().replace(/\s/g, ''))} placeholder="KMTU1234567" />
                     {form.container_no.length >= 4 && <Badge variant={isValid ? 'default' : 'destructive'}>{isValid ? '유효' : '형식오류'}</Badge>}
                   </div>
@@ -163,11 +163,11 @@ export function ContainerForm({ transactionId, open, onOpenChange, initialData, 
                   </SelectContent>
                 </Select>
               } />
-              <F l="Master B/L (유니패스 조회 시 자동 입력)" c={<Input className="font-mono" value={form.mbl_no} onChange={e => set('mbl_no', e.target.value.toUpperCase().replace(/\s/g, ''))} />} />
+              <F l="Master B/L (유니패스 조회 시 자동 입력)" c={<Input className="tabular-nums" value={form.mbl_no} onChange={e => set('mbl_no', e.target.value.toUpperCase().replace(/\s/g, ''))} />} />
               <F l="선사명 (원문)" c={<Input value={form.carrier} onChange={e => set('carrier', e.target.value)} placeholder="KMTC LINE (MALAYSIA) SDN BHD" />} />
               <F l="선박명" c={<Input value={form.vessel_name} onChange={e => set('vessel_name', e.target.value)} />} />
               <F l="항차" c={<Input value={form.voyage_no} onChange={e => set('voyage_no', e.target.value)} />} />
-              <F l="카톤수" c={<NumberInput className="text-right font-mono" value={form.carton_count} onValueChange={v => set('carton_count', v)} />} />
+              <F l="카톤수" c={<NumberInput className="text-right tabular-nums" value={form.carton_count} onValueChange={v => set('carton_count', v)} />} />
               <F l="실제 출발일" c={<Input type="date" value={form.actual_departure} onChange={e => set('actual_departure', e.target.value)} />} />
               <F l="실제 도착일" c={<Input type="date" value={form.actual_arrival} onChange={e => set('actual_arrival', e.target.value)} />} />
               <div className="col-span-2"><F l="메모" c={<Input value={form.manual_notes} onChange={e => set('manual_notes', e.target.value)} />} /></div>

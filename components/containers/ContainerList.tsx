@@ -65,19 +65,19 @@ export function ContainerList({ transactionId, isLocked, defaultLcNumber }: {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <BlLink blNo={c.bl_no} mblNo={c.mbl_no} carrierName={c.carrier} containerNo={c.container_no} />
-                {c.container_no && <span className="font-mono text-xs text-muted-foreground">{c.container_no}</span>}
-                {c.container_size && <Badge variant="outline" className="text-xs">{c.container_size}</Badge>}
-                {c.carrier && <Badge variant="outline" className="text-xs">{c.carrier}</Badge>}
+                {c.container_no && <span className="tabular-nums text-sm text-muted-foreground">{c.container_no}</span>}
+                {c.container_size && <Badge variant="outline" className="text-sm">{c.container_size}</Badge>}
+                {c.carrier && <Badge variant="outline" className="text-sm">{c.carrier}</Badge>}
                 {c.tracking_status && (
-                  <Badge variant="secondary" className="text-xs">{c.tracking_status}</Badge>
+                  <Badge variant="secondary" className="text-sm">{c.tracking_status}</Badge>
                 )}
               </div>
               {!isLocked && (
                 <div className="flex gap-1 shrink-0 ml-2">
                   {deleteId === c.id ? (
                     <>
-                      <Button size="sm" variant="destructive" className="h-6 text-xs px-2" onClick={() => handleDelete(c.id)}>삭제 확인</Button>
-                      <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setDeleteId(null)}>취소</Button>
+                      <Button size="sm" variant="destructive" className="h-6 text-sm px-2" onClick={() => handleDelete(c.id)}>삭제 확인</Button>
+                      <Button size="sm" variant="ghost" className="h-6 text-sm" onClick={() => setDeleteId(null)}>취소</Button>
                     </>
                   ) : (
                     <>

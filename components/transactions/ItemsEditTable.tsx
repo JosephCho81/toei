@@ -118,7 +118,7 @@ export function ItemsEditTable({ transactionId, isLocked }: {
       <CardContent className="p-0">
         <ItemDatalists products={products} />
         {mismatches.length > 0 && (
-          <div className="mx-4 mb-2 rounded-md border border-red-200 bg-red-50/70 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+          <div className="mx-4 mb-2 rounded-md border border-red-200 bg-red-50/70 px-3 py-2 text-sm text-red-700   dark:text-red-300">
             품목 합계와 다른 입력금액이 {mismatches.length}건 있습니다. 차액 사유를 확인하세요.
           </div>
         )}
@@ -180,7 +180,7 @@ export function ItemsEditTable({ transactionId, isLocked }: {
           </Table>
         </div>
         {!isLocked && (
-          <p className="px-4 py-2 text-xs text-muted-foreground">
+          <p className="px-4 py-2 text-sm text-muted-foreground">
             ↑·↓ 로 위아래 칸 이동, Tab 으로 오른쪽 이동. 품목을 고르면 종류·색상·단위가 자동 입력되고, 행 추가 시 사이즈가 순서대로 채워집니다.
           </p>
         )}

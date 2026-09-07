@@ -67,26 +67,26 @@ export function TransactionFlagPanel({ transactionId, flags, onChange }: Props) 
   return (
     <div className="space-y-2 pt-2">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-muted-foreground">오류 검토</p>
-        <Button size="sm" variant="outline" className="h-7 text-xs" disabled={busy} onClick={addFlag}>
+        <p className="text-sm font-medium text-muted-foreground">오류 검토</p>
+        <Button size="sm" variant="outline" className="h-7 text-sm" disabled={busy} onClick={addFlag}>
           <Plus className="h-3 w-3 mr-1" />오류 항목 추가
         </Button>
       </div>
 
       {open.length === 0 && resolved.length === 0 && (
-        <p className="text-xs text-muted-foreground py-1">표시된 오류가 없습니다.</p>
+        <p className="text-sm text-muted-foreground py-1">표시된 오류가 없습니다.</p>
       )}
 
       {open.map((f) => (
         <div key={f.id} className="flex items-center gap-2">
           <Select value={f.field} onValueChange={(v) => patchFlag(f.id, { field: (v as FlagField) ?? '기타' })}>
-            <SelectTrigger className="h-7 text-xs w-24 shrink-0"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-7 text-sm w-24 shrink-0"><SelectValue /></SelectTrigger>
             <SelectContent>
               {FLAG_FIELDS.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
             </SelectContent>
           </Select>
           <Input
-            className="h-7 text-xs"
+            className="h-7 text-sm"
             defaultValue={f.memo ?? ''}
             placeholder="무엇이 잘못되었는지 메모 (예: 3행 수량 250 → 205)"
             onBlur={(e) => {
@@ -94,8 +94,8 @@ export function TransactionFlagPanel({ transactionId, flags, onChange }: Props) 
               if (memo !== (f.memo ?? null)) patchFlag(f.id, { memo })
             }}
           />
-          <span className="text-[10px] text-muted-foreground shrink-0 w-20">{formatDate(f.created_at)}</span>
-          <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-600 shrink-0"
+          <span className="text-sm text-muted-foreground shrink-0 w-20">{formatDate(f.created_at)}</span>
+          <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-600 shrink-0"
             title="수정 완료 처리" onClick={() => resolveFlag(f.id)}>
             <Check className="h-3.5 w-3.5" />
           </Button>
@@ -110,7 +110,7 @@ export function TransactionFlagPanel({ transactionId, flags, onChange }: Props) 
         <div className="space-y-1 pt-1">
           <p className="text-[11px] text-muted-foreground">처리 완료</p>
           {resolved.map((f) => (
-            <div key={f.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div key={f.id} className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="w-24 shrink-0">[{f.field}]</span>
               <span className="flex-1 line-through">{f.memo || '(메모 없음)'}</span>
               <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0"

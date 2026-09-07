@@ -54,34 +54,34 @@ export function AuditLogDiff({
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base">
-            변경 상세 &mdash; <span className="font-mono">{log.table_name}</span> / {log.action}
+            변경 상세 &mdash; <span className="tabular-nums">{log.table_name}</span> / {log.action}
           </DialogTitle>
         </DialogHeader>
 
         {changed.length > 0 ? (
           <div className="mb-4">
-            <p className="text-xs font-semibold text-muted-foreground mb-2">
+            <p className="text-sm font-semibold text-muted-foreground mb-2">
               변경된 필드 ({changed.length}개)
             </p>
             <div className="rounded-md border overflow-hidden">
-              <table className="w-full text-xs">
+              <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-amber-50 border-b">
+                  <tr className="bg-slate-50 border-b">
                     <th className="text-left px-3 py-1.5 font-medium w-1/4">필드</th>
                     <th className="text-left px-3 py-1.5 font-medium w-[37.5%] text-red-700">변경 전</th>
-                    <th className="text-left px-3 py-1.5 font-medium w-[37.5%] text-green-700">변경 후</th>
+                    <th className="text-left px-3 py-1.5 font-medium w-[37.5%] text-slate-700">변경 후</th>
                   </tr>
                 </thead>
                 <tbody>
                   {changed.map((d, i) => (
-                    <tr key={d.key} className={i % 2 === 0 ? 'bg-amber-50/60' : 'bg-amber-50/30'}>
-                      <td className="px-3 py-1.5 font-mono font-semibold text-amber-800 break-all">
+                    <tr key={d.key} className={i % 2 === 0 ? 'bg-slate-50' : 'bg-slate-50'}>
+                      <td className="px-3 py-1.5 tabular-nums font-semibold text-slate-700 break-all">
                         {d.key}
                       </td>
-                      <td className="px-3 py-1.5 font-mono text-red-700 break-all whitespace-pre-wrap">
+                      <td className="px-3 py-1.5 tabular-nums text-red-700 break-all whitespace-pre-wrap">
                         {fmt(d.old)}
                       </td>
-                      <td className="px-3 py-1.5 font-mono text-green-700 break-all whitespace-pre-wrap">
+                      <td className="px-3 py-1.5 tabular-nums text-slate-700 break-all whitespace-pre-wrap">
                         {fmt(d.new)}
                       </td>
                     </tr>
@@ -95,17 +95,17 @@ export function AuditLogDiff({
         )}
 
         {unchanged.length > 0 && (
-          <details className="text-xs">
+          <details className="text-sm">
             <summary className="cursor-pointer text-muted-foreground py-1 select-none hover:text-foreground">
               변경 없는 필드 ({unchanged.length}개) 펼치기
             </summary>
             <div className="rounded-md border overflow-hidden mt-2">
-              <table className="w-full text-xs">
+              <table className="w-full text-sm">
                 <tbody>
                   {unchanged.map((d, i) => (
                     <tr key={d.key} className={i % 2 === 0 ? 'bg-muted/20' : ''}>
-                      <td className="px-3 py-1 font-mono text-muted-foreground w-1/4">{d.key}</td>
-                      <td className="px-3 py-1 font-mono text-muted-foreground break-all">{fmt(d.old)}</td>
+                      <td className="px-3 py-1 tabular-nums text-muted-foreground w-1/4">{d.key}</td>
+                      <td className="px-3 py-1 tabular-nums text-muted-foreground break-all">{fmt(d.old)}</td>
                     </tr>
                   ))}
                 </tbody>
