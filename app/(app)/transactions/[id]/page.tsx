@@ -11,6 +11,7 @@ import { SettlementCard, Row } from '@/components/transactions/SettlementCard'
 import { ItemsEditTable } from '@/components/transactions/ItemsEditTable'
 import { ForwardingQuoteSection } from '@/components/transactions/ForwardingQuoteSection'
 import { TransactionNotesCard } from '@/components/transactions/TransactionNotesCard'
+import { TransactionLockButton } from '@/components/transactions/TransactionLockButton'
 
 const STATUS_LABELS: Record<string, string> = {
   pending: '미진행',
@@ -76,6 +77,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
           {!t.is_locked && (
             <Link href={`/transactions/${id}/edit`} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>수정</Link>
           )}
+          <TransactionLockButton transactionId={id} isLocked={t.is_locked} />
         </div>
       </div>
 

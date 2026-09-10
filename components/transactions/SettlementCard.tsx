@@ -73,9 +73,10 @@ export function SettlementCard({
         {date && <p className="text-sm text-muted-foreground">{formatDate(date)}</p>}
         <div className="flex gap-2 pt-1">
           <SettlementPdfButton type={pdfType} settlementId={settlementId} isLocked={isLocked} />
-          {!txLocked && (
+          {/* 잠긴 거래도 정산 화면은 열어 준다 — 안에 잠금 해제 버튼이 있고, 링크를 숨기면 도달할 방법이 없다 */}
+          {(amount != null || !txLocked) && (
             <Link href={href} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
-              {amount == null ? '정산 시작' : '상세보기'}
+              {amount == null ? '정산 시작' : isLocked ? '상세보기' : '수정'}
             </Link>
           )}
         </div>
