@@ -46,7 +46,14 @@ export function ClosingSummaryCard({
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
             <div className="space-y-1">
-              <Label>절사 정책 — 공급가에 적용</Label>
+              {/*
+                구방식(inclusive)은 절사가 **최종가**에 걸린다 — 부가세를 분리할 수 없어
+                공급가라는 칸 자체가 없기 때문이다. 라벨을 한 가지로 못 박아 두면
+                33건 전부가 화면과 다르게 계산된다 (담당자 지적 2026-09-10).
+              */}
+              <Label>
+                절사 정책 — {calc?.vatMode === 'inclusive' ? '최종가에 적용 (구방식)' : '공급가에 적용'}
+              </Label>
               <Select value={roundingPolicy} onValueChange={(v) => onRoundingChange(v as RoundingPolicy)} disabled={isLocked}>
                 <SelectTrigger className="w-36"><SelectValue>{(v: RoundingPolicy) => ROUNDING_LABELS[v]}</SelectValue></SelectTrigger>
                 <SelectContent>

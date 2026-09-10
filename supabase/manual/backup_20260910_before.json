@@ -1,0 +1,80 @@
+{
+  "interim": [
+    {
+      "round": 37,
+      "transaction_id": "0292223d-b408-42e0-9fb8-2a6d4e2b1c34",
+      "invoiced_amount_krw": 207895876
+    },
+    {
+      "round": 38,
+      "transaction_id": "ce9e7175-8a1e-4afd-b87a-3a8941f55661",
+      "invoiced_amount_krw": 136883194
+    },
+    {
+      "round": 39,
+      "transaction_id": "00c98cdd-d42e-49ab-949b-5215447fe306",
+      "invoiced_amount_krw": 136822694
+    },
+    {
+      "round": 36,
+      "transaction_id": "2e738d52-12cf-4f41-81a6-9caef20c0a86",
+      "invoiced_amount_krw": 124384618
+    }
+  ],
+  "closing": [
+    {
+      "round": 30,
+      "transaction_id": "ad8c0758-151d-49a9-b55d-057b78b24bf1",
+      "vat_mode": "inclusive",
+      "rounding_policy": "floor_100",
+      "supply_amount_krw": null,
+      "vat_amount_krw": null,
+      "confirmed_amount_krw": 2858100
+    },
+    {
+      "round": 31,
+      "transaction_id": "aaaa52f4-3dc7-4ac7-926c-84a3ed224b34",
+      "vat_mode": "inclusive",
+      "rounding_policy": "floor_100",
+      "supply_amount_krw": null,
+      "vat_amount_krw": null,
+      "confirmed_amount_krw": 1964700
+    },
+    {
+      "round": 32,
+      "transaction_id": "832c07ef-6a9c-4457-ad5f-588e0585121d",
+      "vat_mode": "inclusive",
+      "rounding_policy": "floor_100",
+      "supply_amount_krw": null,
+      "vat_amount_krw": null,
+      "confirmed_amount_krw": 3117900
+    },
+    {
+      "round": 29,
+      "transaction_id": "33481875-2005-4f72-a7a3-825f49075c14",
+      "vat_mode": "inclusive",
+      "rounding_policy": "floor_100",
+      "supply_amount_krw": null,
+      "vat_amount_krw": null,
+      "confirmed_amount_krw": 2828800
+    },
+    {
+      "round": 33,
+      "transaction_id": "a521416a-6d71-4d4c-85ff-2ee979e844ad",
+      "vat_mode": "inclusive",
+      "rounding_policy": "floor_100",
+      "supply_amount_krw": null,
+      "vat_amount_krw": null,
+      "confirmed_amount_krw": 5080200
+    },
+    {
+      "round": 34,
+      "transaction_id": "ade60a9d-b3c7-4616-a087-21bb6c53efb5",
+      "vat_mode": "inclusive",
+      "rounding_policy": "floor_100",
+      "supply_amount_krw": null,
+      "vat_amount_krw": null,
+      "confirmed_amount_krw": -290900
+    }
+  ]
+}

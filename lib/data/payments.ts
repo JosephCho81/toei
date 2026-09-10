@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { computeSettlementSchedule } from '@/lib/calculations/schedule'
+// 회귀 테스트가 node 로 이 파일을 직접 부른다 — 별칭(@/) 은 node 가 풀지 못하므로 상대경로로 둔다.
+import { computeSettlementSchedule } from '../calculations/schedule.ts'
 
 /**
  * 지급 현황 화면이 읽는 데이터.
@@ -14,6 +15,25 @@ export const PAID_TOLERANCE_KRW = 1_000
 
 /** 기일이 이 일수 안으로 들어오면 「임박」으로 표시한다. */
 export const DUE_SOON_DAYS = 7
+
+/**
+ * 여기까지가 「정산이 끝난 구간」이다. 남은 금액을 연체가 아니라 **지급금 차이**로 센다.
+ *
+ * 담당자 2026-09-10: 「지금까지 정산된 35차까지를 지급금 차이로 계산.
+ *   연체는 이번달 지급 중인 금액을 제외하고 계산.」
+ *
+ * 기간(1년 경과 등)으로 자르지 않는다 — 그러면 지금 정상인 37·38차가 1년 뒤
+ * 조용히 연체에서 빠져나가 진짜 연체가 화면에서 사라진다.
+ */
+export const SETTLED_THROUGH_ROUND = 35
+
+/**
+ * 기일에서 이 일수까지는 빨강을 붙이지 않는다.
+ *
+ * 담당자 2026-09-10: 「영업일로 3,4일 정도 차이를 두고 지급 가능. 계산서 일정, 휴일,
+ *   금액 검토 등으로 약간 바뀔 수 있음. 해서 1주 정도 기간 설정.」
+ */
+export const DUE_GRACE_DAYS = 7
 
 /** 일부만 내고 이 기간이 지나도록 추가 지급이 없으면 「정체」로 본다. */
 export const STALLED_DAYS = 30
@@ -31,8 +51,28 @@ export type PaymentState =
   | 'upcoming'
   /** 완납 */
   | 'paid'
-  /** 청구금액이 아직 없어 판단 불가 */
+  /** 청구금액도 계산값도 없어 판단 불가 */
   | 'unbilled'
+
+/**
+ * 남은 금액이 어느 칸에 들어가는가. 넷은 서로 겹치지 않는다.
+ *
+ * 담당자 2026-09-10 로 갈라졌다 — 예전에는 「기일 경과」 한 칸이 셋을 다 담고 있어
+ * 2차 1억 3천만원(2022년, 개인 통장 지급분)이 이번 달 연체와 나란히 서 있었다.
+ */
+export type PaymentBucket =
+  /** 35차까지의 남은 금액 — 연체가 아니라 정산이 끝난 구간의 차이다 */
+  | 'settled_gap'
+  /** 36차 이후, 기일이 이번 달 — 지급이 도는 중이다 */
+  | 'in_progress'
+  /** 36차 이후, 기일이 달을 넘겼다 — 지체상금 대상 */
+  | 'overdue'
+  /** 기일이 아직 오지 않았다 */
+  | 'not_due'
+  /** 청구액보다 많이 나갔다 */
+  | 'overpaid'
+  /** 남은 금액이 없다 */
+  | 'none'
 
 export interface Installment {
   /** 통장 원장 행 id — 수정·삭제가 이걸로 간다 */
@@ -53,6 +93,16 @@ export interface PaymentRow {
   billedKrw: number | null
   /** 시스템 확정값. billedKrw 와 다르면 검산 차이가 있다는 뜻 */
   confirmedKrw: number | null
+  /**
+   * 남은 금액을 내는 기준. 청구액이 있으면 청구액, 없으면 계산값이다.
+   *
+   * 담당자 2026-09-10: 「시스템은 계산값으로 계산, 이후 정산에서 청구값을 입력.」
+   * 36차부터는 엑셀 청구금액을 쓰지 않으므로, 청구값을 넣기 전까지는 계산값이 기준이다.
+   * 넣는 순간 청구액이 기준을 넘겨받는다.
+   */
+  basisKrw: number | null
+  /** 위 기준이 계산값인가 (= 아직 청구값을 넣지 않았다) */
+  basisIsCalc: boolean
   /** billedKrw − confirmedKrw. 미지급이 아니라 계산 차이다 */
   calcDiffKrw: number | null
   /** 아직 청구하지 않은 차수의 예상 청구액 (확정값) */
@@ -66,6 +116,7 @@ export interface PaymentRow {
   /** 마지막 지급일 − 기일. 음수면 기일 전에 냈다는 뜻. 미지급이면 오늘 기준 경과일 */
   delayDays: number | null
   state: PaymentState
+  bucket: PaymentBucket
   /** 배분이 사람 손을 거치지 않은 건이 섞여 있는가 */
   needsConfirm: boolean
   /** 일부만 내고 30일 넘게 멈춰 있는가 */
@@ -132,9 +183,19 @@ export interface MonthlyDue {
     roundNo: number | null
     roundLabel: string
     dueDate: string
+    /** 아직 나가야 할 금액 */
     krw: number
-    /** 청구 전이라 예상액인가 */
+    /** 그 달에 나갈 총액. krw 와 다르면 일부가 이미 나갔다는 뜻 */
+    basisKrw: number
+    /** 청구값을 아직 안 넣어 계산값으로 잡은 금액인가 */
     planned: boolean
+    /** 기일이 지났는가 */
+    pastDue: boolean
+    /**
+     * 유예(7일)까지 넘겼는가. 여기서만 빨강이 붙는다 —
+     * 영업일 3~4일 차이로 늦는 것은 연체가 아니라 일정이다.
+     */
+    pastGrace: boolean
   }[]
 }
 
@@ -143,9 +204,16 @@ export interface PaymentSummary {
   paidKrw: number
   /** 청구 잔액 전체 — 기일 경과분과 미도래분을 합친 값이다. 화면에서 한 칸에 쓰지 않는다 */
   balanceKrw: number
+  /** 기일이 달을 넘긴 미지급 — 지체상금 대상이다 */
   overdueKrw: number
   overdueCount: number
   maxDelayDays: number
+  /** 기일이 이번 달인 미지급 — 지급이 도는 중이라 연체로 세지 않는다 */
+  inProgressKrw: number
+  inProgressCount: number
+  /** 35차까지의 남은 금액 — 연체가 아니라 정산이 끝난 구간의 차이다 */
+  settledGapKrw: number
+  settledGapCount: number
   /** 청구액보다 많이 나간 금액 (양수로 담는다) */
   overpaidKrw: number
   overpaidCount: number
@@ -217,6 +285,29 @@ function num(v: number | string | null | undefined): number {
   return v == null ? 0 : Number(v)
 }
 
+/**
+ * 남은 금액이 어느 칸에 들어가는가. 넷은 겹치지 않고, 합하면 전체 잔액이 된다.
+ *
+ * 「이번 달 기일」과 「달을 넘긴 기일」을 가르는 것이 핵심이다 —
+ * 담당자는 달이 넘어간 것만 연체로 보고 지체상금으로 옮긴다.
+ */
+export function bucketOf(
+  r: { roundNo: number | null; balanceKrw: number; basisKrw: number | null; dueDate: string | null },
+  today: string,
+): PaymentBucket {
+  if (r.basisKrw == null) return 'none'
+  if (Math.abs(r.balanceKrw) < PAID_TOLERANCE_KRW) return 'none'
+  if (r.balanceKrw < 0) return 'overpaid'
+  if (r.roundNo != null && r.roundNo <= SETTLED_THROUGH_ROUND) return 'settled_gap'
+  if (r.dueDate == null) return 'not_due'
+
+  const thisMonth = today.slice(0, 7)
+  const dueMonth = r.dueDate.slice(0, 7)
+  if (dueMonth < thisMonth) return 'overdue'
+  if (dueMonth === thisMonth) return 'in_progress'
+  return 'not_due'
+}
+
 /** 'YYYY-MM' 에 n 개월을 더한다. */
 function addMonths(ym: string, n: number): string {
   const total = Number(ym.slice(0, 4)) * 12 + (Number(ym.slice(5, 7)) - 1) + n
@@ -226,8 +317,12 @@ function addMonths(ym: string, n: number): string {
 /**
  * 이번 달부터 4개월치 결제 예정.
  *
- * **기일이 지난 것은 넣지 않는다** — 그건 예정이 아니라 이미 밀린 돈이고 미지급금이 센다.
- * 아직 청구 전인 차수는 계산값으로 잡되 「예상」임을 행마다 들고 간다.
+ * **이번 달 안에서 기일이 지난 것도 넣는다** (담당자 2026-09-10:
+ * 「날자 지난 것도 넣어주시고 일정 기간 이상 지나갔는데 지급 다 안 된 건은 빨간색 표시」).
+ * 빼 두면 기일이 오늘을 지나는 순간 그 달 표에서 사라져, 아직 나가야 할 돈이 화면에서 없어진다.
+ *
+ * 35차까지의 남은 금액은 넣지 않는다 — 그건 결제 예정이 아니라 지급금 차이다.
+ * 아직 청구값을 안 넣은 차수는 계산값으로 잡되 「예상」임을 행마다 들고 간다.
  */
 function buildSchedule(rows: PaymentRow[], today: string) {
   const months = Array.from({ length: 4 }, (_, i) => addMonths(today.slice(0, 7), i))
@@ -238,16 +333,21 @@ function buildSchedule(rows: PaymentRow[], today: string) {
   let laterCount = 0
 
   for (const r of rows) {
-    if (r.dueDate == null || r.dueDate <= today) continue
+    if (r.dueDate == null) continue
+    // 35차까지의 남은 금액은 예정이 아니라 지급금 차이다 — KPI 가 따로 센다.
+    if (r.roundNo != null && r.roundNo <= SETTLED_THROUGH_ROUND) continue
 
-    const planned = r.billedKrw == null
-    const krw = planned ? (r.plannedKrw ?? 0) : r.balanceKrw
-    if (Math.abs(krw) < PAID_TOLERANCE_KRW) continue
+    const planned = r.basisIsCalc
+    const krw = r.balanceKrw
+    if (krw < PAID_TOLERANCE_KRW) continue
 
     const bucket = byMonth.get(r.dueDate.slice(0, 7))
     if (!bucket) {
-      laterKrw += krw
-      laterCount += 1
+      // 이번 달보다 앞선 기일은 예정이 아니다 — 연체 칸이 받는다.
+      if (r.dueDate.slice(0, 7) > months[0]) {
+        laterKrw += krw
+        laterCount += 1
+      }
       continue
     }
     if (planned) bucket.plannedKrw += krw
@@ -259,7 +359,10 @@ function buildSchedule(rows: PaymentRow[], today: string) {
       roundLabel: r.roundLabel,
       dueDate: r.dueDate,
       krw,
+      basisKrw: r.basisKrw ?? krw,
       planned,
+      pastDue: r.dueDate < today,
+      pastGrace: daysBetween(r.dueDate, today) > DUE_GRACE_DAYS,
     })
   }
 
@@ -368,8 +471,10 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
 
     const schedule = computeSettlementSchedule(t.lc_open_date, holidays)
     const dueDate = t.payment_due_date ?? schedule.interimDue
-    const balanceKrw = billedKrw == null ? 0 : billedKrw - paidKrw
-    const settled = billedKrw != null && Math.abs(balanceKrw) < PAID_TOLERANCE_KRW
+    // 청구값이 없으면 계산값으로 센다. 없다고 0으로 두면 36차 이후가 통째로 화면에서 사라진다.
+    const basisKrw = billedKrw ?? confirmedKrw
+    const balanceKrw = basisKrw == null ? 0 : basisKrw - paidKrw
+    const settled = basisKrw != null && Math.abs(balanceKrw) < PAID_TOLERANCE_KRW
 
     // 완납이면 「마지막 지급이 기일보다 며칠 늦었나」, 미납이면 「기일에서 며칠 지났나」.
     const delayDays = dueDate == null
@@ -379,7 +484,7 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
         : daysBetween(dueDate, today)
 
     let state: PaymentState
-    if (billedKrw == null) state = 'unbilled'
+    if (basisKrw == null) state = 'unbilled'
     else if (settled) state = 'paid'
     // 초과 지급은 기일과 무관하다. 연체로 묶으면 대표 화면이 반대로 읽힌다.
     else if (balanceKrw < 0) state = 'overpaid'
@@ -400,6 +505,8 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
       importAmountUsd: t.import_amount_usd == null ? null : Number(t.import_amount_usd),
       billedKrw,
       confirmedKrw,
+      basisKrw,
+      basisIsCalc: billedKrw == null && confirmedKrw != null,
       calcDiffKrw: billedKrw != null && confirmedKrw != null ? billedKrw - confirmedKrw : null,
       plannedKrw: billedKrw == null ? confirmedKrw : null,
       paidKrw,
@@ -409,6 +516,7 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
       dueIsExplicit: t.payment_due_date != null,
       delayDays,
       state,
+      bucket: bucketOf({ roundNo: t.round_no, balanceKrw, basisKrw, dueDate }, today),
       needsConfirm: s ? !s.all_confirmed : false,
       stalled,
       closingBilledKrw,
@@ -427,13 +535,15 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
 
   // ── 요약 ──
   const billedRows = rows.filter((r) => r.billedKrw != null)
-  const open = billedRows.filter((r) => r.state !== 'paid')
-  const overdue = open.filter((r) => r.state === 'no_record' || r.state === 'overdue')
-  const overpaid = open.filter((r) => r.state === 'overpaid')
-  const notDue = open.filter((r) => r.state === 'due_soon' || r.state === 'upcoming')
-  const upcoming = open
-    .filter((r) => r.dueDate != null && r.delayDays != null && r.delayDays <= 0)
-    .sort((a, b) => (b.delayDays ?? 0) - (a.delayDays ?? 0))
+  const inBucket = (b: PaymentBucket) => rows.filter((r) => r.bucket === b)
+  const overdue = inBucket('overdue')
+  const inProgress = inBucket('in_progress')
+  const settledGap = inBucket('settled_gap')
+  const notDue = inBucket('not_due')
+  const overpaid = inBucket('overpaid')
+  const upcoming = notDue
+    .filter((r) => r.dueDate != null)
+    .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''))
 
   let lastPayment: PaymentSummary['lastPayment'] = null
   for (const r of rows) {
@@ -488,11 +598,15 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
 
   const summary: PaymentSummary = {
     billedKrw: billedRows.reduce((s, r) => s + (r.billedKrw ?? 0), 0),
-    paidKrw: billedRows.reduce((s, r) => s + r.paidKrw, 0),
-    balanceKrw: billedRows.reduce((s, r) => s + r.balanceKrw, 0),
+    paidKrw: rows.reduce((s, r) => s + r.paidKrw, 0),
+    balanceKrw: rows.reduce((s, r) => s + r.balanceKrw, 0),
     overdueKrw: overdue.reduce((s, r) => s + r.balanceKrw, 0),
     overdueCount: overdue.length,
     maxDelayDays: overdue.reduce((m, r) => Math.max(m, r.delayDays ?? 0), 0),
+    inProgressKrw: inProgress.reduce((s, r) => s + r.balanceKrw, 0),
+    inProgressCount: inProgress.length,
+    settledGapKrw: settledGap.reduce((s, r) => s + r.balanceKrw, 0),
+    settledGapCount: settledGap.length,
     overpaidKrw: -overpaid.reduce((s, r) => s + r.balanceKrw, 0),
     overpaidCount: overpaid.length,
     notDueKrw: notDue.reduce((s, r) => s + r.balanceKrw, 0),
@@ -527,8 +641,9 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
     .filter((p) => Number(p.unconfirmed_count) > 0).length
 
   const noRecord = rows.filter((r) => r.state === 'no_record')
-  // 청구액이 없는데 돈이 나간 차수. 잔액을 낼 근거가 없어 대사가 불가능하다.
-  const billedMissing = rows.filter((r) => r.billedKrw == null && r.paidKrw !== 0)
+  // 청구액도 계산값도 없는데 돈이 나간 차수. 잔액을 낼 근거가 없어 대사가 불가능하다.
+  // 계산값이라도 있으면 그걸로 세므로 알림에 올리지 않는다 — 36차 이후가 여기 걸리면 안 된다.
+  const billedMissing = rows.filter((r) => r.basisKrw == null && r.paidKrw !== 0)
   const overpaidRows = rows.filter((r) => r.state === 'overpaid')
   const dueSoon = rows.filter((r) => r.state === 'due_soon')
   const stalled = rows.filter((r) => r.stalled)

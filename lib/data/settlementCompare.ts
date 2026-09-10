@@ -49,6 +49,8 @@ export interface CompareRow {
   roundLabel: string
   /** P/O No. — 토에이 자료와 대조할 때 차수보다 이걸 먼저 찾는다 */
   orderNo: string | null
+  /** 수입금액(USD) — 담당자 양식의 둘째 열. 금액이 어긋날 때 규모를 먼저 본다 */
+  importAmountUsd: number | null
   kind: SettlementKind
 
   /** 실제 청구액. 아직 청구 전이면 null */
@@ -86,6 +88,13 @@ export interface CompareRow {
   /** 차이가 왜 났는지 담당자가 적어 두는 자리 */
   note: string | null
   noteTarget: NoteTarget | null
+  /**
+   * 청구액을 적어 넣을 자리. 담당자 2026-09-10:
+   * 「기본적으로 계산하여 검산 후 청구하나 계산서 발행에서 10단위 자리가 달라질 수 있음.
+   *   직원 검수 → 최차장님 검토 → 계산서 검토 → 입력」
+   * 지체상금은 적힌 금액이 곧 청구액이라(037) 따로 넣을 자리가 없다.
+   */
+  invoicedTarget: { table: 'interim_settlements' | 'closing_settlements'; id: string } | null
   /** 지체상금만: 무엇 때문에 물렸나 */
   reason?: string
   incurredOn?: string
@@ -501,6 +510,11 @@ function build(args: {
   note: string | null
   noteTarget: NoteTarget | null
 }): CompareRow {
+  const nt = args.noteTarget
+  const invoicedTarget =
+    nt != null && (nt.table === 'interim_settlements' || nt.table === 'closing_settlements')
+      ? { table: nt.table, id: nt.id }
+      : null
   const paidKrw = num(args.status?.paid_krw)
   const installments = toInstallments(args.status)
   const { invoicedKrw, confirmedKrw, calcKrw, legacyVatMode } = args
@@ -509,6 +523,7 @@ function build(args: {
     roundNo: args.tx.round_no,
     roundLabel: args.tx.round_label,
     orderNo: args.tx.order_no,
+    importAmountUsd: nullableNum(args.tx.import_amount_usd),
     kind: args.kind,
     invoicedKrw,
     confirmedKrw,
@@ -529,6 +544,7 @@ function build(args: {
     legacyVatMode,
     note: args.note,
     noteTarget: args.noteTarget,
+    invoicedTarget,
   }
 }
 

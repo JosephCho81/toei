@@ -9,7 +9,10 @@ import { PaymentDialog, type PaymentDraft } from './PaymentDialog'
 import { MemoField } from '@/components/ui/MemoField'
 import { TABLE, TABLE_WRAP, TH, TD, THEAD_ROW, CENTER, NUM } from '@/components/ui/table-style'
 import { createClient } from '@/lib/supabase/client'
-import { PAID_TOLERANCE_KRW, roundName, type Installment, type PaymentRow } from '@/lib/data/payments'
+import {
+  DUE_GRACE_DAYS, PAID_TOLERANCE_KRW, roundName,
+  type Installment, type PaymentRow,
+} from '@/lib/data/payments'
 
 /**
  * 차수별 지급 현황.
@@ -48,12 +51,11 @@ const FILTERS: { key: FilterKey; label: string; test: (r: PaymentRow) => boolean
     key: 'attention',
     label: '확인 필요',
     test: (r) =>
-      r.state === 'no_record' || r.state === 'overdue' || r.state === 'overpaid' ||
-      (r.billedKrw == null && r.paidKrw !== 0),
+      needsAttention(r) || r.state === 'overpaid' || (r.basisKrw == null && r.paidKrw !== 0),
   },
-  { key: 'open', label: '미납', test: (r) => r.billedKrw != null && r.state !== 'paid' },
+  { key: 'open', label: '미납', test: (r) => r.basisKrw != null && r.state !== 'paid' },
   { key: 'paid', label: '완납', test: (r) => r.state === 'paid' },
-  { key: 'unbilled', label: '청구 전', test: (r) => r.billedKrw == null },
+  { key: 'unbilled', label: '청구값 미입력', test: (r) => r.billedKrw == null },
   { key: 'closing', label: '최종정산 남음', test: (r) => hasOpenClosing(r) },
 ]
 
@@ -78,15 +80,16 @@ function dayGap(from: string | null, to: string): number | null {
 /** 대표가 읽는 한 마디. 내부 용어를 쓰지 않는다. */
 function statusText(r: PaymentRow): string {
   const d = r.delayDays
-  switch (r.state) {
-    case 'paid': return '완납'
-    case 'overpaid': return '초과 수령'
-    case 'no_record':
-    case 'overdue': return d != null ? `기일 ${d.toLocaleString('ko-KR')}일 경과` : '기일 경과'
-    case 'due_soon':
-    case 'upcoming': return d != null ? `기일 ${-d}일 전` : '기일 미정'
-    case 'unbilled': return r.paidKrw !== 0 ? '청구액 미등록' : '청구 전'
+  if (r.state === 'paid') return '완납'
+  if (r.state === 'overpaid') return '초과 수령'
+  if (r.state === 'unbilled') return r.paidKrw !== 0 ? '기준 없음' : '청구값 미입력'
+  // 같은 「기일 경과」라도 뜻이 셋으로 갈린다 (담당자 2026-09-10).
+  if (r.bucket === 'settled_gap') return '지급금 차이'
+  if (r.bucket === 'overdue') return d != null ? `연체 ${d.toLocaleString('ko-KR')}일` : '연체'
+  if (r.bucket === 'in_progress') {
+    return d != null && d > DUE_GRACE_DAYS ? `기일 ${d}일 경과` : '이번 달 지급 중'
   }
+  return d != null ? `기일 ${-d}일 전` : '기일 미정'
 }
 
 /**
@@ -95,17 +98,30 @@ function statusText(r: PaymentRow): string {
  *
  * 돈은 에이원에서 토에이로 나간다 — 에이원 기준이라 「나갔다」로 적는다.
  */
+/**
+ * 지금 손대야 하는 줄인가.
+ *
+ * 담당자 2026-09-10 로 좁아졌다 — 35차까지의 남은 금액은 「지급금 차이」라 빨강이 아니고,
+ * 이번 달 기일 건도 유예 7일 안에서는 지급이 도는 중이라 빨강이 아니다.
+ */
+function needsAttention(r: PaymentRow): boolean {
+  if (r.bucket === 'overdue') return true
+  return r.bucket === 'in_progress' && (r.delayDays ?? 0) > DUE_GRACE_DAYS
+}
+
 function issueText(r: PaymentRow): string | null {
-  if (r.billedKrw == null) {
+  if (r.basisKrw == null) {
     return r.paidKrw !== 0
-      ? `${krw(r.paidKrw)}원이 지급됐으나 청구액이 등록되지 않아 대조할 기준이 없습니다`
+      ? `${krw(r.paidKrw)}원이 지급됐으나 청구액도 계산값도 없어 대조할 기준이 없습니다`
       : null
   }
-  if (r.state === 'no_record') return '지급 기록이 없습니다'
-  if (r.state === 'overdue') {
+  if (r.bucket === 'settled_gap') {
+    return `${krw(r.balanceKrw)}원이 남아 있습니다 — 정산이 끝난 구간이라 지급금 차이로 봅니다`
+  }
+  if (needsAttention(r)) {
     const last = r.installments.at(-1)
     return `${krw(r.balanceKrw)}원이 아직 나가지 않았습니다`
-      + (last ? ` (최근 지급 ${last.paidAt})` : '')
+      + (last ? ` (최근 지급 ${last.paidAt})` : ' (지급 기록 없음)')
   }
   if (r.state === 'overpaid') {
     return `청구액보다 ${krw(-r.balanceKrw)}원 더 나갔습니다`
@@ -243,9 +259,10 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
                       : krw(r.paidKrw)}
                   </td>
                   <td className={cn(TD, NUM, 'font-semibold tabular-nums',
-                    // 빨강은 「덜 나간 돈」에만. 초과 지급은 확인 대상이지 연체가 아니다.
-                    r.state === 'no_record' || r.state === 'overdue' ? 'text-red-700' : 'text-slate-600')}>
-                    {r.billedKrw == null ? '—'
+                    // 빨강은 「덜 나간 돈」에만. 초과 지급은 확인 대상이지 연체가 아니고,
+                    // 35차까지의 지급금 차이와 유예 안의 이번 달 건도 회색이다.
+                    needsAttention(r) ? 'text-red-700' : 'text-slate-600')}>
+                    {r.basisKrw == null ? '—'
                       : Math.abs(r.balanceKrw) < PAID_TOLERANCE_KRW ? '0'
                       : r.balanceKrw < 0 ? `+${krw(-r.balanceKrw)}`
                       : krw(r.balanceKrw)}

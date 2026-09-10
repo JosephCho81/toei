@@ -4,8 +4,11 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronRight } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { MemoField } from '@/components/ui/MemoField'
 import { PAID_TOLERANCE_KRW } from '@/lib/data/payments'
 import { aggregate, type CompareRow, type CompareTotals, type SettlementKind } from '@/lib/data/settlementCompare'
@@ -36,12 +39,16 @@ import { aggregate, type CompareRow, type CompareTotals, type SettlementKind } f
  */
 
 import { TABLE, TABLE_WRAP, TH_TIGHT as TH, TD_TIGHT as TD, THEAD_ROW, CENTER, NUM } from '@/components/ui/table-style'
-const COLS = 10
+const COLS = 11
 
 type FilterKey = 'all' | 'billMismatch' | 'overdue' | 'open' | 'paid' | 'unbilled'
 
 function krw(n: number | null | undefined): string {
   return n == null ? '—' : Math.round(n).toLocaleString('ko-KR')
+}
+
+function usd(n: number): string {
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 /** 부호를 앞에 붙여 방향을 보여준다. 「청구−계산」에서만 쓴다. */
@@ -52,6 +59,87 @@ function signed(n: number): string {
 
 function rowKey(r: CompareRow): string {
   return `${r.transactionId}-${r.incurredOn ?? ''}`
+}
+
+/** 기일 대비 며칠. 양수면 늦은 것이다. */
+function dayGap(due: string, paidAt: string): number {
+  return Math.round((Date.parse(paidAt) - Date.parse(due)) / 86_400_000)
+}
+
+/**
+ * 청구액 한 칸 — 담당자가 계산서를 확인하고 나서 적어 넣는다.
+ *
+ * 계산값을 그대로 굳히는 버튼을 두지 않는다. 청구액은 **계산 결과가 아니라
+ * 실제로 보낸 청구서의 금액**이라, 계산값을 복사해 넣으면 둘의 차이가 영원히 0이 되어
+ * 이 표가 답해야 할 질문 자체가 사라진다.
+ */
+function InvoicedField({
+  value,
+  calcKrw,
+  onSave,
+}: {
+  value: number | null
+  calcKrw: number | null
+  onSave: (amount: number | null) => Promise<void>
+}) {
+  const [text, setText] = useState(value == null ? '' : String(Math.round(value)))
+  const [saving, setSaving] = useState(false)
+
+  const parsed = text.trim() === '' ? null : Number(text.replace(/[,\s원]/g, ''))
+  const invalid = parsed != null && !Number.isFinite(parsed)
+  const dirty = (parsed ?? null) !== (value == null ? null : Math.round(value))
+
+  async function save() {
+    if (invalid) return
+    setSaving(true)
+    try {
+      await onSave(parsed)
+      toast.success(parsed == null ? '청구액을 비웠습니다' : '청구액을 저장했습니다')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '저장에 실패했습니다')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const gap = parsed != null && calcKrw != null ? parsed - calcKrw : null
+
+  return (
+    <div className="max-w-2xl rounded-md border bg-white px-3 py-2">
+      <p className="mb-1 font-semibold">청구액 입력 — 계산서를 확인한 금액</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          inputMode="numeric"
+          className="h-8 w-44 text-right tabular-nums"
+          placeholder="아직 청구 전"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); save() } }}
+          disabled={saving}
+        />
+        <span className="text-muted-foreground">원</span>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8"
+          onClick={save}
+          disabled={saving || invalid || !dirty}
+        >
+          저장
+        </Button>
+        {calcKrw != null && (
+          <span className="text-muted-foreground">
+            계산값 {krw(calcKrw)}원
+            {gap != null && Math.abs(gap) >= PAID_TOLERANCE_KRW && ` · 차이 ${signed(gap)}`}
+          </span>
+        )}
+      </div>
+      {invalid && <p className="mt-1 text-red-700">숫자로 적어 주세요.</p>}
+      <p className="mt-1 text-muted-foreground">
+        비우면 「청구 전」으로 돌아가고 남은 금액을 계산값으로 셉니다.
+      </p>
+    </div>
+  )
 }
 
 export function CompareTable({
@@ -140,6 +228,21 @@ export function CompareTable({
     })
   }
 
+  /**
+   * 청구액을 적어 넣는다. **계산값은 저장하지 않는다** — 저장하는 순간
+   * 규약이 바뀌어도 화면이 옛 규약을 말한다. 사람이 넣는 것은 청구서에 적힌 사실뿐이다.
+   */
+  async function saveInvoiced(row: CompareRow, amount: number | null) {
+    if (!row.invoicedTarget) throw new Error('청구액을 저장할 곳이 없습니다')
+    const supabase = createClient()
+    const { error } = await supabase
+      .from(row.invoicedTarget.table)
+      .update({ invoiced_amount_krw: amount })
+      .eq('id', row.invoicedTarget.id)
+    if (error) throw new Error(error.message)
+    router.refresh()
+  }
+
   async function saveNote(row: CompareRow, note: string | null) {
     if (!row.noteTarget) throw new Error('메모를 저장할 곳이 없습니다')
     const supabase = createClient()
@@ -213,15 +316,16 @@ export function CompareTable({
                   className="h-3.5 w-3.5 align-middle accent-slate-700"
                 />
               </th>
-              <th className={cn(TH, CENTER, 'w-[13%]')}>차수 · P/O No.</th>
-              <th className={cn(TH, NUM, 'w-[11%]')}>청구액 (원)</th>
-              <th className={cn(TH, NUM, 'w-[11%]')}>계산값 (원)</th>
-              <th className={cn(TH, NUM, 'w-[9%]')}>청구−계산</th>
-              <th className={cn(TH, NUM, 'w-[11%]')}>지급액 (원)</th>
-              <th className={cn(TH, NUM, 'w-[9%]')}>청구−지급</th>
-              <th className={cn(TH, NUM, 'w-[9%]')}>계산−지급</th>
-              <th className={cn(TH, CENTER, 'w-[11%]')}>기일 · 실지급일</th>
-              <th className={cn(TH, 'w-[13%]')}>비고 (금액 차이 사유)</th>
+              <th className={cn(TH, CENTER, 'w-[12%]')}>차수 · P/O No.</th>
+              <th className={cn(TH, NUM, 'w-[9%]')}>수입금액 ($)</th>
+              <th className={cn(TH, NUM, 'w-[11%]')}>청구금액 (원)</th>
+              <th className={cn(TH, NUM, 'w-[11%]')}>계산금액 (원)</th>
+              <th className={cn(TH, NUM, 'w-[9%]')}>계산 차이</th>
+              <th className={cn(TH, NUM, 'w-[11%]')}>실지급액 (원)</th>
+              <th className={cn(TH, NUM, 'w-[9%]')}>청구-지급 차이</th>
+              <th className={cn(TH, NUM, 'w-[9%]')}>계산-지급 차이</th>
+              <th className={cn(TH, CENTER, 'w-[7%]')}>기일</th>
+              <th className={cn(TH, 'w-[9%]')}>비고 (금액 차이 사유)</th>
             </tr>
           </thead>
 
@@ -234,6 +338,7 @@ export function CompareTable({
               onToggle={toggle}
               onPick={pick}
               onSaveNote={saveNote}
+              onSaveInvoiced={saveInvoiced}
               showYearSubtotal={groups.length > 1}
             />
           ))}
@@ -286,6 +391,7 @@ function GroupBody({
   onToggle,
   onPick,
   onSaveNote,
+  onSaveInvoiced,
   showYearSubtotal,
 }: {
   group: { year: number | null; rows: CompareRow[] }
@@ -294,6 +400,7 @@ function GroupBody({
   onToggle: (id: string) => void
   onPick: (id: string) => void
   onSaveNote: (row: CompareRow, note: string | null) => Promise<void>
+  onSaveInvoiced: (row: CompareRow, amount: number | null) => Promise<void>
   showYearSubtotal: boolean
 }) {
   return (
@@ -340,6 +447,11 @@ function GroupBody({
                 )}
               </td>
 
+              <td className={cn(TD, NUM, 'tabular-nums text-slate-600')}>
+                {r.importAmountUsd != null ? usd(r.importAmountUsd)
+                  : <span className="text-muted-foreground">—</span>}
+              </td>
+
               <td className={cn(TD, NUM, 'tabular-nums')}>
                 {r.invoicedKrw != null ? krw(r.invoicedKrw)
                   : <span className="text-muted-foreground">청구 전</span>}
@@ -379,11 +491,9 @@ function GroupBody({
                   : <Gap value={r.calcVsPaidKrw} />}
               </td>
 
+              {/* 실지급일은 펼침으로 내렸다 (담당자 2026-09-10) — 표에는 청구 기일만 선다 */}
               <td className={cn(TD, CENTER, 'tabular-nums text-slate-600')}>
                 {r.dueDate ?? '미정'}
-                <span className="block text-muted-foreground">
-                  {r.lastPaidAt ?? '지급 없음'}
-                </span>
               </td>
 
               <td className="px-2.5 py-2.5 align-middle">
@@ -394,7 +504,7 @@ function GroupBody({
             {isOpen && (
               <tr>
                 <td colSpan={COLS} className="border-l-4 border-slate-300 bg-slate-100/70 px-6 py-3">
-                  <RowDetail row={r} onSaveNote={onSaveNote} />
+                  <RowDetail row={r} onSaveNote={onSaveNote} onSaveInvoiced={onSaveInvoiced} />
                 </td>
               </tr>
             )}
@@ -449,6 +559,7 @@ function TotalsRow({
         {label}
         <span className="block font-normal text-muted-foreground">{totals.rowCount}건</span>
       </td>
+      <td />
       <td className={cls}>{krw(totals.invoicedKrw)}</td>
       <td className={cls}>
         {krw(totals.calcKrw)}
@@ -478,9 +589,11 @@ function TotalsRow({
 function RowDetail({
   row,
   onSaveNote,
+  onSaveInvoiced,
 }: {
   row: CompareRow
   onSaveNote: (row: CompareRow, note: string | null) => Promise<void>
+  onSaveInvoiced: (row: CompareRow, amount: number | null) => Promise<void>
 }) {
   const bill = row.billVsCalcKrw
   const confirm = row.confirmVsCalcKrw
@@ -528,6 +641,22 @@ function RowDetail({
           )}
         </>
       )}
+
+      {/* 계산서를 확인하고 나서 적어 넣는 자리. 검산이 끝난 값만 여기 들어온다. */}
+      {row.invoicedTarget && (
+        <InvoicedField
+          value={row.invoicedKrw}
+          calcKrw={row.calcKrw}
+          onSave={(next) => onSaveInvoiced(row, next)}
+        />
+      )}
+
+      <p className="text-muted-foreground">
+        마지막 실지급일 {row.lastPaidAt ?? '없음'}
+        {row.dueDate && row.lastPaidAt && (
+          <> · 청구 기일 {row.dueDate} 기준 {dayGap(row.dueDate, row.lastPaidAt)}일</>
+        )}
+      </p>
 
       {row.installments.length > 0 ? (
         <table className="w-full max-w-2xl border-collapse">
