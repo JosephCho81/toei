@@ -24,9 +24,9 @@ export function KindSummary({ byKind }: { byKind: KindTotals[] }) {
         <thead>
           <tr className="border-b bg-slate-50 text-slate-600">
             <th className="w-[22%] px-3 py-2 text-left font-semibold">구분</th>
-            <th className="w-[22%] px-3 py-2 text-right font-semibold">청구액 (원)</th>
-            <th className="w-[22%] px-3 py-2 text-right font-semibold">지급액 (원)</th>
-            <th className="w-[22%] px-3 py-2 text-right font-semibold">미지급금 (원)</th>
+            <th className="w-[22%] px-3 py-2 text-right font-semibold">청구액 (원, VAT 포함)</th>
+            <th className="w-[22%] px-3 py-2 text-right font-semibold">지급액 (원, VAT 포함)</th>
+            <th className="w-[22%] px-3 py-2 text-right font-semibold">미지급금 (원, VAT 포함)</th>
             <th className="w-[12%] px-3 py-2 text-center font-semibold">남은 차수</th>
           </tr>
         </thead>

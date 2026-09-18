@@ -32,7 +32,7 @@ export function PaymentSchedule({
   return (
     <div className="overflow-hidden rounded-md border">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b bg-slate-50 px-3 py-2">
-        <span className="text-sm font-semibold">월별 결제 예정</span>
+        <span className="text-sm font-semibold">월별 결제 예정 (VAT 포함)</span>
         <span className="text-sm text-muted-foreground">
           넉 달 합계 <b className="tabular-nums text-foreground">{krw(total)}</b>원
           {laterCount > 0 && ` · 그 이후 ${laterCount}개 차수 ${krw(laterKrw)}원`}

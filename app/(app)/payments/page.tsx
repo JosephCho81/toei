@@ -39,7 +39,8 @@ export default async function PaymentsPage() {
         <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>지급 현황</h2>
         <p className="text-sm text-muted-foreground">
           {today} 기준 · 전체 {rows.length}차수 중 청구 완료 {billed}차수 ·
-          {' '}한국에이원 기준이며 대금은 에이원 → 토에이산교 방향입니다
+          {' '}한국에이원 기준이며 대금은 에이원 → 토에이산교 방향입니다 ·
+          {' '}원화 금액은 모두 부가세(VAT) 포함입니다
         </p>
       </div>
 

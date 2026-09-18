@@ -102,7 +102,7 @@ export function PaymentDialog({
           </div>
 
           <div className="grid grid-cols-[76px_1fr] items-center gap-3">
-            <Label htmlFor="amount">금액</Label>
+            <Label htmlFor="amount">금액 (원, VAT 포함)</Label>
             <NumberInput
               id="amount"
               value={amount}

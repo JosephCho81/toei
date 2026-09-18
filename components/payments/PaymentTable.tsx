@@ -206,7 +206,7 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
           ))}
         </div>
         <p className="text-sm text-muted-foreground">
-          금액은 중간정산 기준입니다 · 차수를 누르면 지급 내역이 열리고 그 자리에서 입력·수정합니다.
+          금액은 중간정산 기준이며 부가세(VAT) 포함입니다 · 차수를 누르면 지급 내역이 열리고 그 자리에서 입력·수정합니다.
         </p>
       </div>
 
@@ -216,9 +216,9 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
             <tr className={THEAD_ROW}>
               <th className={cn(TH, CENTER, 'w-[7%]')}>차수</th>
               <th className={cn(TH, NUM, 'w-[11%]')}>수입금액 (USD)</th>
-              <th className={cn(TH, NUM, 'w-[14%]')}>청구금액 (원)</th>
-              <th className={cn(TH, NUM, 'w-[14%]')}>{paidLabel} (원)</th>
-              <th className={cn(TH, NUM, 'w-[12%]')}>{balanceLabel} (원)</th>
+              <th className={cn(TH, NUM, 'w-[14%]')}>청구금액 (원, VAT 포함)</th>
+              <th className={cn(TH, NUM, 'w-[14%]')}>{paidLabel} (원, VAT 포함)</th>
+              <th className={cn(TH, NUM, 'w-[12%]')}>{balanceLabel} (원, VAT 포함)</th>
               <th className={cn(TH, CENTER, 'w-[10%]')}>기일</th>
               <th className={cn(TH, CENTER, 'w-[14%]')}>상태</th>
               <th className={cn(TH, 'w-[14%]')}>비고 (금액 차이 사유)</th>
