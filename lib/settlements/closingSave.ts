@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { advanceExceedsTotal, advanceRateMissing, feeRateMissing, type LcPaymentInput } from '@/lib/calculations/closing'
 import type { FeeRow } from '@/components/settlements/lcFeeDefaults'
 import type { ClosingCostRow } from './closingLoad'
+import { saveSettlementInOrder, toError } from './saveInOrder'
 
 /**
  * 저장 전 검증. 값이 0원으로 굳어 정산금액이 통째로 틀어지는 입력을 막는다.
@@ -56,35 +57,30 @@ export async function saveClosingSettlement(
     costRows: ClosingCostRow[]
   },
 ): Promise<string> {
-  let sid = args.settlementId
-  if (sid) {
-    const { error } = await supabase.from('closing_settlements').update(args.payload).eq('id', sid)
-    if (error) throw error
-  } else {
-    const { data, error } = await supabase
-      .from('closing_settlements').insert(args.payload).select('id').single()
-    if (error) throw error
-    sid = data?.id ?? null
-  }
-  if (!sid) throw new Error('클로징정산 ID를 확인할 수 없습니다.')
-
-  const { error: itemsError } = await supabase.rpc('save_closing_items', {
-    p_closing_settlement_id: sid,
-    p_lc_fees: args.feeRows.map((r, i) => ({
-      item_name: r.item_name,
-      amount_krw: args.feeAmountKrw(r),
-      currency: r.currency,
-      amount_usd: r.currency === 'USD' ? (parseFloat(r.amount_usd) || 0) : null,
-      exchange_rate: r.currency === 'USD' && r.use_custom_rate ? (parseFloat(r.exchange_rate) || null) : null,
-      sort_order: i,
-    })),
-    p_costs: args.costRows.map((r, i) => ({
-      item_name: r.item_name,
-      amount_krw: parseFloat(r.amount_krw) || 0,
-      includes_vat: r.includes_vat,
-      sort_order: i,
-    })),
+  return saveSettlementInOrder(supabase, {
+    table: 'closing_settlements',
+    settlementId: args.settlementId,
+    payload: args.payload,
+    missingIdMessage: '클로징정산 ID를 확인할 수 없습니다.',
+    saveItems: async (sid) => {
+      const { error: itemsError } = await supabase.rpc('save_closing_items', {
+        p_closing_settlement_id: sid,
+        p_lc_fees: args.feeRows.map((r, i) => ({
+          item_name: r.item_name,
+          amount_krw: args.feeAmountKrw(r),
+          currency: r.currency,
+          amount_usd: r.currency === 'USD' ? (parseFloat(r.amount_usd) || 0) : null,
+          exchange_rate: r.currency === 'USD' && r.use_custom_rate ? (parseFloat(r.exchange_rate) || null) : null,
+          sort_order: i,
+        })),
+        p_costs: args.costRows.map((r, i) => ({
+          item_name: r.item_name,
+          amount_krw: parseFloat(r.amount_krw) || 0,
+          includes_vat: r.includes_vat,
+          sort_order: i,
+        })),
+      })
+      if (itemsError) throw toError(itemsError)
+    },
   })
-  if (itemsError) throw itemsError
-  return sid
 }

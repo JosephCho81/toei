@@ -3,6 +3,7 @@ import { fetchTransactionBase, fetchInterimSettlement, fetchInterimCostItems } f
 import { toCostRow } from '@/lib/utils/costRows'
 import type { VatMode } from '@/lib/calculations/interim'
 import type { CostRow } from '@/types/settlement'
+import { saveSettlementInOrder, toError } from './saveInOrder'
 
 export interface InterimTx {
   import_amount_usd: number | null
@@ -144,18 +145,6 @@ export async function saveInterimSettlement(
     customsRows: CostRow[]
   },
 ): Promise<string> {
-  let sid = args.settlementId
-  if (sid) {
-    const { error } = await supabase.from('interim_settlements').update(args.payload).eq('id', sid)
-    if (error) throw error
-  } else {
-    const { data, error } = await supabase
-      .from('interim_settlements').insert(args.payload).select('id').single()
-    if (error) throw error
-    sid = data?.id ?? null
-  }
-  if (!sid) throw new Error('중간정산 ID를 확인할 수 없습니다.')
-
   const mkItem = (r: CostRow, i: number, grp: string) => ({
     item_name: r.item_name, group_type: grp,
     amount_krw: parseFloat(r.amount_krw) || 0, is_vat_taxable: r.is_vat_taxable,
@@ -163,13 +152,20 @@ export async function saveInterimSettlement(
     is_duty: r.is_duty,
     sort_order: i,
   })
-  const { error } = await supabase.rpc('save_interim_cost_items', {
-    p_interim_settlement_id: sid,
-    p_items: [
-      ...args.shippingRows.map((r, i) => mkItem(r, i, 'shipping')),
-      ...args.customsRows.map((r, i) => mkItem(r, args.shippingRows.length + i, 'customs')),
-    ],
+  return saveSettlementInOrder(supabase, {
+    table: 'interim_settlements',
+    settlementId: args.settlementId,
+    payload: args.payload,
+    missingIdMessage: '중간정산 ID를 확인할 수 없습니다.',
+    saveItems: async (sid) => {
+      const { error } = await supabase.rpc('save_interim_cost_items', {
+        p_interim_settlement_id: sid,
+        p_items: [
+          ...args.shippingRows.map((r, i) => mkItem(r, i, 'shipping')),
+          ...args.customsRows.map((r, i) => mkItem(r, args.shippingRows.length + i, 'customs')),
+        ],
+      })
+      if (error) throw toError(error)
+    },
   })
-  if (error) throw error
-  return sid
 }
