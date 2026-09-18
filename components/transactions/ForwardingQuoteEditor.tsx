@@ -69,7 +69,7 @@ export function ForwardingQuoteEditor({ row, onChange, onRemove }: {
             <tr key={it._key} className="border-b border-dashed">
               <td className="py-1 pr-2">
                 <Select value={it.item_type}
-                  onValueChange={(v) => setItem(it._key, 'item_type', (v as ItemType) ?? 'quote')}>
+                  onValueChange={(v) => setItem(it._key, 'item_type', (v as ItemType) ?? 'invoice')}>
                   <SelectTrigger className="h-7 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {(Object.keys(ITEM_TYPE_LABELS) as ItemType[]).map((t) => (

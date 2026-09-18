@@ -71,8 +71,8 @@ export function ForwardingRowsCard({ forwardings, onChange }: {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left font-medium py-1 pr-2">항목명</th>
-                    <th className="text-right font-medium py-1 px-2">견적금액 (원)</th>
                     <th className="text-right font-medium py-1 px-2">실청구금액 (원)</th>
+                    <th className="text-right font-medium py-1 px-2">견적금액 (원)</th>
                     <th className="text-center font-medium py-1 px-2 whitespace-nowrap">부가세</th>
                     <th className="w-8" />
                   </tr>
@@ -89,15 +89,15 @@ export function ForwardingRowsCard({ forwardings, onChange }: {
                       </td>
                       <td className="py-1 px-2">
                         <NumberInput
-                          value={d.quote_amount_krw}
-                          onValueChange={(v) => setForwardingDetail(r._key, d._key, 'quote_amount_krw', v)}
+                          value={d.actual_amount_krw}
+                          onValueChange={(v) => setForwardingDetail(r._key, d._key, 'actual_amount_krw', v)}
                           className="h-7 text-sm text-right"
                         />
                       </td>
                       <td className="py-1 px-2">
                         <NumberInput
-                          value={d.actual_amount_krw}
-                          onValueChange={(v) => setForwardingDetail(r._key, d._key, 'actual_amount_krw', v)}
+                          value={d.quote_amount_krw}
+                          onValueChange={(v) => setForwardingDetail(r._key, d._key, 'quote_amount_krw', v)}
                           className="h-7 text-sm text-right"
                         />
                       </td>
@@ -118,8 +118,8 @@ export function ForwardingRowsCard({ forwardings, onChange }: {
                 <tfoot>
                   <tr>
                     <td className="pt-2 text-muted-foreground text-sm">소계</td>
-                    <td className="pt-2 px-2 text-right font-medium">{quoteTotal.toLocaleString()}</td>
                     <td className="pt-2 px-2 text-right font-medium">{actualTotal.toLocaleString()}</td>
+                    <td className="pt-2 px-2 text-right font-medium">{quoteTotal.toLocaleString()}</td>
                     <td colSpan={2} />
                   </tr>
                 </tfoot>

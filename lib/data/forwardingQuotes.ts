@@ -2,9 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type ItemType = 'quote' | 'invoice'
 
+// 실청구가 먼저다 — 서류는 통관·운송이 끝난 뒤에 오므로 받는 금액은 이미 청구값이다(직원 2026-09-18).
 export const ITEM_TYPE_LABELS: Record<ItemType, string> = {
-  quote: '견적',
   invoice: '실청구',
+  quote: '견적',
 }
 
 const DEFAULT_ITEM_NAMES = ['해상운임', '터미널 처리비(THC)', '서류발급비(D/O Fee)', '내륙운송비', '기타운임']
@@ -30,7 +31,7 @@ export interface QuoteRow {
   items: QuoteItemRow[]
 }
 
-export function blankQuoteItem(item_name = '', item_type: ItemType = 'quote'): QuoteItemRow {
+export function blankQuoteItem(item_name = '', item_type: ItemType = 'invoice'): QuoteItemRow {
   return {
     _key: crypto.randomUUID(),
     item_type, item_name, amount_krw: '', is_vat_taxable: false,
