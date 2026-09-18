@@ -1,11 +1,17 @@
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/server'
 import { normalizeOne } from '@/lib/utils/normalize'
+import { getEta, getEtaDisplay, getMfr } from '@/lib/transactions/rowSummary'
+import type { TxRow } from '@/types/transaction'
 
 export async function GET() {
   const supabase = await createClient()
 
-  const [{ data: txs }, { data: interims }, { data: closings }] = await Promise.all([
+  const results = await Promise.all([
+    supabase
+      .from('v_transaction_status')
+      .select('round_no,round_label,order_no,settlement_status,manufacturers(name),transaction_items(spec,color,size,unit_price_usd,quantity,unit,sort_order),containers(eta),delivery_dates')
+      .order('round_no'),
     supabase
       .from('v_transaction_status')
       .select('round_no,round_label,order_no,import_amount_usd,margin_rate_pct,settlement_status,lc_open_date,customs_date,manufacturers(name)')
@@ -19,8 +25,41 @@ export async function GET() {
       .select('confirmed_amount_krw,closing_date,bok_exchange_rate,is_paid,paid_date,transactions(round_label,round_no)')
       .order('transaction_id'),
   ])
+  // 한 시트라도 못 읽으면 빈 시트가 섞인 파일을 내보내지 않는다 — 빈 칸은 「없음」으로 읽힌다
+  const failed = results.find((r) => r.error)
+  if (failed?.error) return new Response(`엑셀 생성 실패: ${failed.error.message}`, { status: 500 })
+  const [{ data: itemTxs }, { data: txs }, { data: interims }, { data: closings }] = results
 
   const wb = XLSX.utils.book_new()
+
+  // 시트 0: 품목내역 — 거래 목록에서 한 차수씩 펼쳐 보던 것을 한 줄 한 품목으로 편다.
+  // ETA·상태는 거래 목록 화면과 같은 규칙으로 뽑는다.
+  const itemRows = (itemTxs ?? []).flatMap((t) => {
+    const common = {
+      '회차': t.round_label,
+      'PO No.': t.order_no ?? '',
+      '제조사': getMfr(t.manufacturers as TxRow['manufacturers']),
+    }
+    const tail = {
+      'ETA': getEtaDisplay(getEta(t.containers ?? []), t.delivery_dates as TxRow['delivery_dates']),
+      '상태': t.settlement_status === 'closing_done' ? '완료' : '진행중',
+    }
+    const items = [...(t.transaction_items ?? [])].sort((a, b) => a.sort_order - b.sort_order)
+    if (items.length === 0) {
+      return [{ ...common, '제품명(스펙)': '', '색상': '', '사이즈': '', '단가(USD)': '', '수량': '', '단위': '', ...tail }]
+    }
+    return items.map((it) => ({
+      ...common,
+      '제품명(스펙)': it.spec ?? '',
+      '색상': it.color ?? '',
+      '사이즈': it.size ?? '',
+      '단가(USD)': it.unit_price_usd != null ? Number(it.unit_price_usd) : '',
+      '수량': it.quantity ?? '',
+      '단위': it.unit ?? '',
+      ...tail,
+    }))
+  })
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(itemRows), '품목내역')
 
   // 시트 1: 거래현황
   const txRows = (txs ?? []).map((t) => {
