@@ -51,11 +51,15 @@ export function InterimResultsCard({
             {exclusive && calc.importVatKrw > 0 && (
               <Row label="수입부가세 (매입세액공제 — 청구 제외)" value={`− ${formatKrw(calc.importVatKrw)}`} muted />
             )}
+            {exclusive && calc.dutyKrw !== 0 && (
+              <Row label="관세 (공급가 제외 — 합계에 가산)" value={`− ${formatKrw(calc.dutyKrw)}`} muted />
+            )}
             <Separator />
             <Row label={exclusive ? '공급가' : '청구액'} value={formatKrw(calc.supplyAmountKrw)} bold />
             {exclusive && (
               <>
                 <Row label="부가세 (공급가 × 10%)" value={formatKrw(calc.vatKrw)} />
+                {calc.dutyKrw !== 0 && <Row label="관세 (부가세 없음)" value={formatKrw(calc.dutyKrw)} />}
                 <Row label="합계" value={formatKrw(calc.confirmedKrw)} bold />
               </>
             )}
@@ -74,7 +78,9 @@ export function InterimResultsCard({
                 <SelectItem value="none">{ROUNDING_LABELS.none}</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-sm text-muted-foreground">공급가에 적용 — 합계는 공급가+부가세로 맞춘다</p>
+            <p className="text-sm text-muted-foreground">
+              공급가에 적용 — 합계는 공급가+부가세{calc && calc.dutyKrw !== 0 ? '+관세' : ''}로 맞춘다
+            </p>
           </div>
           {systemSupply > 0 && (
             <div className="space-y-1">
@@ -101,6 +107,7 @@ export function InterimResultsCard({
             <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm space-y-1">
               <Row label="확정 공급가" value={formatKrw(parseFloat(supplyAmount) || 0)} />
               <Row label="부가세 (10%)" value={formatKrw(confirmedVat)} />
+              {calc && calc.dutyKrw !== 0 && <Row label="관세 (부가세 없음)" value={formatKrw(calc.dutyKrw)} />}
               <Row label="청구 합계" value={formatKrw(confirmedTotal)} bold />
             </div>
           )}

@@ -72,7 +72,7 @@ function GroupSubtotalRow({ label, items }: { label: string; items: CostItem[] }
 
 export function ReportInterimSection({ data }: { data: InterimCostData }) {
   const {
-    exclusive, shippingTotal, customsTotal, supplyKrw, outputVatKrw, subTotal,
+    exclusive, shippingTotal, customsTotal, supplyKrw, outputVatKrw, dutyKrw, subTotal,
     showConfirmed, confirmedDiff, diffIsRounding,
     importFormula, vatFormula, supplyFormula, subTotalFormula,
   } = interimSummary(data)
@@ -126,6 +126,13 @@ export function ReportInterimSection({ data }: { data: InterimCostData }) {
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{krw(outputVatKrw)}</TableCell>
               </TableRow>
+              {dutyKrw !== 0 && (
+                <TableRow>
+                  <TableCell className="font-medium">관세</TableCell>
+                  <TableCell className="text-sm text-gray-400">부가세가 붙지 않아 합계에 그대로 더한다</TableCell>
+                  <TableCell className="text-right tabular-nums">{krw(dutyKrw)}</TableCell>
+                </TableRow>
+              )}
             </>
           ) : data.vatAmountKrw > 0 && (
             <TableRow>
@@ -147,7 +154,7 @@ export function ReportInterimSection({ data }: { data: InterimCostData }) {
                 <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{krw(subTotal)}</TableCell>
               </TableRow>
               <TableRow className="bg-slate-100 font-bold border-t-2 border-slate-200">
-                <TableCell className="text-slate-700 text-base">중간정산 확정금액{exclusive ? ' (공급가+부가세)' : ''}</TableCell>
+                <TableCell className="text-slate-700 text-base">중간정산 확정금액{exclusive ? (dutyKrw !== 0 ? ' (공급가+부가세+관세)' : ' (공급가+부가세)') : ''}</TableCell>
                 <TableCell className="text-sm">
                   {Math.abs(confirmedDiff) > 0 && (
                     <div className={diffIsRounding ? 'text-muted-foreground' : 'text-slate-600'}>
