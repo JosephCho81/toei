@@ -25,46 +25,52 @@ export function PaymentKpis({ summary }: { summary: PaymentSummary }) {
     <StatCards
       items={[
         {
-          label: '연체 (달 넘김)',
+          label: '연체 (기일 월 경과)',
           value: krw(summary.overdueKrw),
-          unit: '원 (VAT 포함)',
+          unit: '원',
           sub: summary.overdueCount > 0
-            ? `${summary.overdueCount}개 차수 · 최장 ${summary.maxDelayDays.toLocaleString('ko-KR')}일 경과 · 지체상금 대상`
-            : '없습니다',
+            ? [
+                `${summary.overdueCount}개 차수`,
+                `최장 ${summary.maxDelayDays.toLocaleString('ko-KR')}일 경과`,
+                '지체상금 부과 대상',
+              ]
+            : '해당 없음',
           alert: summary.overdueKrw > 0,
         },
         {
-          label: '이번 달 지급 중',
+          label: '당월 지급 진행',
           value: krw(summary.inProgressKrw),
-          unit: '원 (VAT 포함)',
+          unit: '원',
           sub: summary.inProgressCount > 0
-            ? `${summary.inProgressCount}개 차수 · 기일이 이번 달입니다`
-            : '없습니다',
+            ? [`${summary.inProgressCount}개 차수`, '당월 지급기일 도래분']
+            : '해당 없음',
         },
         {
           label: `지급금 차이 (${SETTLED_THROUGH_ROUND}차까지)`,
           value: krw(summary.settledGapKrw),
-          unit: '원 (VAT 포함)',
+          unit: '원',
           sub: summary.settledGapCount > 0
-            ? `${summary.settledGapCount}개 차수 · 정산이 끝난 구간의 차이입니다`
-            : '없습니다',
+            ? [`${summary.settledGapCount}개 차수`, '정산 완료 구간 잔액']
+            : '해당 없음',
         },
         {
           label: '기일 미도래',
           value: krw(summary.notDueKrw),
-          unit: '원 (VAT 포함)',
+          unit: '원',
           sub: summary.notDueCount > 0
-            ? `${summary.notDueCount}개 차수 · 가장 이른 기일 ${summary.nextDue?.dueDate ?? '미정'}`
-            : '없습니다',
+            ? [`${summary.notDueCount}개 차수`, `차기 지급기일 ${summary.nextDue?.dueDate ?? '미정'}`]
+            : '해당 없음',
         },
         {
           label: '지급 누계',
           value: krw(summary.paidKrw),
-          unit: '원 (VAT 포함)',
-          sub: `청구 누계 ${krw(summary.billedKrw)}원`
-            + (summary.overpaidCount > 0
-              ? ` · 초과 지급 ${summary.overpaidCount}개 차수 ${krw(summary.overpaidKrw)}원`
-              : ''),
+          unit: '원',
+          sub: [
+            `청구 누계 ${krw(summary.billedKrw)}원`,
+            ...(summary.overpaidCount > 0
+              ? [`초과 지급 ${summary.overpaidCount}개 차수 ${krw(summary.overpaidKrw)}원`]
+              : []),
+          ],
         },
       ]}
     />

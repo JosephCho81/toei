@@ -20,14 +20,18 @@ export function KindSummary({ byKind }: { byKind: KindTotals[] }) {
 
   return (
     <div className="overflow-hidden rounded-md border">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b bg-slate-50 px-3 py-2">
+        <span className="text-sm font-semibold">정산 구분별 현황</span>
+        <span className="text-sm text-muted-foreground">단위: 원 (부가세 포함)</span>
+      </div>
       <table className="w-full table-fixed border-collapse text-sm">
         <thead>
-          <tr className="border-b bg-slate-50 text-slate-600">
+          <tr className="border-b text-slate-600">
             <th className="w-[22%] px-3 py-2 text-left font-semibold">구분</th>
-            <th className="w-[22%] px-3 py-2 text-right font-semibold">청구액 (원, VAT 포함)</th>
-            <th className="w-[22%] px-3 py-2 text-right font-semibold">지급액 (원, VAT 포함)</th>
-            <th className="w-[22%] px-3 py-2 text-right font-semibold">미지급금 (원, VAT 포함)</th>
-            <th className="w-[12%] px-3 py-2 text-center font-semibold">남은 차수</th>
+            <th className="w-[22%] px-3 py-2 text-right font-semibold">청구금액</th>
+            <th className="w-[22%] px-3 py-2 text-right font-semibold">지급액</th>
+            <th className="w-[22%] px-3 py-2 text-right font-semibold">미지급금</th>
+            <th className="w-[12%] px-3 py-2 text-center font-semibold">미결 차수</th>
           </tr>
         </thead>
         <tbody>
@@ -43,7 +47,7 @@ export function KindSummary({ byKind }: { byKind: KindTotals[] }) {
                 </td>
                 {empty ? (
                   <td colSpan={4} className="px-3 py-2 text-muted-foreground">
-                    아직 등록된 것이 없습니다
+                    등록 내역 없음
                   </td>
                 ) : (
                   <>
@@ -56,7 +60,7 @@ export function KindSummary({ byKind }: { byKind: KindTotals[] }) {
                       {Math.abs(r.balanceKrw) < PAID_TOLERANCE_KRW ? '0' : krw(Math.abs(r.balanceKrw))}
                       {r.balanceKrw < -PAID_TOLERANCE_KRW && (
                         <span className="ml-1 text-xs font-normal text-muted-foreground">
-                          돌려받을 몫
+                          환급 예정
                         </span>
                       )}
                     </td>

@@ -55,8 +55,8 @@ const FILTERS: { key: FilterKey; label: string; test: (r: PaymentRow) => boolean
   },
   { key: 'open', label: '미납', test: (r) => r.basisKrw != null && r.state !== 'paid' },
   { key: 'paid', label: '완납', test: (r) => r.state === 'paid' },
-  { key: 'unbilled', label: '청구값 미입력', test: (r) => r.billedKrw == null },
-  { key: 'closing', label: '최종정산 남음', test: (r) => hasOpenClosing(r) },
+  { key: 'unbilled', label: '청구금액 미입력', test: (r) => r.billedKrw == null },
+  { key: 'closing', label: '최종정산 미결', test: (r) => hasOpenClosing(r) },
 ]
 
 /** 최종정산에 아직 오갈 돈이 남았는가. */
@@ -81,13 +81,13 @@ function dayGap(from: string | null, to: string): number | null {
 function statusText(r: PaymentRow): string {
   const d = r.delayDays
   if (r.state === 'paid') return '완납'
-  if (r.state === 'overpaid') return '초과 수령'
-  if (r.state === 'unbilled') return r.paidKrw !== 0 ? '기준 없음' : '청구값 미입력'
+  if (r.state === 'overpaid') return '초과 지급'
+  if (r.state === 'unbilled') return r.paidKrw !== 0 ? '청구금액 미등록' : '청구금액 미입력'
   // 같은 「기일 경과」라도 뜻이 셋으로 갈린다 (담당자 2026-09-10).
   if (r.bucket === 'settled_gap') return '지급금 차이'
   if (r.bucket === 'overdue') return d != null ? `연체 ${d.toLocaleString('ko-KR')}일` : '연체'
   if (r.bucket === 'in_progress') {
-    return d != null && d > DUE_GRACE_DAYS ? `기일 ${d}일 경과` : '이번 달 지급 중'
+    return d != null && d > DUE_GRACE_DAYS ? `기일 ${d}일 경과` : '당월 지급 진행'
   }
   return d != null ? `기일 ${-d}일 전` : '기일 미정'
 }
@@ -112,20 +112,19 @@ function needsAttention(r: PaymentRow): boolean {
 function issueText(r: PaymentRow): string | null {
   if (r.basisKrw == null) {
     return r.paidKrw !== 0
-      ? `${krw(r.paidKrw)}원이 지급됐으나 청구액도 계산값도 없어 대조할 기준이 없습니다`
+      ? `지급액 ${krw(r.paidKrw)}원 — 청구금액 및 계산값 미등록으로 대사 불가`
       : null
   }
   if (r.bucket === 'settled_gap') {
-    return `${krw(r.balanceKrw)}원이 남아 있습니다 — 정산이 끝난 구간이라 지급금 차이로 봅니다`
+    return `잔액 ${krw(r.balanceKrw)}원 — 정산 완료 구간의 지급금 차이`
   }
   if (needsAttention(r)) {
     const last = r.installments.at(-1)
-    return `${krw(r.balanceKrw)}원이 아직 나가지 않았습니다`
-      + (last ? ` (최근 지급 ${last.paidAt})` : ' (지급 기록 없음)')
+    return `미지급 ${krw(r.balanceKrw)}원`
+      + (last ? ` (최근 지급일 ${last.paidAt})` : ' (지급 내역 없음)')
   }
   if (r.state === 'overpaid') {
-    return `청구액보다 ${krw(-r.balanceKrw)}원 더 나갔습니다`
-      + ' — 다음 차수 상계 여부를 확인해 주세요'
+    return `청구금액 대비 ${krw(-r.balanceKrw)}원 초과 지급 — 차기 차수 상계 여부 확인 필요`
   }
   return null
 }
@@ -161,7 +160,7 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
    * 정산이 아직 없는 차수에는 적을 곳이 없어 상세에서 그 사실을 말해 준다.
    */
   async function saveNote(row: PaymentRow, note: string | null) {
-    if (!row.interimSettlementId) throw new Error('중간정산이 아직 없어 메모를 저장할 수 없습니다')
+    if (!row.interimSettlementId) throw new Error('중간정산 미등록 차수로 비고를 저장할 수 없습니다')
     const supabase = createClient()
     const { error } = await supabase
       .from('interim_settlements')
@@ -172,12 +171,12 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
   }
 
   async function remove(paymentId: string, label: string) {
-    if (!confirm(`${label} 지급 기록을 삭제합니다. 되돌릴 수 없습니다.`)) return
+    if (!confirm(`${label} 지급 기록을 삭제하시겠습니까? 삭제 후에는 복구할 수 없습니다.`)) return
     setBusy(paymentId)
     const res = await fetch(`/api/payments/${paymentId}`, { method: 'DELETE' })
     setBusy(null)
     if (!res.ok) {
-      const { error } = await res.json().catch(() => ({ error: '삭제하지 못했습니다' }))
+      const { error } = await res.json().catch(() => ({ error: '삭제에 실패했습니다' }))
       alert(error)
       return
     }
@@ -206,7 +205,7 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
           ))}
         </div>
         <p className="text-sm text-muted-foreground">
-          금액은 중간정산 기준이며 부가세(VAT) 포함입니다 · 차수를 누르면 지급 내역이 열리고 그 자리에서 입력·수정합니다.
+          중간정산 기준 · 단위: 원 (부가세 포함)
         </p>
       </div>
 
@@ -216,9 +215,9 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
             <tr className={THEAD_ROW}>
               <th className={cn(TH, CENTER, 'w-[7%]')}>차수</th>
               <th className={cn(TH, NUM, 'w-[11%]')}>수입금액 (USD)</th>
-              <th className={cn(TH, NUM, 'w-[14%]')}>청구금액 (원, VAT 포함)</th>
-              <th className={cn(TH, NUM, 'w-[14%]')}>{paidLabel} (원, VAT 포함)</th>
-              <th className={cn(TH, NUM, 'w-[12%]')}>{balanceLabel} (원, VAT 포함)</th>
+              <th className={cn(TH, NUM, 'w-[14%]')}>청구금액</th>
+              <th className={cn(TH, NUM, 'w-[14%]')}>{paidLabel}</th>
+              <th className={cn(TH, NUM, 'w-[12%]')}>{balanceLabel}</th>
               <th className={cn(TH, CENTER, 'w-[10%]')}>기일</th>
               <th className={cn(TH, CENTER, 'w-[14%]')}>상태</th>
               <th className={cn(TH, 'w-[14%]')}>비고 (금액 차이 사유)</th>
@@ -323,11 +322,12 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
         </table>
       </div>
 
-      <p className="mt-2 text-sm text-muted-foreground">
-        차수 {rows.length}개를 최근 차수부터 보여줍니다 (맨 아래가 1차).
-        「예상」이 붙은 청구금액은 아직 청구 전이라 시스템이 계산한 값입니다.
-        1,000원 미만의 차이는 절사로 보아 완납으로 처리합니다.
-      </p>
+      <div className="mt-2 text-sm text-muted-foreground">
+        <p>총 {rows.length}개 차수 · 최근 차수 순으로 표시합니다.</p>
+        <p>차수를 선택하면 지급 내역을 조회하고 입력·수정할 수 있습니다.</p>
+        <p>「예상」 금액은 청구금액 입력 전 시스템 산출액입니다.</p>
+        <p>1,000원 미만의 차액은 절사로 간주하여 완납 처리합니다.</p>
+      </div>
 
       {draft && (
         <PaymentDialog
@@ -380,7 +380,7 @@ function RoundDetail({
       </div>
 
       {row.installments.length === 0 ? (
-        <p className="text-muted-foreground">아직 지급 기록이 없습니다.</p>
+        <p className="text-muted-foreground">지급 내역 없음</p>
       ) : (
         <table className="w-full max-w-2xl border-collapse">
           <tbody>
@@ -429,69 +429,75 @@ function RoundDetail({
 
       {unconfirmed > 0 && (
         <p className="text-muted-foreground">
-          이 중 {unconfirmed}건은 여러 차수를 한 번에 묶어 보낸 이체입니다. 차수별 금액은{' '}
+          이 중 {unconfirmed}건은 복수 차수 일괄 이체 건입니다. 차수별 금액은{' '}
           <Link href="/payments/ledger" className="underline underline-offset-2">통장 원장</Link>에서
-          확인해 주세요.
+          확인하시기 바랍니다.
         </p>
       )}
 
       {row.billedKrw != null && row.installments.length > 0 && (
-        <p className={matched ? 'text-slate-700' : 'text-red-700'}>
-          {row.installments.length}회 합계 <b className="tabular-nums">{krw(row.paidKrw)}</b>원
-          {' · 청구액 '}<b className="tabular-nums">{krw(row.billedKrw)}</b>원
-          {matched
-            ? (row.billedKrw === row.paidKrw
-                ? ' — 일치합니다'
-                : ` — 일치합니다 (절사 ${krw(Math.abs(row.billedKrw - row.paidKrw))}원)`)
-            : (row.balanceKrw > 0
-                ? ` — ${krw(row.balanceKrw)}원 모자랍니다`
-                : ` — ${krw(-row.balanceKrw)}원 더 나갔습니다`)}
-        </p>
+        <div className={matched ? 'text-slate-700' : 'text-red-700'}>
+          <p>지급 합계 ({row.installments.length}회) <b className="tabular-nums">{krw(row.paidKrw)}</b>원</p>
+          <p>청구금액 <b className="tabular-nums">{krw(row.billedKrw)}</b>원</p>
+          <p>
+            {matched
+              ? (row.billedKrw === row.paidKrw
+                  ? '대사 결과: 일치'
+                  : `대사 결과: 일치 (절사 ${krw(Math.abs(row.billedKrw - row.paidKrw))}원)`)
+              : (row.balanceKrw > 0
+                  ? `대사 결과: ${krw(row.balanceKrw)}원 미지급`
+                  : `대사 결과: ${krw(-row.balanceKrw)}원 초과 지급`)}
+          </p>
+        </div>
       )}
 
       {ledgerMismatch && (
         <p className="text-red-700">
-          회차를 더한 값({krw(sum)}원)이 집계와 어긋납니다 — 통장 원장을 확인하세요.
+          회차별 지급 합계({krw(sum)}원)가 집계 금액과 일치하지 않습니다. 통장 원장을 확인하시기 바랍니다.
         </p>
       )}
 
       {/* 청구액 양수 = 에이원이 토에이에 낼 돈, 음수 = 토에이가 에이원에 돌려줄 환급이다. */}
       {row.closingBilledKrw != null && (
-        <p className="text-slate-700">
-          <span className="font-semibold">최종정산</span>
-          {' · 청구 '}<b className="tabular-nums">{krw(Math.abs(row.closingBilledKrw))}</b>원
-          {row.closingBilledKrw < 0 ? ' (토에이가 에이원에 돌려줄 환급)' : ''}
-          {' · 지급 '}
-          <b className="tabular-nums">
-            {row.closingInstallments.length === 0 ? '없음' : `${krw(Math.abs(row.closingPaidKrw))}원`}
-          </b>
-          {' — '}
-          {Math.abs(row.closingBalanceKrw) < PAID_TOLERANCE_KRW
-            ? '정산이 끝났습니다'
-            : `${krw(Math.abs(row.closingBalanceKrw))}원이 `
-              + (row.closingBalanceKrw > 0
-                  ? '아직 토에이로 나가지 않았습니다'
-                  : '아직 토에이에서 돌아오지 않았습니다')}
-        </p>
+        <div className="text-slate-700">
+          <p className="font-semibold">최종정산</p>
+          <p>
+            청구금액 <b className="tabular-nums">{krw(Math.abs(row.closingBilledKrw))}</b>원
+            {row.closingBilledKrw < 0 ? ' (토에이산교 → 한국에이원 환급)' : ''}
+          </p>
+          <p>
+            지급액{' '}
+            <b className="tabular-nums">
+              {row.closingInstallments.length === 0 ? '없음' : `${krw(Math.abs(row.closingPaidKrw))}원`}
+            </b>
+          </p>
+          <p>
+            {Math.abs(row.closingBalanceKrw) < PAID_TOLERANCE_KRW
+              ? '정산 결과: 정산 완료'
+              : row.closingBalanceKrw > 0
+                ? `정산 결과: ${krw(row.closingBalanceKrw)}원 미지급`
+                : `정산 결과: 환급 ${krw(-row.closingBalanceKrw)}원 미수령`}
+          </p>
+        </div>
       )}
 
       {row.calcDiffKrw != null && Math.abs(row.calcDiffKrw) >= PAID_TOLERANCE_KRW && (
         <p className="text-muted-foreground">
-          실제 청구액과 시스템 계산값({krw(row.confirmedKrw)}원)이 {krw(Math.abs(row.calcDiffKrw))}원 다릅니다.
-          미결제가 아니라 계산 차이이며{' '}
-          <Link href="/verification" className="underline underline-offset-2">검증 리포트</Link>에서 다룹니다.
+          청구금액과 시스템 계산값({krw(row.confirmedKrw)}원) 간 {krw(Math.abs(row.calcDiffKrw))}원의 차이가 있습니다.
+          미지급이 아닌 산출 차이로,{' '}
+          <Link href="/verification" className="underline underline-offset-2">검증 리포트</Link>에서 관리합니다.
         </p>
       )}
 
       {/* 금액 차이의 원인은 사람만 안다 — 최차장님께 설명할 문장을 여기 적어 둔다.
           정산 비교 화면의 비고와 같은 칸이라 어느 쪽에서 적어도 둘 다에 뜬다. */}
       <div className="max-w-2xl rounded-md border bg-white px-3 py-2">
-        <p className="mb-1 font-semibold">비고 — 금액 차이가 난 이유</p>
+        <p className="mb-1 font-semibold">비고 (금액 차이 사유)</p>
         {row.interimSettlementId ? (
           <MemoField notes={row.note} onSave={(next) => onSaveNote(row, next)} />
         ) : (
           <p className="text-muted-foreground">
-            이 차수는 중간정산이 아직 없어 메모를 저장할 곳이 없습니다.
+            중간정산 미등록 차수로 비고를 입력할 수 없습니다.
           </p>
         )}
       </div>
@@ -514,7 +520,7 @@ function RoundDetail({
 function NoteCell({ note }: { note: string | null }) {
   const lines = note ? note.split('\n').filter((l) => l.trim() !== '') : []
   if (lines.length === 0) {
-    return <span className="text-muted-foreground">+ 메모</span>
+    return <span className="text-muted-foreground">+ 비고</span>
   }
   return (
     <span className="block truncate text-slate-700" title={lines.join('\n')}>

@@ -12,7 +12,8 @@ export interface Stat {
   /** 이미 서식이 끝난 문자열. 단위는 `unit` 로 따로 넘겨 작게 붙인다 */
   value: string
   unit?: string
-  sub?: string
+  /** 배열이면 한 항목에 한 줄 — 「·」로 이어 붙이면 여러 사실이 한 줄에 뭉쳐 읽히지 않는다 */
+  sub?: string | string[]
   alert?: boolean
 }
 
@@ -44,7 +45,11 @@ export function StatCards({ items, className }: { items: Stat[]; className?: str
             )}
           </div>
           {c.sub && (
-            <div className="mt-1 break-keep text-sm leading-snug text-muted-foreground">{c.sub}</div>
+            <div className="mt-1 break-keep text-sm leading-snug text-muted-foreground">
+              {(Array.isArray(c.sub) ? c.sub : [c.sub]).map((line) => (
+                <div key={line}>{line}</div>
+              ))}
+            </div>
           )}
         </div>
       ))}

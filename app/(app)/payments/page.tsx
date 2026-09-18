@@ -37,11 +37,11 @@ export default async function PaymentsPage() {
     <div className="space-y-4">
       <div>
         <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>지급 현황</h2>
-        <p className="text-sm text-muted-foreground">
-          {today} 기준 · 전체 {rows.length}차수 중 청구 완료 {billed}차수 ·
-          {' '}한국에이원 기준이며 대금은 에이원 → 토에이산교 방향입니다 ·
-          {' '}원화 금액은 모두 부가세(VAT) 포함입니다
-        </p>
+        <div className="text-sm text-muted-foreground">
+          <p>기준일 {today} · 전체 {rows.length}개 차수 중 {billed}개 차수 청구 완료</p>
+          <p>한국에이원 기준 (지급 방향: 한국에이원 → 토에이산교)</p>
+          <p>금액 단위: 원 (부가세 포함)</p>
+        </div>
       </div>
 
       <PaymentAlerts alerts={alerts} />
@@ -62,26 +62,27 @@ export default async function PaymentsPage() {
         {summary.lastPayment && (
           <p>
             <span className="font-semibold text-foreground">최근 지급</span>
-            {' · '}{roundName(summary.lastPayment)}{' '}
+            {' '}{roundName(summary.lastPayment)}{' '}
             <span className="tabular-nums text-foreground">
               {Math.round(summary.lastPayment.amountKrw).toLocaleString('ko-KR')}원
             </span>
-            {' · '}{summary.lastPayment.paidAt}
+            {' '}({summary.lastPayment.paidAt})
           </p>
         )}
         {/* 부호 대신 방향을 말로 적는다 — 「-15,935,688원」은 누가 누구에게 줄 돈인지 알 수 없다.
             양수 = 에이원이 낼 돈, 음수 = 토에이가 돌려줄 돈. 위 화면 주석의 규약과 같다. */}
         <p>
           <span className="font-semibold text-foreground">최종정산</span>
-          {' · '}미정산 {summary.closingOpenCount}개 차수를 서로 상계하면{' '}
+          {' '}미정산 {summary.closingOpenCount}개 차수 상계 시 한국에이원{' '}
+          {summary.closingBalanceKrw >= 0 ? '추가 지급액' : '환급 예정액'}{' '}
           <span className="tabular-nums text-foreground">
             {Math.abs(Math.round(summary.closingBalanceKrw)).toLocaleString('ko-KR')}원
           </span>
-          {'은 '}
-          {summary.closingBalanceKrw >= 0 ? '에이원이 더 낼 금액입니다' : '에이원이 돌려받을 금액입니다'}
-          {'. 창고 보관료 등 정산과 무관한 입출금은 '}
+        </p>
+        <p>
+          창고 보관료 등 정산 외 입출금 내역은{' '}
           <Link href="/payments/ledger" className="underline underline-offset-2">통장 원장</Link>
-          에서 확인합니다.
+          에서 확인하실 수 있습니다.
         </p>
       </div>
     </div>

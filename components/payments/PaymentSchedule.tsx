@@ -32,11 +32,15 @@ export function PaymentSchedule({
   return (
     <div className="overflow-hidden rounded-md border">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b bg-slate-50 px-3 py-2">
-        <span className="text-sm font-semibold">월별 결제 예정 (VAT 포함)</span>
-        <span className="text-sm text-muted-foreground">
-          넉 달 합계 <b className="tabular-nums text-foreground">{krw(total)}</b>원
-          {laterCount > 0 && ` · 그 이후 ${laterCount}개 차수 ${krw(laterKrw)}원`}
-        </span>
+        <span className="text-sm font-semibold">월별 결제 예정</span>
+        <span className="text-sm text-muted-foreground">단위: 원 (부가세 포함)</span>
+      </div>
+
+      <div className="border-b px-3 py-2 text-sm text-muted-foreground">
+        <div>4개월 합계 <b className="tabular-nums text-foreground">{krw(total)}</b>원</div>
+        {laterCount > 0 && (
+          <div>이후 예정 {laterCount}개 차수 <span className="tabular-nums">{krw(laterKrw)}</span>원</div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
@@ -50,7 +54,7 @@ export function PaymentSchedule({
             </div>
 
             {m.rounds.length === 0 ? (
-              <p className="mt-1 text-sm text-muted-foreground">예정된 결제가 없습니다</p>
+              <p className="mt-1 text-sm text-muted-foreground">결제 예정 없음</p>
             ) : (
               <ul className="mt-1 space-y-1 text-sm">
                 {m.rounds.map((r) => (
@@ -73,11 +77,11 @@ export function PaymentSchedule({
                     {/* 손댈 줄에만 한 문장. 문장이 없으면 일정대로 도는 중이라는 뜻이다. */}
                     {r.pastGrace ? (
                       <p className="text-sm text-red-700">
-                        {krw(r.krw)}원 지급 필요 (기일 {DUE_GRACE_DAYS}일 경과)
+                        미지급 {krw(r.krw)}원 (지급기일 {DUE_GRACE_DAYS}일 초과 경과)
                       </p>
                     ) : r.krw !== r.basisKrw ? (
                       <p className="text-sm text-muted-foreground">
-                        이 달 총액 {krw(r.basisKrw)}원 중 남은 금액입니다
+                        당월 총액 {krw(r.basisKrw)}원 중 잔액
                       </p>
                     ) : null}
                   </li>
@@ -86,18 +90,19 @@ export function PaymentSchedule({
             )}
 
             {m.plannedKrw !== 0 && m.billedKrw !== 0 && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                청구분 {krw(m.billedKrw)} · 예상 {krw(m.plannedKrw)}
-              </p>
+              <div className="mt-1 text-sm text-muted-foreground">
+                <div>청구 확정 <span className="tabular-nums">{krw(m.billedKrw)}</span></div>
+                <div>예상 <span className="tabular-nums">{krw(m.plannedKrw)}</span></div>
+              </div>
             )}
           </div>
         ))}
       </div>
 
-      <p className="border-t bg-slate-50 px-3 py-2 text-sm text-muted-foreground">
-        기일에서 {DUE_GRACE_DAYS}일까지는 계산서 일정·휴일로 늦어질 수 있어 빨강을 붙이지 않습니다.
-        「예상」은 아직 청구값을 넣지 않아 계산값으로 잡은 금액입니다.
-      </p>
+      <div className="border-t bg-slate-50 px-3 py-2 text-sm text-muted-foreground">
+        <p>지급기일 경과 후 {DUE_GRACE_DAYS}일 이내는 세금계산서 발행 일정 및 휴일을 고려하여 연체로 표시하지 않습니다.</p>
+        <p>「예상」 금액은 청구금액 입력 전 시스템 산출액입니다.</p>
+      </div>
     </div>
   )
 }

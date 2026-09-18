@@ -44,9 +44,8 @@ export function PaymentAlerts({ alerts }: { alerts: Alerts }) {
 
   for (const r of alerts.noRecord) {
     items.push({
-      text: `${roundName(r)} ${r.balanceKrw.toLocaleString('ko-KR')}원이 기일에서 `
-        + `${r.delayDays?.toLocaleString('ko-KR')}일 지나도록 `
-        + '나간 기록이 없습니다',
+      text: `${roundName(r)} 미지급 ${r.balanceKrw.toLocaleString('ko-KR')}원 — `
+        + `지급기일 ${r.delayDays?.toLocaleString('ko-KR')}일 경과, 지급 내역 없음`,
       href: `/transactions/${r.transactionId}`,
       action: '거래 보기',
       note: noteOf(r),
@@ -58,8 +57,8 @@ export function PaymentAlerts({ alerts }: { alerts: Alerts }) {
     // 전부 미확인으로 남는다. 차수별로 세운다.
     for (const r of alerts.overpaid) {
       items.push({
-        text: `${roundName(r)}은 청구액보다 ${(-r.balanceKrw).toLocaleString('ko-KR')}원 `
-          + '많이 나갔습니다 — 다음 차수에서 상계했는지 확인이 필요합니다',
+        text: `${roundName(r)} 청구금액 대비 ${(-r.balanceKrw).toLocaleString('ko-KR')}원 `
+          + '초과 지급 — 차기 차수 상계 여부 확인 필요',
         href: `/transactions/${r.transactionId}`,
         action: '거래 보기',
         note: noteOf(r),
@@ -69,8 +68,8 @@ export function PaymentAlerts({ alerts }: { alerts: Alerts }) {
   }
   for (const r of alerts.billedMissing) {
     items.push({
-      text: `${roundName(r)}은 ${Math.round(r.paidKrw).toLocaleString('ko-KR')}원이 `
-        + '나갔는데 청구액이 등록되어 있지 않아 대조할 수 없습니다',
+      text: `${roundName(r)} 지급액 ${Math.round(r.paidKrw).toLocaleString('ko-KR')}원 — `
+        + '청구금액 미등록으로 대사 불가',
       href: `/transactions/${r.transactionId}`,
       action: '거래 보기',
       note: noteOf(r),
@@ -79,16 +78,15 @@ export function PaymentAlerts({ alerts }: { alerts: Alerts }) {
   }
   if (alerts.unallocated.length > 0) {
     items.push({
-      text: `어느 차수 것인지 모르는 입출금이 ${alerts.unallocated.length}건 `
-        + `${alerts.unallocatedKrw.toLocaleString('ko-KR')}원 있습니다`,
+      text: `차수 미지정 입출금 ${alerts.unallocated.length}건 `
+        + `(${alerts.unallocatedKrw.toLocaleString('ko-KR')}원)`,
       href: '/payments/ledger',
       action: '통장 원장에서 처리',
     })
   }
   if (alerts.unconfirmedPayments > 0) {
     items.push({
-      text: `여러 차수를 한 번에 묶어 보낸 이체가 ${alerts.unconfirmedPayments}건 있습니다 — `
-        + '차수별 금액을 아직 사람이 확인하지 않았습니다',
+      text: `복수 차수 일괄 이체 ${alerts.unconfirmedPayments}건 — 차수별 금액 확인 필요`,
       href: '/payments/ledger',
       action: '통장 원장에서 처리',
     })
@@ -113,7 +111,7 @@ export function PaymentAlerts({ alerts }: { alerts: Alerts }) {
             <span className="font-normal text-muted-foreground">(사유 미기재)</span>
           </button>
         ) : (
-          <span className="font-semibold">확인 필요한 항목이 모두 정리됐습니다</span>
+          <span className="font-semibold">확인 필요 항목 없음</span>
         )}
 
         {noted.length > 0 && (
@@ -123,12 +121,12 @@ export function PaymentAlerts({ alerts }: { alerts: Alerts }) {
             className="inline-flex items-center gap-1 text-muted-foreground"
           >
             <Chevron open={openNoted} />
-            메모로 정리됨 {noted.length}건
+            비고 기재 완료 {noted.length}건
           </button>
         )}
 
         <span className="ml-auto text-muted-foreground">
-          사유를 차수 비고에 적으면 이 줄에서 내려갑니다
+          차수 비고에 사유를 기재하면 확인 필요 목록에서 제외됩니다
         </span>
       </div>
 

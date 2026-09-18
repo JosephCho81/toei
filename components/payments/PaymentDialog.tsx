@@ -74,8 +74,8 @@ export function PaymentDialog({
 
     setSaving(false)
     if (!res.ok) {
-      const body = await res.json().catch(() => ({ error: '저장하지 못했습니다' }))
-      setError(body.error ?? '저장하지 못했습니다')
+      const body = await res.json().catch(() => ({ error: '저장에 실패했습니다' }))
+      setError(body.error ?? '저장에 실패했습니다')
       return
     }
     onSaved()
@@ -89,9 +89,12 @@ export function PaymentDialog({
             {roundName(row)} 지급 {editing ? '수정' : '입력'}
           </DialogTitle>
           <DialogDescription>
-            청구 {row.billedKrw == null ? '미등록' : `${row.billedKrw.toLocaleString('ko-KR')}원`}
-            {' · '}
-            {editing ? '이 회차만 고칩니다' : `현재 잔액 ${row.balanceKrw.toLocaleString('ko-KR')}원`}
+            <span className="block">
+              청구금액 {row.billedKrw == null ? '미등록' : `${row.billedKrw.toLocaleString('ko-KR')}원`}
+            </span>
+            <span className="block">
+              {editing ? '해당 회차만 수정됩니다' : `현재 잔액 ${row.balanceKrw.toLocaleString('ko-KR')}원`}
+            </span>
           </DialogDescription>
         </DialogHeader>
 
@@ -102,7 +105,7 @@ export function PaymentDialog({
           </div>
 
           <div className="grid grid-cols-[76px_1fr] items-center gap-3">
-            <Label htmlFor="amount">금액 (원, VAT 포함)</Label>
+            <Label htmlFor="amount">금액 (부가세 포함)</Label>
             <NumberInput
               id="amount"
               value={amount}
@@ -128,22 +131,22 @@ export function PaymentDialog({
           )}
 
           <div className="grid grid-cols-[76px_1fr] items-center gap-3">
-            <Label htmlFor="memo">메모</Label>
+            <Label htmlFor="memo">적요</Label>
             <Input
               id="memo"
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
-              placeholder="통장 적요 · 선택"
+              placeholder="통장 적요 (선택)"
             />
           </div>
 
           {!editing && (
             <p className="text-xs text-muted-foreground">
-              한 번의 이체가 여러 차수에 걸친다면{' '}
+              복수 차수에 걸친 이체는{' '}
               <Link href="/payments/ledger" className="text-primary underline">
-                통장 원장에서 나눠 넣으세요
+                통장 원장
               </Link>
-              .
+              에서 차수별로 나누어 입력하시기 바랍니다.
             </p>
           )}
 
@@ -158,7 +161,7 @@ export function PaymentDialog({
           <span className="text-xs text-muted-foreground">
             {valid
               ? <>반영 후 잔액 <b className="tabular-nums text-foreground">{after.toLocaleString('ko-KR')}원</b></>
-              : '금액을 입력하세요'}
+              : '금액을 입력하십시오'}
           </span>
           <span className="flex gap-2">
             <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>취소</Button>
