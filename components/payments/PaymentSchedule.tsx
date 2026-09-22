@@ -77,7 +77,7 @@ export function PaymentSchedule({
                     {/* 손댈 줄에만 한 문장. 문장이 없으면 일정대로 도는 중이라는 뜻이다. */}
                     {r.pastGrace ? (
                       <p className="text-sm text-red-700">
-                        미지급 {krw(r.krw)}원 (지급기일 {DUE_GRACE_DAYS}일 초과 경과)
+                        미지급 {krw(r.krw)}원 (지급기일 {DUE_GRACE_DAYS}일 이상 경과)
                       </p>
                     ) : r.krw !== r.basisKrw ? (
                       <p className="text-sm text-muted-foreground">
@@ -100,7 +100,7 @@ export function PaymentSchedule({
       </div>
 
       <div className="border-t bg-slate-50 px-3 py-2 text-sm text-muted-foreground">
-        <p>지급기일 경과 후 {DUE_GRACE_DAYS}일 이내는 세금계산서 발행 일정 및 휴일을 고려하여 연체로 표시하지 않습니다.</p>
+        <p>지급기일 경과 후 {DUE_GRACE_DAYS}일 미만은 세금계산서 발행 일정 및 휴일을 고려하여 연체로 표시하지 않습니다.</p>
         <p>「예상」 금액은 청구금액 입력 전 시스템 산출액입니다.</p>
       </div>
     </div>

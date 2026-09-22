@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MemoField } from '@/components/ui/MemoField'
-import { PAID_TOLERANCE_KRW } from '@/lib/data/payments'
+import { PAID_TOLERANCE_KRW, calcPaidPhase, type CalcPaidPhase } from '@/lib/data/payments'
 import { aggregate, type CompareRow, type CompareTotals, type SettlementKind } from '@/lib/data/settlementCompare'
 
 /**
@@ -24,15 +24,17 @@ import { aggregate, type CompareRow, type CompareTotals, type SettlementKind } f
  * **그래서 차이는 셋이다.** 2026-09-05 담당자 양식(`_source_docs/양식 예시.xlsx`)까지
  * 반영해 셋을 다 세웠다:
  *
- *   청구−계산   청구서가 틀린 금액          (K열)
- *   청구−지급   아직 안 받은 금액           (L열, 미지급금)
- *   계산−지급   청구가 맞았다면 남았을 금액  (M열)  ← 어제까지 없던 열
+ *   계산 차이        청구−계산   청구서가 틀린 금액              (K열)
+ *   청구-지급 차이   지급−청구   청구 기준으로 더/덜 나간 금액   (L열)
+ *   계산-지급 차이   지급−계산   청구가 맞았다면 더/덜 나간 금액 (M열)
  *
- * 마지막 것이 없어서 담당자가 「청구 기준 68만 더 지급 / 계산 기준 덜 지급」이라는
- * 자기 수기검산을 화면에서 확인할 수 없었다. 셋을 한 칸에 합치지 말 것.
+ * 셋을 한 칸에 합치지 말 것.
  *
- * 색은 빨강 하나만 쓴다 — 지급 현황과 같은 규칙이다.
- * 빨강은 「덜 청구한 돈」과 「덜 들어온 돈」에만 붙는다.
+ * **지급 쪽 두 열은 더 지급이 +, 덜 지급이 − 다** (담당자 2026-09-22 — 그 전에는 반대로
+ * 「미지급이 +」였다). 데이터(`balanceKrw` · `calcVsPaidKrw`)는 청구·계산에서 지급을 뺀
+ * 그대로 두고 **표시할 때만 뒤집는다** — 지급 현황이 같은 값을 쓰기 때문이다.
+ *
+ * 빨강 글씨는 「덜 청구한 돈」과 「덜 들어온 돈」에만 붙는다.
  *
  * 금액은 전부 **에이원 기준**이다 — 시점 토글은 없앴다(담당자 요청 2026-09-05).
  * 「에이원 자료이니 에이원 기준으로만 해도 상관없다」
@@ -51,10 +53,20 @@ function usd(n: number): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-/** 부호를 앞에 붙여 방향을 보여준다. 「청구−계산」에서만 쓴다. */
-function signed(n: number): string {
+/** 부호를 앞에 붙여 방향을 보여준다. 절사 폭 안이면 0 이다. */
+function signedGap(n: number): string {
+  if (Math.abs(n) < PAID_TOLERANCE_KRW) return '0'
   const v = Math.round(n)
-  return `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toLocaleString('ko-KR')}`
+  return `${v > 0 ? '+' : '−'}${Math.abs(v).toLocaleString('ko-KR')}`
+}
+
+/** 머리글 아래 한 줄 — 무엇에서 무엇을 뺐는지. strong 은 시스템이 낸 값이라 빨강 굵게 (담당자 2026-09-22) */
+function Sub({ children, strong = false }: { children: React.ReactNode; strong?: boolean }) {
+  return (
+    <span className={cn('block text-xs', strong ? 'font-bold text-red-700' : 'font-normal text-muted-foreground')}>
+      {children}
+    </span>
+  )
 }
 
 function rowKey(r: CompareRow): string {
@@ -130,7 +142,7 @@ function InvoicedField({
         {calcKrw != null && (
           <span className="text-muted-foreground">
             계산값 {krw(calcKrw)}원
-            {gap != null && Math.abs(gap) >= PAID_TOLERANCE_KRW && ` · 차이 ${signed(gap)}`}
+            {gap != null && Math.abs(gap) >= PAID_TOLERANCE_KRW && ` · 차이 ${signedGap(gap)}`}
           </span>
         )}
       </div>
@@ -292,7 +304,7 @@ export function CompareTable({
       {pickedRows.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-md border border-slate-400 bg-slate-100 px-4 py-2.5 text-sm">
           <span className="font-semibold">선택 {pickedRows.length}개 차수 합계</span>
-          <PickedFigures totals={aggregate(pickedRows)} />
+          <PickedFigures totals={aggregate(pickedRows, today)} />
           <button
             type="button"
             onClick={() => setPicked(new Set())}
@@ -316,16 +328,16 @@ export function CompareTable({
                   className="h-3.5 w-3.5 align-middle accent-slate-700"
                 />
               </th>
-              <th className={cn(TH, CENTER, 'w-[12%]')}>차수 · P/O No.</th>
-              <th className={cn(TH, NUM, 'w-[9%]')}>수입금액 ($)</th>
-              <th className={cn(TH, NUM, 'w-[11%]')}>청구금액 (원)</th>
-              <th className={cn(TH, NUM, 'w-[11%]')}>계산금액 (원)</th>
-              <th className={cn(TH, NUM, 'w-[9%]')}>계산 차이</th>
-              <th className={cn(TH, NUM, 'w-[11%]')}>실지급액 (원)</th>
-              <th className={cn(TH, NUM, 'w-[9%]')}>청구-지급 차이</th>
-              <th className={cn(TH, NUM, 'w-[9%]')}>계산-지급 차이</th>
+              <th className={cn(TH, CENTER, 'w-[11%]')}>차수 · P/O No.</th>
+              <th className={cn(TH, NUM, 'w-[8%]')}>수입금액 ($)</th>
               <th className={cn(TH, CENTER, 'w-[7%]')}>기일</th>
-              <th className={cn(TH, 'w-[9%]')}>비고 (금액 차이 사유)</th>
+              <th className={cn(TH, NUM, 'w-[10%]')}>청구금액<Sub>(토에이 계산금액)</Sub></th>
+              <th className={cn(TH, NUM, 'w-[10%]')}>계산금액<Sub strong>(시스템 계산금액)</Sub></th>
+              <th className={cn(TH, NUM, 'w-[10%]')}>실지급액 (원)</th>
+              <th className={cn(TH, NUM, 'w-[9%]')}>계산 차이<Sub>(청구−계산)</Sub></th>
+              <th className={cn(TH, NUM, 'w-[9%]')}>청구-지급 차이<Sub>(지급−청구)</Sub></th>
+              <th className={cn(TH, NUM, 'w-[9%]')}>계산-지급 차이<Sub strong>(지급−계산)</Sub></th>
+              <th className={cn(TH, 'w-[14%]')}>비고 (금액 차이 사유)</th>
             </tr>
           </thead>
 
@@ -333,6 +345,7 @@ export function CompareTable({
             <GroupBody
               key={`${g.year ?? 'none'}-${g.rows[0] ? rowKey(g.rows[0]) : ''}`}
               group={g}
+              today={today}
               open={open}
               picked={picked}
               onToggle={toggle}
@@ -344,15 +357,19 @@ export function CompareTable({
           ))}
 
           <tbody className="border-t-2 border-slate-400">
-            <TotalsRow label="총 합계" totals={aggregate(visible)} strong />
+            <TotalsRow label="총 합계" totals={aggregate(visible, today)} strong />
           </tbody>
         </table>
       </div>
 
       <p className="mt-2 text-sm text-muted-foreground">
-        「청구−계산」은 청구서가 어긋난 금액, 「청구−지급」은 아직 오가지 않은 금액,
-        「계산−지급」은 청구가 맞았다면 남았을 금액입니다 — 셋이 다른 이야기라 열을 나눠 두었습니다.
-        1,000원 미만 차이는 절사로 보아 0으로 봅니다.
+        「계산 차이」는 청구서가 계산값과 어긋난 금액(청구−계산)이고, 「청구-지급 차이」와
+        「계산-지급 차이」는 더 지급한 값이 +, 덜 지급한 값이 −입니다.
+        계산-지급 차이는 기일이 지난달까지인 차수만 숫자로 보이고, 이번 달 이후는
+        <span className="mx-1 rounded bg-red-100 px-1">기일 1주 경과 · 덜 지급</span>
+        <span className="mx-1 rounded bg-green-100 px-1">다음 달 이후 지급 예정</span>
+        으로만 표시하며 합계에도 넣지 않습니다.
+        200원 미만 차이는 절사로 보아 0으로 봅니다.
       </p>
     </>
   )
@@ -360,19 +377,19 @@ export function CompareTable({
 
 /** 선택 합계 바에 들어가는 숫자들. 표의 소계와 같은 `aggregate()` 를 쓴다. */
 function PickedFigures({ totals }: { totals: CompareTotals }) {
-  const items: [string, number][] = [
-    ['청구', totals.invoicedKrw],
-    ['계산', totals.calcKrw],
-    ['지급', totals.paidKrw],
-    ['청구−지급', totals.balanceKrw],
-    ['계산−지급', totals.calcVsPaidKrw],
+  const items: [string, string][] = [
+    ['청구', krw(totals.invoicedKrw)],
+    ['계산', krw(totals.calcKrw)],
+    ['지급', krw(totals.paidKrw)],
+    ['지급−청구', signedGap(-totals.balanceKrw)],
+    ['지급−계산', signedGap(-totals.calcVsPaidKrw)],
   ]
   return (
     <>
       {items.map(([label, v]) => (
         <span key={label}>
           <span className="text-muted-foreground">{label}</span>{' '}
-          <b className="tabular-nums">{signed(v)}</b>
+          <b className="tabular-nums">{v}</b>
         </span>
       ))}
       {totals.excludedCount > 0 && (
@@ -386,6 +403,7 @@ function PickedFigures({ totals }: { totals: CompareTotals }) {
 
 function GroupBody({
   group,
+  today,
   open,
   picked,
   onToggle,
@@ -395,6 +413,7 @@ function GroupBody({
   showYearSubtotal,
 }: {
   group: { year: number | null; rows: CompareRow[] }
+  today: string
   open: Set<string>
   picked: Set<string>
   onToggle: (id: string) => void
@@ -413,6 +432,8 @@ function GroupBody({
         const underBilled = !r.legacyVatMode && billGap != null && billGap < -PAID_TOLERANCE_KRW
         const unpaid = r.balanceKrw != null && r.balanceKrw > PAID_TOLERANCE_KRW
         const calcUnpaid = r.calcVsPaidKrw != null && r.calcVsPaidKrw > PAID_TOLERANCE_KRW
+        const phase = calcPaidPhase(r.dueDate, today, unpaid || calcUnpaid)
+        const hasNote = !!r.note?.trim()
 
         return (
           <tbody key={id} className="border-t">
@@ -452,6 +473,11 @@ function GroupBody({
                   : <span className="text-muted-foreground">—</span>}
               </td>
 
+              {/* 실지급일은 펼침으로 내렸다 (담당자 2026-09-10) — 표에는 청구 기일만 선다 */}
+              <td className={cn(TD, CENTER, 'tabular-nums text-slate-600')}>
+                {r.dueDate ?? '미정'}
+              </td>
+
               <td className={cn(TD, NUM, 'tabular-nums')}>
                 {r.invoicedKrw != null ? krw(r.invoicedKrw)
                   : <span className="text-muted-foreground">청구 전</span>}
@@ -462,41 +488,37 @@ function GroupBody({
                   : <span className="text-muted-foreground">—</span>}
               </td>
 
-              {/* 청구가 계산과 다른 것은 미지급이 아니라 청구 오류다. 빨강은 덜 청구한 쪽에만. */}
-              <td className={cn(TD, NUM, 'tabular-nums font-semibold',
-                underBilled ? 'text-red-700' : 'text-slate-600')}>
-                {r.legacyVatMode ? <span className="text-muted-foreground">구방식</span>
-                  : billGap == null ? <span className="text-muted-foreground">—</span>
-                  : Math.abs(billGap) < PAID_TOLERANCE_KRW ? '0'
-                  : signed(billGap)}
-              </td>
-
               <td className={cn(TD, NUM, 'tabular-nums')}>
                 {r.installments.length === 0
                   ? <span className="text-muted-foreground">—</span>
                   : krw(r.paidKrw)}
               </td>
 
-              {/* 담당자 요청 — 미지급금이 +가 되도록. 초과 지급은 말로 붙인다. */}
+              {/* 청구가 계산과 다른 것은 미지급이 아니라 청구 오류다. 빨강은 덜 청구한 쪽에만. */}
               <td className={cn(TD, NUM, 'tabular-nums font-semibold',
-                unpaid ? 'text-red-700' : 'text-slate-600')}>
-                <Gap value={r.balanceKrw} />
+                underBilled ? 'text-red-700' : 'text-slate-600')}>
+                {r.legacyVatMode ? <span className="text-muted-foreground">구방식</span>
+                  : billGap == null ? <span className="text-muted-foreground">—</span>
+                  : signedGap(billGap)}
               </td>
 
-              {/* 청구가 맞았다면 남았을 금액. 구방식은 비교 자체가 성립하지 않는다. */}
               <td className={cn(TD, NUM, 'tabular-nums font-semibold',
+                unpaid ? 'text-red-700' : 'text-slate-600')}>
+                <Gap value={r.balanceKrw == null ? null : -r.balanceKrw} />
+              </td>
+
+              {/* 청구가 맞았다면 더/덜 나간 금액. 기일이 이번 달 이후면 숫자 대신 상태만 (담당자 2026-09-22) */}
+              <td className={cn(TD, NUM, 'tabular-nums font-semibold', PHASE_BG[phase],
                 calcUnpaid ? 'text-red-700' : 'text-slate-600')}>
                 {r.legacyVatMode
                   ? <span className="text-muted-foreground">구방식</span>
-                  : <Gap value={r.calcVsPaidKrw} />}
+                  : phase === 'shown'
+                    ? <Gap value={r.calcVsPaidKrw == null ? null : -r.calcVsPaidKrw} />
+                    : <span className="text-sm font-normal text-slate-600">{PHASE_LABEL[phase]}</span>}
               </td>
 
-              {/* 실지급일은 펼침으로 내렸다 (담당자 2026-09-10) — 표에는 청구 기일만 선다 */}
-              <td className={cn(TD, CENTER, 'tabular-nums text-slate-600')}>
-                {r.dueDate ?? '미정'}
-              </td>
-
-              <td className="px-2.5 py-2.5 align-middle">
+              {/* 메모가 있는 칸은 노랑 — 펼쳐 볼 차수가 표에서 먼저 보이게 (담당자 2026-09-22) */}
+              <td className={cn('px-2.5 py-2.5 align-middle', hasNote && 'bg-yellow-100')}>
                 <NoteCell note={r.note} />
               </td>
             </tr>
@@ -516,7 +538,7 @@ function GroupBody({
         <tbody className="border-t border-slate-300">
           <TotalsRow
             label={group.year != null ? `${group.year}년 소계` : '기일 미정 소계'}
-            totals={aggregate(group.rows)}
+            totals={aggregate(group.rows, today)}
           />
         </tbody>
       )}
@@ -525,19 +547,28 @@ function GroupBody({
 }
 
 /**
- * 차이 한 칸.
- * **부호로 방향을 말하지 않는다** — 크기는 숫자로, 방향은 말로 적는다.
- * 담당자 요청대로 「아직 안 낸 돈」이 양수이고, 반대는 「초과」를 붙인다.
+ * 차이 한 칸. 부호로 방향을 말한다 — 지급 쪽 두 열은 **더 지급이 +, 덜 지급이 −**
+ * (담당자 2026-09-22). 넘겨받는 값은 이미 지급−청구 / 지급−계산 으로 뒤집혀 있다.
  */
 function Gap({ value }: { value: number | null }) {
   if (value == null) return <span className="text-muted-foreground">—</span>
-  if (Math.abs(value) < PAID_TOLERANCE_KRW) return <>0</>
-  return (
-    <>
-      {krw(Math.abs(value))}
-      {value < 0 && <span className="ml-1 text-sm font-normal text-muted-foreground">초과</span>}
-    </>
-  )
+  return <>{signedGap(value)}</>
+}
+
+/** 계산-지급 차이 칸 — 숫자를 감춘 차수의 바탕색과 한 마디 */
+const PHASE_BG: Record<CalcPaidPhase, string> = {
+  shown: '',
+  late: 'bg-red-100',
+  this_month: '',
+  upcoming: 'bg-green-100',
+  undated: '',
+}
+const PHASE_LABEL: Record<CalcPaidPhase, string> = {
+  shown: '',
+  late: '기일 1주 경과',
+  this_month: '이번 달 지급',
+  upcoming: '지급 예정',
+  undated: '—',
 }
 
 /** 연도 소계·총계·선택 합계가 전부 같은 모양으로 선다. */
@@ -560,6 +591,7 @@ function TotalsRow({
         <span className="block font-normal text-muted-foreground">{totals.rowCount}건</span>
       </td>
       <td />
+      <td />
       <td className={cls}>{krw(totals.invoicedKrw)}</td>
       <td className={cls}>
         {krw(totals.calcKrw)}
@@ -569,11 +601,10 @@ function TotalsRow({
           </span>
         )}
       </td>
-      <td className={cls}>{signed(totals.billVsCalcKrw)}</td>
       <td className={cls}>{krw(totals.paidKrw)}</td>
-      <td className={cls}><Gap value={totals.balanceKrw} /></td>
-      <td className={cls}><Gap value={totals.calcVsPaidKrw} /></td>
-      <td />
+      <td className={cls}>{signedGap(totals.billVsCalcKrw)}</td>
+      <td className={cls}><Gap value={-totals.balanceKrw} /></td>
+      <td className={cls}><Gap value={-totals.calcVsPaidKrw} /></td>
       <td />
     </tr>
   )

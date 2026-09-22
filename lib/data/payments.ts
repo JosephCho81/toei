@@ -10,8 +10,13 @@ import { computeSettlementSchedule } from '../calculations/schedule.ts'
  * 화면이 조용히 거짓말을 한다.
  */
 
-/** 절사 오차. 이보다 작은 잔액은 완납으로 본다 (28차 32원, 35차 58원 등). */
-export const PAID_TOLERANCE_KRW = 1_000
+/**
+ * 절사 오차. 이보다 작은 잔액은 완납으로 본다 (28차 32원, 35차 58원 등).
+ *
+ * 담당자 2026-09-22: 절사 차이는 99원 + 9원 = 108원이고, 계산서 단가 맞춤으로 소수 조정이
+ * 더 붙을 수 있어 200원까지를 폭으로 본다. 1,000원이면 진짜 차이가 0으로 묻힌다.
+ */
+export const PAID_TOLERANCE_KRW = 200
 
 /** 기일이 이 일수 안으로 들어오면 「임박」으로 표시한다. */
 export const DUE_SOON_DAYS = 7
@@ -28,7 +33,7 @@ export const DUE_SOON_DAYS = 7
 export const SETTLED_THROUGH_ROUND = 35
 
 /**
- * 기일에서 이 일수까지는 빨강을 붙이지 않는다.
+ * 기일에서 이 일수가 되는 날부터 빨강을 붙인다 (그 전날까지는 유예).
  *
  * 담당자 2026-09-10: 「영업일로 3,4일 정도 차이를 두고 지급 가능. 계산서 일정, 휴일,
  *   금액 검토 등으로 약간 바뀔 수 있음. 해서 1주 정도 기간 설정.」
@@ -53,6 +58,38 @@ export type PaymentState =
   | 'paid'
   /** 청구금액도 계산값도 없어 판단 불가 */
   | 'unbilled'
+
+/** 기일이 1주 이상 지났는가 — 담당자 2026-09-22 「1주 이상 지나간 것」, 기일 +7일째(38차)부터 */
+export function isPastGrace(dueDate: string, today: string): boolean {
+  return daysBetween(dueDate, today) >= DUE_GRACE_DAYS
+}
+
+/**
+ * 정산비교 「계산-지급 차이」가 숫자를 보일 수 있는가.
+ *
+ * 담당자 2026-09-22: 「이번달 포함 달이 넘어가는 것들은 계산 지급 차이 표시 X」.
+ * 기일이 이번 달 이후인 차수는 지급이 아직 도는 중이라 그 칸이 차이가 아니라 남은 금액일 뿐이다.
+ * 달로 가르는 것은 `bucketOf` 의 지급 중 / 미도래 경계와 같다.
+ */
+export function isCalcPaidShown(dueDate: string | null, today: string): boolean {
+  return dueDate != null && dueDate.slice(0, 7) < today.slice(0, 7)
+}
+
+/**
+ * 숫자를 감춘 칸에 대신 붙는 상태.
+ *   late        이번 달 기일이 1주 이상 지났는데 덜 지급 — 연빨강 (38차)
+ *   this_month  이번 달 기일, 아직 유예 안이거나 다 지급
+ *   upcoming    다음 달 이후 기일 — 연녹색 (37차, 39차~)
+ *   undated     기일이 없다
+ */
+export type CalcPaidPhase = 'shown' | 'late' | 'this_month' | 'upcoming' | 'undated'
+
+export function calcPaidPhase(dueDate: string | null, today: string, unpaid: boolean): CalcPaidPhase {
+  if (dueDate == null) return 'undated'
+  if (isCalcPaidShown(dueDate, today)) return 'shown'
+  if (dueDate.slice(0, 7) > today.slice(0, 7)) return 'upcoming'
+  return unpaid && isPastGrace(dueDate, today) ? 'late' : 'this_month'
+}
 
 /**
  * 남은 금액이 어느 칸에 들어가는가. 넷은 서로 겹치지 않는다.
@@ -362,7 +399,7 @@ function buildSchedule(rows: PaymentRow[], today: string) {
       basisKrw: r.basisKrw ?? krw,
       planned,
       pastDue: r.dueDate < today,
-      pastGrace: daysBetween(r.dueDate, today) > DUE_GRACE_DAYS,
+      pastGrace: isPastGrace(r.dueDate, today),
     })
   }
 

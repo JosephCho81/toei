@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { StatCards, type Stat } from '@/components/ui/StatCards'
 import { CompareTable } from './CompareTable'
+import { PAID_TOLERANCE_KRW } from '@/lib/data/payments'
 import { KIND_LABEL, type CompareRow, type CompareSummary, type SettlementKind } from '@/lib/data/settlementCompare'
 
 /**
@@ -27,6 +28,13 @@ function krw(n: number): string {
   return Math.round(n).toLocaleString('ko-KR')
 }
 
+/** 절사 폭 안이면 0, 밖이면 부호를 붙인다 — 표의 차이 칸과 같은 규칙 */
+function signed(n: number): string {
+  if (Math.abs(n) < PAID_TOLERANCE_KRW) return '0'
+  const v = Math.round(n)
+  return `${v > 0 ? '+' : '−'}${Math.abs(v).toLocaleString('ko-KR')}`
+}
+
 export function CompareScreen({
   kind,
   rows,
@@ -44,9 +52,9 @@ export function CompareScreen({
   error?: string | null
 }) {
   /**
-   * 카드 다섯 장이 담당자의 문장 하나를 그대로 답한다 —
+   * 카드 넷이 담당자의 문장 하나를 그대로 답한다 —
    * 「청구금액 기준으로는 68만 더 지급됐는데, 계산금액과 비교하면 덜 지급된 상태다」.
-   * 넷째·다섯째가 그 두 숫자다. 어제까지 다섯째가 없어 뒷문장을 화면에서 확인할 수 없었다.
+   * 셋째·넷째가 그 두 숫자다.
    */
   const cards: Stat[] = [
     {
@@ -66,43 +74,30 @@ export function CompareScreen({
           ? ` · 청구 예정 ${krw(summary.plannedCalcKrw)}원 별도`
           : ''),
     },
-    {
-      label: '덜 청구한 금액',
-      value: krw(summary.underBilledKrw),
-      unit: '원',
-      sub: summary.underBilledCount > 0
-        ? `${summary.underBilledCount}건`
-          + (summary.overBilledCount > 0
-            ? ` · 더 청구 ${summary.overBilledCount}건 ${krw(summary.overBilledKrw)}원`
-            : '')
-        : '없습니다',
-      alert: summary.underBilledKrw > 0,
-    },
     // 아래 두 장은 **기일이 지난 차수의 순액**이다 — 초과 지급분이 상계되어 들어간다.
     // 담당자 수기검산이 그렇게 낸다(「35차까지 68만 더 지급」). 그래서 지급 현황의
     // 「미지급금」(초과 지급을 따로 세우는 대표용 숫자)과 이름을 나눠 둔다 —
     // 같은 말에 다른 수가 붙으면 두 화면을 두고 하는 대화가 어긋난다.
+    //
+    // 담당자 2026-09-22: 더 지급한 값이 +, 덜 지급한 값이 − 다. 표의 두 열과 같은 방향이다.
+    // (「덜 청구한 금액」 카드는 같은 날 요청으로 뺐다 — 표의 계산 차이 열이 같은 것을 말한다.)
     {
-      label: '청구 대비 차액',
-      value: krw(Math.abs(summary.overdueBalanceKrw)),
+      label: '청구 대비 차액 (지급−청구)',
+      value: signed(-summary.overdueBalanceKrw),
       unit: '원',
-      sub: `기일 지난 ${summary.overdueCount}건 순액 · `
-        + (summary.overdueBalanceKrw >= 0 ? '덜 지급' : '더 지급')
+      sub: `기일 지난 ${summary.overdueCount}건 순액`
         + (Math.abs(summary.notDueBalanceKrw) >= 1
           ? ` · 기일 미도래 ${krw(summary.notDueBalanceKrw)}원 별도`
           : ''),
-      alert: summary.overdueBalanceKrw > 0,
+      alert: summary.overdueBalanceKrw > PAID_TOLERANCE_KRW,
     },
     {
-      label: '계산 대비 차액',
-      value: krw(Math.abs(summary.overdueCalcVsPaidKrw)),
+      label: '계산 대비 차액 (지급−계산)',
+      value: signed(-summary.overdueCalcVsPaidKrw),
       unit: '원',
-      sub: '기일 지난 차수 순액 · '
-        + (summary.overdueCalcVsPaidKrw >= 0
-          ? '청구가 맞았다면 더 받았을 금액'
-          : '계산값보다 더 지급된 금액')
+      sub: '지난달까지 기일인 차수 순액 · 이번 달 이후는 지급 중이라 빼고 셉니다'
         + (summary.excludedCount > 0 ? ` · 비교 불가 ${summary.excludedCount}건 제외` : ''),
-      alert: summary.overdueCalcVsPaidKrw > 0,
+      alert: summary.overdueCalcVsPaidKrw > PAID_TOLERANCE_KRW,
     },
   ]
 

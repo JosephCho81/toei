@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { bucketOf, SETTLED_THROUGH_ROUND, PAID_TOLERANCE_KRW } from './payments.ts'
+import { bucketOf, calcPaidPhase, isCalcPaidShown, isPastGrace, SETTLED_THROUGH_ROUND, PAID_TOLERANCE_KRW } from './payments.ts'
 
 /**
  * 남은 금액이 어느 칸에 들어가는가 — 담당자 2026-09-10 규약.
@@ -56,4 +56,41 @@ test('36차 실제 값 — 계산값 기준 1,000만원이 이번 달 지급 중
     TODAY,
   ), 'in_progress')
   assert.equal(basisKrw - paidKrw, 10_000_000)
+})
+
+test('절사 폭은 200원 — 108원 차이는 0, 200원부터는 차이다 (담당자 2026-09-22)', () => {
+  assert.equal(PAID_TOLERANCE_KRW, 200)
+  assert.equal(b({ roundNo: 36, balanceKrw: 108 }), 'none')
+  assert.equal(b({ roundNo: 36, balanceKrw: 200 }), 'in_progress')
+})
+
+/**
+ * 정산비교 「계산-지급 차이」 — 담당자 2026-09-22 요청을 2026-09-22 실제 기일로 못 박는다.
+ * 36차 09-06 · 38차 09-15 · 37차 10-16 · 39차 10-18 · 35차 07-28
+ */
+test('기일 +7일째부터 1주 경과 — 38차(09-15)는 09-22에 빨강', () => {
+  assert.equal(isPastGrace('2026-09-15', '2026-09-22'), true)
+  assert.equal(isPastGrace('2026-09-16', '2026-09-22'), false)
+})
+
+test('계산-지급 차이는 지난달까지 기일인 차수만 숫자를 보인다', () => {
+  const T = '2026-09-22'
+  assert.equal(isCalcPaidShown('2026-07-28', T), true)
+  assert.equal(isCalcPaidShown('2026-08-31', T), true)
+  assert.equal(isCalcPaidShown('2026-09-01', T), false)
+  assert.equal(isCalcPaidShown('2026-10-16', T), false)
+  assert.equal(isCalcPaidShown(null, T), false)
+})
+
+test('숨긴 칸의 상태 — 38차 연빨강, 37·39차 연녹색', () => {
+  const T = '2026-09-22'
+  assert.equal(calcPaidPhase('2026-07-28', T, true), 'shown')
+  assert.equal(calcPaidPhase('2026-09-15', T, true), 'late')
+  assert.equal(calcPaidPhase('2026-09-06', T, true), 'late')
+  // 다 냈으면 기일이 지나도 빨강이 아니다
+  assert.equal(calcPaidPhase('2026-09-15', T, false), 'this_month')
+  assert.equal(calcPaidPhase('2026-09-20', T, true), 'this_month')
+  assert.equal(calcPaidPhase('2026-10-16', T, true), 'upcoming')
+  assert.equal(calcPaidPhase('2026-10-18', T, false), 'upcoming')
+  assert.equal(calcPaidPhase(null, T, true), 'undated')
 })

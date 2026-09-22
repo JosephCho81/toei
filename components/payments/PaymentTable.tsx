@@ -87,7 +87,7 @@ function statusText(r: PaymentRow): string {
   if (r.bucket === 'settled_gap') return '지급금 차이'
   if (r.bucket === 'overdue') return d != null ? `연체 ${d.toLocaleString('ko-KR')}일` : '연체'
   if (r.bucket === 'in_progress') {
-    return d != null && d > DUE_GRACE_DAYS ? `기일 ${d}일 경과` : '당월 지급 진행'
+    return d != null && d >= DUE_GRACE_DAYS ? `기일 ${d}일 경과` : '당월 지급 진행'
   }
   return d != null ? `기일 ${-d}일 전` : '기일 미정'
 }
@@ -106,7 +106,7 @@ function statusText(r: PaymentRow): string {
  */
 function needsAttention(r: PaymentRow): boolean {
   if (r.bucket === 'overdue') return true
-  return r.bucket === 'in_progress' && (r.delayDays ?? 0) > DUE_GRACE_DAYS
+  return r.bucket === 'in_progress' && (r.delayDays ?? 0) >= DUE_GRACE_DAYS
 }
 
 function issueText(r: PaymentRow): string | null {
@@ -326,7 +326,7 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
         <p>총 {rows.length}개 차수 · 최근 차수 순으로 표시합니다.</p>
         <p>차수를 선택하면 지급 내역을 조회하고 입력·수정할 수 있습니다.</p>
         <p>「예상」 금액은 청구금액 입력 전 시스템 산출액입니다.</p>
-        <p>1,000원 미만의 차액은 절사로 간주하여 완납 처리합니다.</p>
+        <p>200원 미만의 차액은 절사로 간주하여 완납 처리합니다.</p>
       </div>
 
       {draft && (

@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { calculateInterim, type CostItem, type RoundingPolicy, type VatMode } from '@/lib/calculations/interim'
 import { calculateClosing } from '@/lib/calculations/closing'
 import { computeSettlementSchedule } from '@/lib/calculations/schedule'
-import { PAID_TOLERANCE_KRW, type Installment } from '@/lib/data/payments'
+import { PAID_TOLERANCE_KRW, isCalcPaidShown, type Installment } from '@/lib/data/payments'
 
 /**
  * 청구값 · 계산값 · 지불값을 한 행에 세운다.
@@ -134,11 +134,6 @@ export interface CompareSummary extends CompareTotals {
   notDueBalanceKrw: number
   /** 아직 청구하지 않은 차수의 계산값 — 앞으로 청구할 금액 */
   plannedCalcKrw: number
-  /** 덜 청구한 차수와 금액 */
-  underBilledCount: number
-  underBilledKrw: number
-  overBilledCount: number
-  overBilledKrw: number
   /** 아직 청구하지 않은 차수 */
   unbilledCount: number
   billedCount: number
@@ -195,11 +190,13 @@ function isComparable(r: CompareRow): boolean {
   return !r.legacyVatMode && r.calcKrw != null
 }
 
-export function aggregate(rows: CompareRow[]): CompareTotals {
+export function aggregate(rows: CompareRow[], today: string): CompareTotals {
   const billed = rows.filter((r) => r.invoicedKrw != null)
   // 계산 비교는 **청구된 차수만** 센다. 청구 전 차수를 넣으면 「아직 청구도 안 한 돈」이
   // 미지급으로 잡혀 40·41·43차만으로 5억이 얹힌다.
   const cmp = billed.filter(isComparable)
+  // 표에서 숫자를 감춘 칸(기일이 이번 달 이후)은 합계에도 넣지 않는다 — 안 보이는 돈이 합계에 섞인다.
+  const calcPaid = cmp.filter((r) => isCalcPaidShown(r.dueDate, today))
   return {
     rowCount: rows.length,
     invoicedKrw: billed.reduce((s, r) => s + (r.invoicedKrw ?? 0), 0),
@@ -207,7 +204,7 @@ export function aggregate(rows: CompareRow[]): CompareTotals {
     paidKrw: rows.reduce((s, r) => s + r.paidKrw, 0),
     billVsCalcKrw: cmp.reduce((s, r) => s + (r.billVsCalcKrw ?? 0), 0),
     balanceKrw: billed.reduce((s, r) => s + (r.balanceKrw ?? 0), 0),
-    calcVsPaidKrw: cmp.reduce((s, r) => s + (r.calcVsPaidKrw ?? 0), 0),
+    calcVsPaidKrw: calcPaid.reduce((s, r) => s + (r.calcVsPaidKrw ?? 0), 0),
     excludedCount: billed.length - cmp.length,
   }
 }
@@ -549,19 +546,14 @@ function build(args: {
 }
 
 function summarize(rows: CompareRow[], today: string): CompareSummary {
-  // 구방식 정산은 재계산과 비교할 수 없어 「덜/더 청구」 집계에서 뺀다.
-  // 넣으면 2·6·7차의 부가세 구조 차이가 3,400만원짜리 청구 오류처럼 보인다.
-  const cmp = rows.filter((r) => !r.legacyVatMode && r.billVsCalcKrw != null)
-  const under = cmp.filter((r) => r.billVsCalcKrw! < -PAID_TOLERANCE_KRW)
-  const over = cmp.filter((r) => r.billVsCalcKrw! > PAID_TOLERANCE_KRW)
   const billed = rows.filter((r) => r.invoicedKrw != null)
 
   // 기일이 없는 행은 「지났다」고 말할 근거가 없다 — 경과로 세지 않는다.
   const overdue = billed.filter((r) => r.dueDate != null && r.dueDate <= today)
-  const overdueTotals = aggregate(overdue)
+  const overdueTotals = aggregate(overdue, today)
 
   return {
-    ...aggregate(rows),
+    ...aggregate(rows, today),
     overdueBalanceKrw: overdueTotals.balanceKrw,
     overdueCalcVsPaidKrw: overdueTotals.calcVsPaidKrw,
     // 「기일 지난 N건」은 **아직 남은** 건수여야 한다. 기일이 지나고 완납된 차수까지 세면
@@ -573,10 +565,6 @@ function summarize(rows: CompareRow[], today: string): CompareSummary {
     plannedCalcKrw: rows
       .filter((r) => r.invoicedKrw == null)
       .reduce((s, r) => s + (r.calcKrw ?? 0), 0),
-    underBilledCount: under.length,
-    underBilledKrw: -under.reduce((s, r) => s + r.billVsCalcKrw!, 0),
-    overBilledCount: over.length,
-    overBilledKrw: over.reduce((s, r) => s + r.billVsCalcKrw!, 0),
     unbilledCount: rows.length - billed.length,
     billedCount: billed.length,
     legacyCount: rows.filter((r) => r.legacyVatMode).length,
