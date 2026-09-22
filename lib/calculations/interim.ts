@@ -121,3 +121,33 @@ export function costItemVat(item: CostItem): number {
   if (item.isVatTaxable) return computeVat(item.amountKrw)
   return item.vatAmountKrw ?? 0
 }
+
+/**
+ * 비용 그룹 하나의 소계 조각. 공급가 산식은 건드리지 않는다 — 공급가는 `calculateInterim` 만 낸다.
+ *
+ * 담당자 2026-09-22: 통관 그룹은 서류 총액과 맞춰 보도록 국내발생비용(통관보수료·검역수수료·정밀검역비)
+ * 부가세를 더한 「소계 (vat 포함)」로 보이고, 계산 결과에서 그 부가세를 수입부가세와 함께 뺀다.
+ * 더했다 빼므로 공급가는 그대로다 — `interim.test.ts` 가 못 박는다.
+ */
+export interface GroupSubtotal {
+  /** 입력 금액 합 — 공급가 항목 + 수입부가세 + 관세 */
+  amountKrw: number
+  /** 과세 항목에 붙은 부가세 합 (`costItemVat`) */
+  itemVatKrw: number
+  importVatKrw: number
+  dutyKrw: number
+  /** amountKrw + itemVatKrw */
+  withVatKrw: number
+}
+
+export function groupSubtotal(items: CostItem[]): GroupSubtotal {
+  const amountKrw = items.reduce((s, i) => s + i.amountKrw, 0)
+  const itemVatKrw = items.reduce((s, i) => s + costItemVat(i), 0)
+  return {
+    amountKrw,
+    itemVatKrw,
+    importVatKrw: items.reduce((s, i) => s + (i.isImportVat ? i.amountKrw : 0), 0),
+    dutyKrw: items.reduce((s, i) => s + (i.isDuty ? i.amountKrw : 0), 0),
+    withVatKrw: amountKrw + itemVatKrw,
+  }
+}

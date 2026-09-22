@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { type RoundingPolicy, type InterimCalculation } from '@/lib/calculations/interim'
+import { type RoundingPolicy, type InterimCalculation, type GroupSubtotal } from '@/lib/calculations/interim'
 import { formatKrw, formatNumberForInput, parseNumberInput } from '@/lib/utils/format'
 import { OverrideMismatchNotice } from './OverrideMismatchNotice'
 
@@ -28,16 +28,19 @@ interface Props {
   confirmedVat: number
   confirmedTotal: number
   isLocked: boolean
-  shippingSubtotal: number
-  customsSubtotal: number
+  shipping: GroupSubtotal
+  customs: GroupSubtotal
 }
 
 export function InterimResultsCard({
   calc, systemSupply, roundingPolicy, onRoundingChange,
   supplyAmount, onSupplyChange, confirmedVat, confirmedTotal, isLocked,
-  shippingSubtotal, customsSubtotal,
+  shipping, customs,
 }: Props) {
   const exclusive = calc?.vatMode !== 'inclusive'
+  // 통관 소계에 더해 보인 국내발생비용 부가세를 수입부가세와 한 줄로 뺀다 (담당자 2026-09-22).
+  // 더했다 빼므로 공급가는 calculateInterim 그대로다 — interim.test.ts
+  const deductVat = calc ? calc.importVatKrw + customs.itemVatKrw : 0
 
   return (
     <Card>
@@ -46,13 +49,22 @@ export function InterimResultsCard({
         {calc && (
           <div className="space-y-1 text-sm">
             <Row label="수입원가 (마진포함)" value={formatKrw(calc.importAmountKrw)} />
-            <Row label="해상운임 소계" value={formatKrw(shippingSubtotal)} />
-            <Row label="통관 소계" value={formatKrw(customsSubtotal)} />
-            {exclusive && calc.importVatKrw > 0 && (
-              <Row label="수입부가세 (매입세액공제 — 청구 제외)" value={`− ${formatKrw(calc.importVatKrw)}`} muted />
-            )}
-            {exclusive && calc.dutyKrw !== 0 && (
-              <Row label="관세 (공급가 제외 — 합계에 가산)" value={`− ${formatKrw(calc.dutyKrw)}`} muted />
+            {exclusive ? (
+              <>
+                <Row label="해상운임 소계 (vat 제외)" value={formatKrw(shipping.amountKrw)} />
+                <Row label="통관 소계 (vat 포함)" value={formatKrw(customs.withVatKrw)} />
+                {deductVat > 0 && (
+                  <Row label="부가세 (수입부가세 + 국내발생비용 부가세)" value={`− ${formatKrw(deductVat)}`} muted />
+                )}
+                {calc.dutyKrw !== 0 && (
+                  <Row label="관세" value={`− ${formatKrw(calc.dutyKrw)}`} muted />
+                )}
+              </>
+            ) : (
+              <>
+                <Row label="해상운임 소계" value={formatKrw(shipping.amountKrw)} />
+                <Row label="통관 소계" value={formatKrw(customs.amountKrw)} />
+              </>
             )}
             <Separator />
             <Row label={exclusive ? '공급가' : '청구액'} value={formatKrw(calc.supplyAmountKrw)} bold />

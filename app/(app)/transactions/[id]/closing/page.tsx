@@ -20,6 +20,7 @@ import {
 } from '@/components/settlements/ClosingDetailCards'
 import { UnlockButton } from '@/components/settlements/UnlockButton'
 import { DeleteSettlementButton } from '@/components/settlements/DeleteSettlementButton'
+import { SettlementIdentity } from '@/components/settlements/SettlementIdentity'
 import type { FeeRow } from '@/components/settlements/lcFeeDefaults'
 
 export default function ClosingSettlementPage() {
@@ -106,8 +107,11 @@ export default function ClosingSettlementPage() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>클로징정산</h2>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>클로징정산</h2>
+          <SettlementIdentity transactionId={id} />
+        </div>
         <div className="flex items-center gap-2">
           {isLocked && <span className="text-muted-foreground">확정 · 잠금</span>}
           {isLocked && settlementId && (

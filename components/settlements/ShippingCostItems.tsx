@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plus, Trash2 } from 'lucide-react'
-import { computeVat, type VatMode } from '@/lib/calculations/interim'
+import { computeVat, groupSubtotal, type VatMode } from '@/lib/calculations/interim'
+import { toCostItem } from '@/lib/utils/costRows'
 import { formatNumberForInput, parseNumberInput } from '@/lib/utils/format'
 
 export type { CostRow } from '@/types/settlement'
@@ -29,10 +30,13 @@ interface Props {
   rows: CostRow[]
   onChange: (rows: CostRow[]) => void
   isLocked: boolean
-  hint?: string
+  hint?: React.ReactNode
   /** exclusive 면 행별 부가세 칸 대신 수입부가세 표시를 쓴다 (부가세는 공급가 전액 10%) */
   vatMode?: VatMode
-  /** 수입부가세 체크를 노출할지 — 통관 그룹에서만 의미가 있다 */
+  /**
+   * 통관 그룹인가. 부가세 · 수입부가세 · 관세 세 체크를 노출하고 소계를 vat 포함으로 보인다
+   * (담당자 2026-09-22 — 통관서류 총액과 바로 맞춰 보도록).
+   */
   allowImportVat?: boolean
 }
 
@@ -49,22 +53,22 @@ export function CostItemsGroup({
         next.vat_amount_krw = String(computeVat(parseFloat(String(value)) || 0))
       if (field === 'is_vat_taxable')
         next.vat_amount_krw = value ? String(computeVat(parseFloat(r.amount_krw) || 0)) : '0'
-      // 수입부가세와 관세는 같은 행일 수 없다 — 둘 다 서면 공급가에서 두 번 빠진다.
-      if (field === 'is_import_vat' && value) next.is_duty = false
-      if (field === 'is_duty' && value) next.is_import_vat = false
+      // 셋은 한 행에 하나만 선다 — 수입부가세·관세가 겹치면 공급가에서 두 번 빠지고,
+      // 세금 행(수입부가세·관세)에는 부가세가 다시 붙지 않는다.
+      if (field === 'is_import_vat' && value) { next.is_duty = false; next.is_vat_taxable = false; next.vat_amount_krw = '0' }
+      if (field === 'is_duty' && value) { next.is_import_vat = false; next.is_vat_taxable = false; next.vat_amount_krw = '0' }
+      if (field === 'is_vat_taxable' && value) { next.is_import_vat = false; next.is_duty = false }
       return next
     }))
   }
 
-  const subtotal = rows.reduce((s, r) => s + (parseFloat(r.amount_krw) || 0), 0)
-  const importVatTotal = rows.reduce((s, r) => s + (r.is_import_vat ? (parseFloat(r.amount_krw) || 0) : 0), 0)
-  const dutyTotal = rows.reduce((s, r) => s + (r.is_duty ? (parseFloat(r.amount_krw) || 0) : 0), 0)
-  const vatTotal = rows.reduce((s, r) =>
-    s + (r.is_vat_taxable ? computeVat(parseFloat(r.amount_krw) || 0) : (parseFloat(r.vat_amount_krw) || 0)), 0)
+  const sub = groupSubtotal(rows.map(toCostItem))
+  // 통관 그룹(신방식)은 국내발생비용 부가세를 더한 vat 포함 소계, 운임 그룹은 vat 제외 소계다.
+  const customs = exclusive && allowImportVat
 
-  // 항목명 / 금액 / (수입부가세·관세 체크 또는 부가세 칸) / 삭제.
+  // 항목명 / 금액 / (부가세·수입부가세·관세 체크 또는 부가세 칸) / 삭제.
   // Tailwind 는 문자열 조합 클래스를 생성하지 않으므로 완성된 클래스명을 골라 쓴다.
-  const nameCls = exclusive ? (allowImportVat ? 'col-span-4' : 'col-span-7') : 'col-span-4'
+  const nameCls = exclusive ? (allowImportVat ? 'col-span-3' : 'col-span-7') : 'col-span-4'
   const amountCls = exclusive ? (allowImportVat ? 'col-span-3' : 'col-span-4') : 'col-span-3'
 
   return (
@@ -78,14 +82,15 @@ export function CostItemsGroup({
         )}
       </CardHeader>
       <CardContent>
-        {hint && <p className="text-sm text-slate-600 mb-2">{hint}</p>}
+        {hint && <div className="text-sm text-slate-600 mb-2">{hint}</div>}
         <div className="grid grid-cols-12 gap-2 text-sm text-muted-foreground px-1 pb-1">
           <span className={nameCls}>항목명</span>
           <span className={amountCls}>금액(원)</span>
           {exclusive
             ? allowImportVat && <>
+                <span className="col-span-2 text-center">부가세</span>
                 <span className="col-span-2 text-center">수입부가세</span>
-                <span className="col-span-2 text-center">관세</span>
+                <span className="col-span-1 text-center">관세</span>
               </>
             : <>
                 <span className="col-span-2 text-center">부가세</span>
@@ -104,12 +109,18 @@ export function CostItemsGroup({
               allowImportVat && (
                 <>
                   <div className="col-span-2 flex justify-center">
+                    <input type="checkbox" checked={r.is_vat_taxable}
+                      onChange={(e) => upd(i, 'is_vat_taxable', e.target.checked)}
+                      disabled={isLocked} className="h-4 w-4"
+                      aria-label={`${r.item_name || '항목'} 부가세 과세`} />
+                  </div>
+                  <div className="col-span-2 flex justify-center">
                     <input type="checkbox" checked={r.is_import_vat}
                       onChange={(e) => upd(i, 'is_import_vat', e.target.checked)}
                       disabled={isLocked} className="h-4 w-4"
                       aria-label={`${r.item_name || '항목'} 수입부가세`} />
                   </div>
-                  <div className="col-span-2 flex justify-center">
+                  <div className="col-span-1 flex justify-center">
                     <input type="checkbox" checked={r.is_duty}
                       onChange={(e) => upd(i, 'is_duty', e.target.checked)}
                       disabled={isLocked} className="h-4 w-4"
@@ -137,19 +148,22 @@ export function CostItemsGroup({
             )}
           </div>
         ))}
-        <div className="flex justify-between pt-2 text-sm font-semibold border-t mt-1">
-          <span>소계</span>
-          <span className="tabular-nums">
-            {subtotal.toLocaleString('ko-KR')}원
-            {exclusive
-              ? (importVatTotal > 0 || dutyTotal > 0) && (
-                  <span className="ml-1 font-normal text-muted-foreground">
-                    (공급가에서 제외
-                    {importVatTotal > 0 && ` · 수입부가세 ${importVatTotal.toLocaleString('ko-KR')}원`}
-                    {dutyTotal > 0 && ` · 관세 ${dutyTotal.toLocaleString('ko-KR')}원 — 부가세를 매긴 뒤 합계에 더한다`})
+        <div className="flex justify-between gap-3 pt-2 text-sm font-semibold border-t mt-1">
+          <span className="shrink-0">
+            {!exclusive ? '소계' : customs ? '소계 (vat 포함)' : '소계 (vat 제외)'}
+          </span>
+          <span className="tabular-nums text-right">
+            {(customs ? sub.withVatKrw : sub.amountKrw).toLocaleString('ko-KR')}원
+            {customs
+              ? (sub.itemVatKrw > 0 || sub.importVatKrw > 0 || sub.dutyKrw > 0) && (
+                  <span className="block font-normal text-muted-foreground">
+                    공급가에서 제외
+                    {sub.itemVatKrw > 0 && ` · 국내발생비용 부가세 ${sub.itemVatKrw.toLocaleString('ko-KR')}원`}
+                    {sub.importVatKrw > 0 && ` · 수입부가세 ${sub.importVatKrw.toLocaleString('ko-KR')}원`}
+                    {sub.dutyKrw > 0 && ` · 관세 ${sub.dutyKrw.toLocaleString('ko-KR')}원 — 부가세를 매긴 뒤 합계에 더한다`}
                   </span>
                 )
-              : ` (VAT ${vatTotal.toLocaleString('ko-KR')}원)`}
+              : !exclusive && ` (VAT ${sub.itemVatKrw.toLocaleString('ko-KR')}원)`}
           </span>
         </div>
       </CardContent>

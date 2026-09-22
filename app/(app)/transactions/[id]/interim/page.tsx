@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { loadInterimForm, saveInterimSettlement, type InterimTx } from '@/lib/settlements/interimIo'
-import { calculateInterim, computeVat, type RoundingPolicy, type CostItem, type VatMode } from '@/lib/calculations/interim'
+import { calculateInterim, computeVat, groupSubtotal, type RoundingPolicy, type VatMode } from '@/lib/calculations/interim'
+import { toCostItem } from '@/lib/utils/costRows'
 import { formatKrw, formatUsd } from '@/lib/utils/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,7 @@ import { InterimResultsCard } from '@/components/settlements/InterimResultsCard'
 import { MemoField } from '@/components/ui/MemoField'
 import { UnlockButton } from '@/components/settlements/UnlockButton'
 import { DeleteSettlementButton } from '@/components/settlements/DeleteSettlementButton'
+import { SettlementIdentity } from '@/components/settlements/SettlementIdentity'
 
 export default function InterimSettlementPage() {
   const { id } = useParams<{ id: string }>()
@@ -55,13 +57,7 @@ export default function InterimSettlementPage() {
     })
   }, [supabase, id])
 
-  const costItems: CostItem[] = [...shippingRows, ...customsRows].map((r) => ({
-    amountKrw: parseFloat(r.amount_krw) || 0,
-    isImportVat: r.is_import_vat,
-    isDuty: r.is_duty,
-    isVatTaxable: r.is_vat_taxable,
-    vatAmountKrw: parseFloat(r.vat_amount_krw) || 0,
-  }))
+  const costItems = [...shippingRows, ...customsRows].map(toCostItem)
 
   const calc = tx?.import_amount_usd && customsRate
     ? calculateInterim({
@@ -107,15 +103,18 @@ export default function InterimSettlementPage() {
     }
   }
 
-  const shippingSubtotal = shippingRows.reduce((s, r) => s + (parseFloat(r.amount_krw) || 0), 0)
-  const customsSubtotal = customsRows.reduce((s, r) => s + (parseFloat(r.amount_krw) || 0), 0)
+  const shippingSubtotal = groupSubtotal(shippingRows.map(toCostItem))
+  const customsSubtotal = groupSubtotal(customsRows.map(toCostItem))
 
   if (!tx) return <p className="p-6 text-muted-foreground">로딩 중...</p>
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>중간정산</h2>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold" style={{ color: '#1B5E20' }}>중간정산</h2>
+          <SettlementIdentity transactionId={id} />
+        </div>
         <div className="flex items-center gap-2">
           {isLocked && <span className="text-muted-foreground">확정 · 잠금</span>}
           {isLocked && sid && <UnlockButton table="interim_settlements" settlementId={sid} onUnlocked={() => setIsLocked(false)} />}
@@ -152,7 +151,7 @@ export default function InterimSettlementPage() {
         onRoundingChange={setRoundingPolicy} supplyAmount={supply}
         onSupplyChange={setSupplyOverride} isLocked={isLocked}
         confirmedVat={confirmedVat} confirmedTotal={confirmedTotal}
-        shippingSubtotal={shippingSubtotal} customsSubtotal={customsSubtotal}
+        shipping={shippingSubtotal} customs={customsSubtotal}
       />
       {sid && (
         <Card>

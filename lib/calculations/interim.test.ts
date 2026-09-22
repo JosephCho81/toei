@@ -1,7 +1,7 @@
 // 실행: node --test lib/calculations/interim.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { calculateInterim, applyRounding, computeVat, costItemVat, type CostItem } from './interim.ts'
+import { calculateInterim, applyRounding, computeVat, costItemVat, groupSubtotal, type CostItem } from './interim.ts'
 
 // 17차 실데이터: $에 마진 5%, 통관환율 적용한 수입원가 81,377,727
 //   해상운임 2,108,685 / 통관비 8,721,480 (그중 수입부가세 7,822,780)
@@ -154,4 +154,42 @@ test('구방식(inclusive)은 항목 부가세에 영향받지 않는다', () =>
     roundingPolicy: 'none', vatMode: 'inclusive',
   })
   assert.equal(c.confirmedKrw, 200000)
+})
+
+/**
+ * 담당자 2026-09-22 계산 결과 재배열:
+ *   통관 소계(vat 포함) − 부가세(수입부가세 + 국내발생비용 부가세) − 관세 로 보여도
+ *   공급가는 종전과 한 푼도 달라지면 안 된다.
+ */
+test('통관 소계를 vat 포함으로 보여도 공급가는 그대로다', () => {
+  const shipping: CostItem[] = [
+    { amountKrw: 2108685 },
+    { amountKrw: 330000, isVatTaxable: true }, // 포워더 과세 항목 — 해상운임 소계는 vat 제외
+  ]
+  const customs: CostItem[] = [
+    { amountKrw: 1200000, isDuty: true },
+    { amountKrw: 7822780, isImportVat: true },
+    { amountKrw: 55000, isVatTaxable: true },  // 통관보수료
+    { amountKrw: 30000, isVatTaxable: true },  // 검역수수료
+    { amountKrw: 43210, isVatTaxable: true },  // 정밀검역비
+    { amountKrw: 120000 },                     // 보관료
+  ]
+  const c = calculateInterim({ ...R17, costItems: [...shipping, ...customs], roundingPolicy: 'none', vatMode: 'exclusive' })
+  const s = groupSubtotal(shipping)
+  const k = groupSubtotal(customs)
+
+  assert.equal(k.itemVatKrw, 5500 + 3000 + 4321)
+  assert.equal(k.withVatKrw, k.amountKrw + 12821)
+
+  const shown = c.importAmountKrw + s.amountKrw + k.withVatKrw
+    - (c.importVatKrw + k.itemVatKrw) - c.dutyKrw
+  assert.equal(Math.round(shown), c.supplyAmountKrw)
+})
+
+test('과세 체크가 없는 통관 그룹은 vat 포함 소계가 금액 합과 같다', () => {
+  const k = groupSubtotal([{ amountKrw: 7822780, isImportVat: true }, { amountKrw: 1200000, isDuty: true }])
+  assert.equal(k.itemVatKrw, 0)
+  assert.equal(k.withVatKrw, 9022780)
+  assert.equal(k.importVatKrw, 7822780)
+  assert.equal(k.dutyKrw, 1200000)
 })
