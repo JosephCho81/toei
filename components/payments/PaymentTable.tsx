@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react'
 import { PaymentDialog, type PaymentDraft } from './PaymentDialog'
 import { MemoField } from '@/components/ui/MemoField'
+import { NoteCell } from '@/components/ui/NoteCell'
 import { TABLE, TABLE_WRAP, TH, TD, THEAD_ROW, CENTER, NUM } from '@/components/ui/table-style'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -33,9 +34,8 @@ import {
  * 글자는 크기 하나(text-sm)·서체 하나(본문 sans)다. 위계는 굵기와 색으로 낸다.
  * 금액 자릿수는 등폭 서체가 아니라 tabular-nums 로 맞춘다.
  *
- * **비고는 표에 펼쳐 둔다** (담당자 2026-09-07: 「지급 현황 페이지에 메모 입력하는 게 안 보인다」).
- * 아이콘만 두면 메모가 있는 줄인지도 모르고 지나간다 — 첫 줄을 그대로 띄우고,
- * 빈 줄에는 「+ 메모」를 남겨 어디를 눌러야 적을 수 있는지 보이게 한다.
+ * **비고는 있다는 것만 「✓ 비고」로 보이고 누르면 펼친다** (담당자 2026-09-22 — 첫 줄을 띄우던 09-07 방식은
+ * 길어서 읽히지 않았다). 빈 줄에는 「+ 비고」를 남겨 어디를 눌러야 적을 수 있는지 보이게 한다.
  * 적는 곳은 정산 비교 화면과 같은 자리(interim_settlements.notes)다 —
  * 두 화면이 다른 곳에 적으면 한 차수에 사유가 둘 생긴다.
  */
@@ -508,26 +508,5 @@ function RoundDetail({
         </Link>
       </p>
     </div>
-  )
-}
-
-/**
- * 표에 보이는 비고 한 칸.
- * 메모는 여러 줄이지만 표에는 첫 줄만 세우고 나머지는 개수로 말한다 —
- * 줄 높이를 메모가 정하게 두면 44줄짜리 표가 들쭉날쭉해진다.
- * 빈 칸에 「+ 메모」를 남겨 두는 이유는, 아이콘만 있으면 적을 수 있는 줄인 줄도 모르기 때문이다.
- */
-function NoteCell({ note }: { note: string | null }) {
-  const lines = note ? note.split('\n').filter((l) => l.trim() !== '') : []
-  if (lines.length === 0) {
-    return <span className="text-muted-foreground">+ 비고</span>
-  }
-  return (
-    <span className="block truncate text-slate-700" title={lines.join('\n')}>
-      {lines[0]}
-      {lines.length > 1 && (
-        <span className="text-muted-foreground"> 외 {lines.length - 1}건</span>
-      )}
-    </span>
   )
 }

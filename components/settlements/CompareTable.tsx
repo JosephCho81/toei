@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MemoField } from '@/components/ui/MemoField'
+import { NoteCell } from '@/components/ui/NoteCell'
 import { PAID_TOLERANCE_KRW, calcPaidPhase, type CalcPaidPhase } from '@/lib/data/payments'
 import { aggregate, type CompareRow, type CompareTotals, type SettlementKind } from '@/lib/data/settlementCompare'
 
@@ -754,24 +755,5 @@ function Line({ label, value, note }: { label: string; value: number | null; not
       </td>
       <td className="py-1.5 text-muted-foreground">{note}</td>
     </tr>
-  )
-}
-
-/**
- * 표에 보이는 비고 한 칸. 지급 현황의 것과 같은 규칙이다 —
- * 첫 줄만 세우고 나머지는 개수로 말한다. 아이콘만 두면 메모가 있는지도 모르고 지나간다.
- */
-function NoteCell({ note }: { note: string | null }) {
-  const lines = note ? note.split('\n').filter((l) => l.trim() !== '') : []
-  if (lines.length === 0) {
-    return <span className="text-muted-foreground">+ 메모</span>
-  }
-  return (
-    <span className="block truncate text-slate-700" title={lines.join('\n')}>
-      {lines[0]}
-      {lines.length > 1 && (
-        <span className="text-muted-foreground"> 외 {lines.length - 1}건</span>
-      )}
-    </span>
   )
 }
