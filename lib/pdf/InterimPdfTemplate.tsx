@@ -47,7 +47,12 @@ const triCol = StyleSheet.create({
 export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
   const itemsTotal = data.costItems.reduce((sum, c) => sum + c.amountKrw, 0)
   const exclusive = data.vatMode !== 'inclusive'
-  const subTotal = data.importAmountKrw + itemsTotal
+  // 관세는 공급가 밖에서 합계에만 얹힌다 — 빠뜨리면 관세만큼이 「시스템 대비 차이」로 보인다
+  const dutyKrw = exclusive ? data.costItems.reduce((sum, c) => sum + (c.isDuty ? c.amountKrw : 0), 0) : 0
+  // 신방식 표는 공급가·부가세·관세로 끝나므로 맨 아래는 그 셋의 합계다 (화면 「합계」와 같다)
+  const subTotal = exclusive
+    ? data.supplyAmountKrw + data.outputVatKrw + dutyKrw
+    : data.importAmountKrw + itemsTotal
 
   const direction = data.confirmedAmountKrw >= 0
     ? '한국에이원 → 토에이산교 지급'
@@ -67,17 +72,14 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
     outputVatKrw: data.outputVatKrw,
   })
 
-  const systemSubTotal = exclusive
-    ? data.supplyAmountKrw + data.outputVatKrw
-    : data.importAmountKrw + itemsTotal
-  const confirmedDiff = data.confirmedAmountKrw - systemSubTotal
+  const confirmedDiff = data.confirmedAmountKrw - subTotal
 
   return (
     <Document>
       <Page size="A4" style={s.page}>
         <PdfHeader title="LC 거래 중간정산 내역" />
 
-        <Text style={s.disclaimer}>{exclusive ? '※ 공급가는 부가세 별도이며, 합계 = 공급가 + 부가세(10%) 입니다. 통관 시 납부한 수입부가세는 청구 대상이 아닙니다.' : '※ 모든 금액은 부가세 별도 기준입니다.'}</Text>
+        <Text style={s.disclaimer}>{exclusive ? '※ 공급가는 부가세 별도이며, 합계 = 공급가 + 부가세(10%)(+ 관세) 입니다. 수입부가세와 국내발생비용 부가세는 공급가에서 제외합니다.' : '※ 모든 금액은 부가세 별도 기준입니다.'}</Text>
 
         <Text style={s.sectionLabel}>섹션 1 — 거래 기본 정보</Text>
         <View style={s.table}>
@@ -110,7 +112,7 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
             )
           })}
           <View style={triCol.subtotalRow}>
-            <Text style={[triCol.cellItem, { color: GREEN, fontWeight: 700 }]}>소계</Text>
+            <Text style={[triCol.cellItem, { color: GREEN, fontWeight: 700 }]}>{exclusive ? '합계' : '소계'}</Text>
             <Text style={triCol.cellFormula} />
             <Text style={[triCol.cellAmount, { color: GREEN, fontWeight: 700 }]}>{subTotal.toLocaleString('ko-KR')}원</Text>
           </View>
@@ -149,8 +151,8 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
         {/* 시스템 계산 vs 확정 비교 */}
         <View style={{ borderWidth: 1, borderColor: BORDER, marginBottom: 8 }}>
           <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, minHeight: 22, alignItems: 'center', backgroundColor: GRAY_BG }}>
-            <Text style={{ flex: 1, paddingLeft: 10, fontSize: 8.5, color: MUTED }}>소계 (시스템 계산)</Text>
-            <Text style={{ width: '40%', textAlign: 'right', paddingRight: 10, fontSize: 8.5 }}>{systemSubTotal.toLocaleString('ko-KR')}원</Text>
+            <Text style={{ flex: 1, paddingLeft: 10, fontSize: 8.5, color: MUTED }}>{exclusive ? '합계' : '소계'} (시스템 계산)</Text>
+            <Text style={{ width: '40%', textAlign: 'right', paddingRight: 10, fontSize: 8.5 }}>{subTotal.toLocaleString('ko-KR')}원</Text>
           </View>
           <View style={{ flexDirection: 'row', minHeight: 22, alignItems: 'center', backgroundColor: '#E8F5E9' }}>
             <View style={{ flex: 1, paddingLeft: 10, paddingTop: 3, paddingBottom: 3 }}>

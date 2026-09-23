@@ -17,6 +17,13 @@ export function interimSummary(data: InterimCostData) {
     amountKrw: r.amount_krw, isImportVat: r.is_import_vat, isDuty: r.is_duty,
     isVatTaxable: r.is_vat_taxable, vatAmountKrw: r.vat_amount_krw,
   }), 0)
+  // 화면과 같이 통관 그룹 부가세만 소계(vat 포함)에 더했다가 수입부가세와 한 줄로 뺀다 (담당자 2026-09-22)
+  const customsItemVatKrw = exclusive ? data.customsItems.reduce((s, r) => s + costItemVat({
+    amountKrw: r.amount_krw, isImportVat: r.is_import_vat, isDuty: r.is_duty,
+    isVatTaxable: r.is_vat_taxable, vatAmountKrw: r.vat_amount_krw,
+  }), 0) : 0
+  const customsWithVatKrw = customsTotal + customsItemVatKrw
+  const deductVatKrw = importVatKrw + customsItemVatKrw
   // 관세는 공급가 밖에서 합계에만 얹힌다. 구방식(inclusive)은 종전대로 전부 합산한다.
   const dutyKrw = exclusive ? allItems.reduce((s, r) => s + (r.is_duty ? r.amount_krw : 0), 0) : 0
 
@@ -45,13 +52,13 @@ export function interimSummary(data: InterimCostData) {
   const vatFormula = vatItems.map((i) => i.vat_amount_krw.toLocaleString('ko-KR')).join(' + ')
 
   const supplyParts = [
-    `수입금액 ${data.importAmountKrw.toLocaleString('ko-KR')}`,
+    `수입원가 ${data.importAmountKrw.toLocaleString('ko-KR')}`,
     ...(shippingTotal !== 0 ? [`해상운임 ${shippingTotal.toLocaleString('ko-KR')}`] : []),
-    ...(customsTotal !== 0 ? [`통관비용 ${customsTotal.toLocaleString('ko-KR')}`] : []),
+    ...(customsWithVatKrw !== 0 ? [`통관(vat 포함) ${customsWithVatKrw.toLocaleString('ko-KR')}`] : []),
   ].join(' + ')
   const supplyFormula = [
     supplyParts,
-    ...(importVatKrw !== 0 ? [`− 수입부가세 ${importVatKrw.toLocaleString('ko-KR')}`] : []),
+    ...(deductVatKrw !== 0 ? [`− 부가세 ${deductVatKrw.toLocaleString('ko-KR')}`] : []),
     ...(dutyKrw !== 0 ? [`− 관세 ${dutyKrw.toLocaleString('ko-KR')}`] : []),
   ].join(' ')
 
@@ -66,7 +73,8 @@ export function interimSummary(data: InterimCostData) {
       ].join(' + ')
 
   return {
-    exclusive, shippingTotal, customsTotal, importVatKrw, itemVatKrw, dutyKrw,
+    exclusive, shippingTotal, customsTotal, customsWithVatKrw, customsItemVatKrw, deductVatKrw,
+    importVatKrw, itemVatKrw, dutyKrw,
     supplyKrw, outputVatKrw, subTotal, showConfirmed, confirmedDiff, diffIsRounding,
     importFormula, vatFormula, supplyFormula, subTotalFormula,
   }
