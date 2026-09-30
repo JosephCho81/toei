@@ -39,7 +39,7 @@ export const KIND_LABEL: Record<SettlementKind, string> = {
 /** 메모를 어디에 쓰는가. 구분마다 테이블도 컬럼명도 다르다. */
 export interface NoteTarget {
   table: 'interim_settlements' | 'closing_settlements' | 'settlement_penalties'
-  column: 'notes' | 'note'
+  column: 'notes' | 'note' | 'calc_diff_note'
   id: string
 }
 
@@ -85,9 +85,16 @@ export interface CompareRow {
 
   /** 구방식(inclusive) 정산 — 재계산과 직접 비교할 수 없다 */
   legacyVatMode: boolean
-  /** 차이가 왜 났는지 담당자가 적어 두는 자리 */
+  /** 금액 차이 사유 — 청구·지급이 어긋난 이유를 담당자가 적는다 */
   note: string | null
   noteTarget: NoteTarget | null
+  /**
+   * 계산금액 차이 사유 — 청구금액이 시스템 계산과 어긋난 이유.
+   * 금액 차이 사유와 한 칸에 섞으면 어디서 틀렸는지가 다시 흐려진다 (담당자 2026-09-30).
+   * 지체상금은 계산값이 없어 null.
+   */
+  calcNote: string | null
+  calcNoteTarget: NoteTarget | null
   /**
    * 청구액을 적어 넣을 자리. 담당자 2026-09-10:
    * 「기본적으로 계산하여 검산 후 청구하나 계산서 발행에서 10단위 자리가 달라질 수 있음.
@@ -315,7 +322,7 @@ async function interimRows(
     .from('interim_settlements')
     .select(
       'id, transaction_id, invoiced_amount_krw, confirmed_amount_krw, customs_exchange_rate,'
-      + ' rounding_policy, vat_mode, notes,'
+      + ' rounding_policy, vat_mode, notes, calc_diff_note,'
       + ' interim_cost_items(amount_krw, is_import_vat, is_duty, is_vat_taxable, vat_amount_krw)',
     )
   const data = orThrow(res, '중간정산')
@@ -329,6 +336,7 @@ async function interimRows(
     rounding_policy: string | null
     vat_mode: string | null
     notes: string | null
+    calc_diff_note: string | null
     interim_cost_items: {
       amount_krw: number | string | null; is_import_vat: boolean | null
       is_duty: boolean | null; is_vat_taxable: boolean | null; vat_amount_krw: number | string | null
@@ -368,6 +376,8 @@ async function interimRows(
       legacyVatMode: isLegacy(r.vat_mode),
       note: r.notes,
       noteTarget: { table: 'interim_settlements', column: 'notes', id: r.id },
+      calcNote: r.calc_diff_note,
+      calcNoteTarget: { table: 'interim_settlements', column: 'calc_diff_note', id: r.id },
     })]
   })
 }
@@ -382,7 +392,7 @@ async function closingRows(
     .from('closing_settlements')
     .select(
       'id, transaction_id, invoiced_amount_krw, confirmed_amount_krw, lc_payment_total_krw,'
-      + ' fx_burden_a1_pct, rounding_policy, vat_mode, notes,'
+      + ' fx_burden_a1_pct, rounding_policy, vat_mode, notes, calc_diff_note,'
       + ' lc_fee_items(amount_krw), closing_cost_items(amount_krw)',
     )
   const data = orThrow(res, '최종정산')
@@ -397,6 +407,7 @@ async function closingRows(
     rounding_policy: string | null
     vat_mode: string | null
     notes: string | null
+    calc_diff_note: string | null
     lc_fee_items: { amount_krw: number | string | null }[] | null
     closing_cost_items: { amount_krw: number | string | null }[] | null
   }
@@ -444,6 +455,8 @@ async function closingRows(
       legacyVatMode: isLegacy(r.vat_mode),
       note: r.notes,
       noteTarget: { table: 'closing_settlements', column: 'notes', id: r.id },
+      calcNote: r.calc_diff_note,
+      calcNoteTarget: { table: 'closing_settlements', column: 'calc_diff_note', id: r.id },
     })]
   })
 }
@@ -488,6 +501,8 @@ async function penaltyRows(
         legacyVatMode: false,
         note: r.note,
         noteTarget: { table: 'settlement_penalties', column: 'note', id: r.id },
+        calcNote: null,
+        calcNoteTarget: null,
       }),
       reason: r.reason,
       incurredOn: r.incurred_on,
@@ -506,6 +521,8 @@ function build(args: {
   legacyVatMode: boolean
   note: string | null
   noteTarget: NoteTarget | null
+  calcNote: string | null
+  calcNoteTarget: NoteTarget | null
 }): CompareRow {
   const nt = args.noteTarget
   const invoicedTarget =
@@ -541,6 +558,8 @@ function build(args: {
     legacyVatMode,
     note: args.note,
     noteTarget: args.noteTarget,
+    calcNote: args.calcNote,
+    calcNoteTarget: args.calcNoteTarget,
     invoicedTarget,
   }
 }

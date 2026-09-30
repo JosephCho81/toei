@@ -10,22 +10,22 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MemoField } from '@/components/ui/MemoField'
-import { NoteCell } from '@/components/ui/NoteCell'
+import { NoteCell, NoteRow } from '@/components/ui/NoteCell'
 import { PAID_TOLERANCE_KRW, calcPaidPhase, type CalcPaidPhase } from '@/lib/data/payments'
-import { aggregate, type CompareRow, type CompareTotals, type SettlementKind } from '@/lib/data/settlementCompare'
+import { aggregate, type CompareRow, type CompareTotals, type NoteTarget, type SettlementKind } from '@/lib/data/settlementCompare'
 
 /**
  * 청구값 · 계산값 · 지불값을 한 줄에 세운 표. 세 화면이 같은 것을 쓴다.
  *
  * 세 금액의 뜻이 다르다 —
- *   청구액   실제로 보낸 청구서 금액 (사실)
+ *   청구액   토에이 계산금액 — 정산파일 기준 (담당자 2026-09-30)
  *   계산값   지금 규약으로 다시 계산한 금액 (규약)
  *   지급액   통장에서 오간 금액 (사실)
  *
  * **그래서 차이는 셋이다.** 2026-09-05 담당자 양식(`_source_docs/양식 예시.xlsx`)까지
  * 반영해 셋을 다 세웠다:
  *
- *   계산 차이        청구−계산   청구서가 틀린 금액              (K열)
+ *   계산 차이        청구−계산   토에이 계산이 틀린 금액          (K열)
  *   청구-지급 차이   지급−청구   청구 기준으로 더/덜 나간 금액   (L열)
  *   계산-지급 차이   지급−계산   청구가 맞았다면 더/덜 나간 금액 (M열)
  *
@@ -42,7 +42,7 @@ import { aggregate, type CompareRow, type CompareTotals, type SettlementKind } f
  */
 
 import { TABLE, TABLE_WRAP, TH_TIGHT as TH, TD_TIGHT as TD, THEAD_ROW, CENTER, NUM } from '@/components/ui/table-style'
-const COLS = 11
+const COLS = 12
 
 type FilterKey = 'all' | 'billMismatch' | 'overdue' | 'open' | 'paid' | 'unbilled'
 
@@ -80,10 +80,11 @@ function dayGap(due: string, paidAt: string): number {
 }
 
 /**
- * 청구액 한 칸 — 담당자가 계산서를 확인하고 나서 적어 넣는다.
+ * 청구액 한 칸 — 토에이가 정산파일(엑셀)에서 계산한 금액을 보고 적어 넣는다 (담당자 2026-09-30).
+ * 계산서를 확인한 금액은 실지급액 쪽이다.
  *
- * 계산값을 그대로 굳히는 버튼을 두지 않는다. 청구액은 **계산 결과가 아니라
- * 실제로 보낸 청구서의 금액**이라, 계산값을 복사해 넣으면 둘의 차이가 영원히 0이 되어
+ * 시스템 계산값을 그대로 굳히는 버튼을 두지 않는다. 청구액은 **시스템 계산이 아니라
+ * 토에이 쪽 계산**이라, 시스템 계산값을 복사해 넣으면 둘의 차이가 영원히 0이 되어
  * 이 표가 답해야 할 질문 자체가 사라진다.
  */
 function InvoicedField({
@@ -119,7 +120,7 @@ function InvoicedField({
 
   return (
     <div className="max-w-2xl rounded-md border bg-white px-3 py-2">
-      <p className="mb-1 font-semibold">청구액 입력 — 계산서를 확인한 금액</p>
+      <p className="mb-1 font-semibold">청구액 입력 — 토에이 계산금액 (정산파일 기준)</p>
       <div className="flex flex-wrap items-center gap-2">
         <Input
           inputMode="numeric"
@@ -149,7 +150,7 @@ function InvoicedField({
       </div>
       {invalid && <p className="mt-1 text-red-700">숫자로 적어 주세요.</p>}
       <p className="mt-1 text-muted-foreground">
-        비우면 「청구 전」으로 돌아가고 남은 금액을 계산값으로 셉니다.
+        엑셀 정산파일에 나온 계산값을 보고 적습니다. 비우면 「청구 전」으로 돌아가고 남은 금액을 계산값으로 셉니다.
       </p>
     </div>
   )
@@ -168,6 +169,8 @@ export function CompareTable({
   const router = useRouter()
   const [filter, setFilter] = useState<FilterKey>('all')
   const [open, setOpen] = useState<Set<string>>(new Set())
+  /** 펼친 비고 — `${rowKey}:amount` / `${rowKey}:calc`. 행 상세 펼침과는 따로 연다 */
+  const [noteOpen, setNoteOpen] = useState<Set<string>>(new Set())
   const [picked, setPicked] = useState<Set<string>>(new Set())
 
   const FILTERS: { key: FilterKey; label: string; test: (r: CompareRow) => boolean }[] = useMemo(() => [
@@ -223,6 +226,15 @@ export function CompareTable({
   const pickedRows = useMemo(() => visible.filter((r) => picked.has(rowKey(r))), [visible, picked])
   const allPicked = visible.length > 0 && pickedRows.length === visible.length
 
+  function toggleNote(key: string) {
+    setNoteOpen((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
   function toggle(id: string) {
     setOpen((prev) => {
       const next = new Set(prev)
@@ -243,7 +255,7 @@ export function CompareTable({
 
   /**
    * 청구액을 적어 넣는다. **계산값은 저장하지 않는다** — 저장하는 순간
-   * 규약이 바뀌어도 화면이 옛 규약을 말한다. 사람이 넣는 것은 청구서에 적힌 사실뿐이다.
+   * 규약이 바뀌어도 화면이 옛 규약을 말한다. 사람이 넣는 것은 토에이 정산파일에 적힌 값뿐이다.
    */
   async function saveInvoiced(row: CompareRow, amount: number | null) {
     if (!row.invoicedTarget) throw new Error('청구액을 저장할 곳이 없습니다')
@@ -256,13 +268,13 @@ export function CompareTable({
     router.refresh()
   }
 
-  async function saveNote(row: CompareRow, note: string | null) {
-    if (!row.noteTarget) throw new Error('메모를 저장할 곳이 없습니다')
+  async function saveNote(target: NoteTarget | null, note: string | null) {
+    if (!target) throw new Error('메모를 저장할 곳이 없습니다')
     const supabase = createClient()
     const { error } = await supabase
-      .from(row.noteTarget.table)
-      .update({ [row.noteTarget.column]: note })
-      .eq('id', row.noteTarget.id)
+      .from(target.table)
+      .update({ [target.column]: note })
+      .eq('id', target.id)
     if (error) throw new Error(error.message)
     router.refresh()
   }
@@ -329,16 +341,17 @@ export function CompareTable({
                   className="h-3.5 w-3.5 align-middle accent-slate-700"
                 />
               </th>
-              <th className={cn(TH, CENTER, 'w-[11%]')}>차수 · P/O No.</th>
-              <th className={cn(TH, NUM, 'w-[8%]')}>수입금액 ($)</th>
+              <th className={cn(TH, CENTER, 'w-[10%]')}>차수 · P/O No.</th>
+              <th className={cn(TH, NUM, 'w-[7%]')}>수입금액 ($)</th>
               <th className={cn(TH, CENTER, 'w-[7%]')}>기일</th>
               <th className={cn(TH, NUM, 'w-[10%]')}>청구금액<Sub>(토에이 계산금액)</Sub></th>
               <th className={cn(TH, NUM, 'w-[10%]')}>계산금액<Sub strong>(시스템 계산금액)</Sub></th>
-              <th className={cn(TH, NUM, 'w-[10%]')}>실지급액 (원)</th>
+              <th className={cn(TH, NUM, 'w-[10%]')}>실지급액 (원)<Sub>(계산서를 확인한 금액)</Sub></th>
               <th className={cn(TH, NUM, 'w-[9%]')}>계산 차이<Sub>(청구−계산)</Sub></th>
               <th className={cn(TH, NUM, 'w-[9%]')}>청구-지급 차이<Sub>(지급−청구)</Sub></th>
               <th className={cn(TH, NUM, 'w-[9%]')}>계산-지급 차이<Sub strong>(지급−계산)</Sub></th>
-              <th className={cn(TH, 'w-[14%]')}>비고 (금액 차이 사유)</th>
+              <th className={cn(TH, 'w-[8%]')}>비고<Sub>(금액 차이 사유)</Sub></th>
+              <th className={cn(TH, 'w-[8%]')}>비고<Sub>(계산금액 차이 사유)</Sub></th>
             </tr>
           </thead>
 
@@ -348,8 +361,10 @@ export function CompareTable({
               group={g}
               today={today}
               open={open}
+              noteOpen={noteOpen}
               picked={picked}
               onToggle={toggle}
+              onToggleNote={toggleNote}
               onPick={pick}
               onSaveNote={saveNote}
               onSaveInvoiced={saveInvoiced}
@@ -364,7 +379,7 @@ export function CompareTable({
       </div>
 
       <p className="mt-2 text-sm text-muted-foreground">
-        「계산 차이」는 청구서가 계산값과 어긋난 금액(청구−계산)이고, 「청구-지급 차이」와
+        「계산 차이」는 청구금액(토에이 계산)이 시스템 계산값과 어긋난 금액(청구−계산)이고, 「청구-지급 차이」와
         「계산-지급 차이」는 더 지급한 값이 +, 덜 지급한 값이 −입니다.
         계산-지급 차이는 기일이 지난달까지인 차수만 숫자로 보이고, 이번 달 이후는
         <span className="mx-1 rounded bg-red-100 px-1">기일 1주 경과 · 덜 지급</span>
@@ -406,8 +421,10 @@ function GroupBody({
   group,
   today,
   open,
+  noteOpen,
   picked,
   onToggle,
+  onToggleNote,
   onPick,
   onSaveNote,
   onSaveInvoiced,
@@ -416,10 +433,12 @@ function GroupBody({
   group: { year: number | null; rows: CompareRow[] }
   today: string
   open: Set<string>
+  noteOpen: Set<string>
   picked: Set<string>
   onToggle: (id: string) => void
+  onToggleNote: (key: string) => void
   onPick: (id: string) => void
-  onSaveNote: (row: CompareRow, note: string | null) => Promise<void>
+  onSaveNote: (target: NoteTarget | null, note: string | null) => Promise<void>
   onSaveInvoiced: (row: CompareRow, amount: number | null) => Promise<void>
   showYearSubtotal: boolean
 }) {
@@ -435,6 +454,9 @@ function GroupBody({
         const calcUnpaid = r.calcVsPaidKrw != null && r.calcVsPaidKrw > PAID_TOLERANCE_KRW
         const phase = calcPaidPhase(r.dueDate, today, unpaid || calcUnpaid)
         const hasNote = !!r.note?.trim()
+        const hasCalcNote = !!r.calcNote?.trim()
+        const amountNoteOpen = hasNote && noteOpen.has(`${id}:amount`)
+        const calcNoteOpen = hasCalcNote && noteOpen.has(`${id}:calc`)
 
         return (
           <tbody key={id} className="border-t">
@@ -520,9 +542,17 @@ function GroupBody({
 
               {/* 메모가 있는 칸은 노랑 — 펼쳐 볼 차수가 표에서 먼저 보이게 (담당자 2026-09-22) */}
               <td className={cn('px-2.5 py-2.5 align-middle', hasNote && 'bg-yellow-100')}>
-                <NoteCell note={r.note} />
+                <NoteCell note={r.note} expanded={amountNoteOpen} onToggle={() => onToggleNote(`${id}:amount`)} />
+              </td>
+              <td className={cn('px-2.5 py-2.5 align-middle', hasCalcNote && 'bg-yellow-100')}>
+                {r.calcNoteTarget
+                  ? <NoteCell note={r.calcNote} expanded={calcNoteOpen} onToggle={() => onToggleNote(`${id}:calc`)} />
+                  : <span className="text-muted-foreground">—</span>}
               </td>
             </tr>
+
+            {amountNoteOpen && <NoteRow colSpan={COLS} label="금액 차이 사유" note={r.note} />}
+            {calcNoteOpen && <NoteRow colSpan={COLS} label="계산금액 차이 사유" note={r.calcNote} />}
 
             {isOpen && (
               <tr>
@@ -624,7 +654,7 @@ function RowDetail({
   onSaveInvoiced,
 }: {
   row: CompareRow
-  onSaveNote: (row: CompareRow, note: string | null) => Promise<void>
+  onSaveNote: (target: NoteTarget | null, note: string | null) => Promise<void>
   onSaveInvoiced: (row: CompareRow, amount: number | null) => Promise<void>
 }) {
   const bill = row.billVsCalcKrw
@@ -643,10 +673,10 @@ function RowDetail({
       {/* 네 금액을 나란히 — 어느 것이 어긋났는지는 여기서만 갈린다 */}
       <table className="w-full max-w-xl border-collapse">
         <tbody>
-          <Line label="실제 청구액" value={row.invoicedKrw} note="청구서로 보낸 금액" />
+          <Line label="청구금액" value={row.invoicedKrw} note="토에이 계산금액 (정산파일 기준)" />
           <Line label="담당자 확정금액" value={row.confirmedKrw} note="확정한 금액" />
           <Line label="시스템 계산값" value={row.calcKrw} note="현재 규약으로 다시 계산" />
-          <Line label="지급액" value={row.paidKrw} note="통장에서 오간 금액" />
+          <Line label="실지급액" value={row.paidKrw} note="계산서를 확인한 금액 (통장에서 오간 금액)" />
         </tbody>
       </table>
 
@@ -660,8 +690,8 @@ function RowDetail({
           {bill != null && Math.abs(bill) >= PAID_TOLERANCE_KRW && (
             <p className={bill < 0 ? 'text-red-700' : 'text-slate-700'}>
               {bill < 0
-                ? `계산값보다 ${krw(-bill)}원 적게 청구됐습니다 — 청구서를 확인해야 합니다`
-                : `계산값보다 ${krw(bill)}원 많이 청구됐습니다 — 청구서를 확인해야 합니다`}
+                ? `계산값보다 ${krw(-bill)}원 적게 청구됐습니다 — 토에이 정산파일을 확인해야 합니다`
+                : `계산값보다 ${krw(bill)}원 많이 청구됐습니다 — 토에이 정산파일을 확인해야 합니다`}
               {confirm != null && Math.abs(confirm) < PAID_TOLERANCE_KRW
                 && ' (확정금액은 계산값과 일치하므로 계산이 아니라 청구가 어긋난 것입니다)'}
             </p>
@@ -718,20 +748,32 @@ function RowDetail({
         </p>
       )}
 
-      {/* 금액 차이의 원인은 사람만 안다. 최차장님께 설명할 문장을 여기 적어 둔다. */}
+      {/* 차이의 원인은 사람만 안다. 어디서 틀렸는지 갈리도록 사유를 두 칸에 나눠 적는다 (담당자 2026-09-30). */}
       <div className="max-w-2xl rounded-md border bg-white px-3 py-2">
         <p className="mb-1 font-semibold">
-          비고 — 금액 차이가 난 이유
+          비고 — 금액 차이 사유 <span className="font-normal text-muted-foreground">(청구·지급이 어긋난 이유)</span>
         </p>
         {row.noteTarget ? (
           <MemoField
             notes={row.note}
-            onSave={(next) => onSaveNote(row, next)}
+            onSave={(next) => onSaveNote(row.noteTarget, next)}
           />
         ) : (
           <p className="text-muted-foreground">이 행에는 메모를 저장할 곳이 없습니다.</p>
         )}
       </div>
+
+      {row.calcNoteTarget && (
+        <div className="max-w-2xl rounded-md border bg-white px-3 py-2">
+          <p className="mb-1 font-semibold">
+            비고 — 계산금액 차이 사유 <span className="font-normal text-muted-foreground">(청구금액이 시스템 계산과 어긋난 이유)</span>
+          </p>
+          <MemoField
+            notes={row.calcNote}
+            onSave={(next) => onSaveNote(row.calcNoteTarget, next)}
+          />
+        </div>
+      )}
 
       <p>
         <Link href={`/transactions/${row.transactionId}`} className="underline underline-offset-2">

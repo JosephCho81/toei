@@ -163,10 +163,11 @@ export interface PaymentRow {
   closingPaidKrw: number
   closingBalanceKrw: number
   closingInstallments: Installment[]
-  /** 금액 차이의 사유 — 사람이 적는다 (interim_settlements.notes) */
+  /**
+   * 지급 비고 — 지급 확인 요청·사유 (transactions.payment_note).
+   * 정산 비교의 비고(금액·계산금액 차이 사유)와 섞지 않는다 (담당자 2026-09-30).
+   */
   note: string | null
-  /** 메모를 저장할 중간정산 행. 정산이 아직 없으면 null */
-  interimSettlementId: string | null
 }
 
 export interface UnallocatedPayment {
@@ -408,22 +409,14 @@ function buildSchedule(rows: PaymentRow[], today: string) {
 }
 
 export async function loadPaymentsData(supabase: SupabaseClient, today: string) {
-  const [
-    { data: txRows },
-    { data: interimRows },
-    { data: closingRows },
-    { data: statusRows },
-    { data: unallocRows },
-    { data: holidayRows },
-    { data: penaltyRows },
-  ] = await Promise.all([
+  const results = await Promise.all([
     supabase
       .from('transactions')
-      .select('id, round_no, round_label, import_amount_usd, lc_open_date, payment_due_date')
+      .select('id, round_no, round_label, import_amount_usd, lc_open_date, payment_due_date, payment_note')
       .order('round_no', { ascending: false }),
     supabase
       .from('interim_settlements')
-      .select('id, transaction_id, invoiced_amount_krw, confirmed_amount_krw, notes'),
+      .select('transaction_id, invoiced_amount_krw, confirmed_amount_krw'),
     supabase
       .from('closing_settlements')
       .select('transaction_id, confirmed_amount_krw'),
@@ -436,6 +429,18 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
     // 지체상금은 산식이 없어 적힌 금액이 곧 청구액이다 (037).
     supabase.from('settlement_penalties').select('transaction_id, amount_krw'),
   ])
+  // 읽기 실패를 삼키면 화면이 「차수가 없다」고 조용히 거짓말한다 — 하나라도 실패하면 멈춘다.
+  const failed = results.find((r) => r.error)
+  if (failed?.error) throw new Error(`지급 현황을 읽지 못했습니다: ${failed.error.message}`)
+  const [
+    { data: txRows },
+    { data: interimRows },
+    { data: closingRows },
+    { data: statusRows },
+    { data: unallocRows },
+    { data: holidayRows },
+    { data: penaltyRows },
+  ] = results
 
   const holidays = new Set((holidayRows ?? []).map((h: { date: string }) => h.date))
 
@@ -443,18 +448,12 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
   // 확정값과의 차이는 「검산 차이」로 따로 보여준다. 둘을 섞으면 미지급처럼 보인다.
   const invoicedOf = new Map<string, number>()
   const confirmedOf = new Map<string, number>()
-  // 메모는 차수마다 하나뿐이라 중간정산 행에 붙여 둔다 — 정산 비교 화면이 쓰는 곳과 같다.
-  // 두 화면이 다른 곳에 적으면 같은 차수에 사유가 둘 생긴다.
-  const noteOf = new Map<string, string | null>()
-  const interimIdOf = new Map<string, string>()
   for (const r of (interimRows ?? []) as {
-    id: string; transaction_id: string
-    invoiced_amount_krw: number | null; confirmed_amount_krw: number | null; notes: string | null
+    transaction_id: string
+    invoiced_amount_krw: number | null; confirmed_amount_krw: number | null
   }[]) {
     if (r.invoiced_amount_krw != null) invoicedOf.set(r.transaction_id, Number(r.invoiced_amount_krw))
     if (r.confirmed_amount_krw != null) confirmedOf.set(r.transaction_id, Number(r.confirmed_amount_krw))
-    interimIdOf.set(r.transaction_id, r.id)
-    noteOf.set(r.transaction_id, r.notes)
   }
   const closingBilledOf = new Map<string, number>()
   for (const r of (closingRows ?? []) as { transaction_id: string; confirmed_amount_krw: number | null }[]) {
@@ -480,6 +479,7 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
     id: string; round_no: number | null; round_label: string
     import_amount_usd: number | string | null
     lc_open_date: string | null; payment_due_date: string | null
+    payment_note: string | null
   }[]).map((t) => {
     const s = status.get(t.id)
     const billedKrw = invoicedOf.get(t.id) ?? null
@@ -560,8 +560,7 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
       closingPaidKrw,
       closingBalanceKrw: closingBilledKrw == null ? 0 : closingBilledKrw - closingPaidKrw,
       closingInstallments,
-      note: noteOf.get(t.id) ?? null,
-      interimSettlementId: interimIdOf.get(t.id) ?? null,
+      note: t.payment_note,
     }
   })
 

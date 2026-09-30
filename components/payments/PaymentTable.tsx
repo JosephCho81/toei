@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react'
 import { PaymentDialog, type PaymentDraft } from './PaymentDialog'
 import { MemoField } from '@/components/ui/MemoField'
-import { NoteCell } from '@/components/ui/NoteCell'
+import { NoteCell, NoteRow } from '@/components/ui/NoteCell'
 import { TABLE, TABLE_WRAP, TH, TD, THEAD_ROW, CENTER, NUM } from '@/components/ui/table-style'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -34,10 +34,10 @@ import {
  * 글자는 크기 하나(text-sm)·서체 하나(본문 sans)다. 위계는 굵기와 색으로 낸다.
  * 금액 자릿수는 등폭 서체가 아니라 tabular-nums 로 맞춘다.
  *
- * **비고는 있다는 것만 「✓ 비고」로 보이고 누르면 펼친다** (담당자 2026-09-22 — 첫 줄을 띄우던 09-07 방식은
- * 길어서 읽히지 않았다). 빈 줄에는 「+ 비고」를 남겨 어디를 눌러야 적을 수 있는지 보이게 한다.
- * 적는 곳은 정산 비교 화면과 같은 자리(interim_settlements.notes)다 —
- * 두 화면이 다른 곳에 적으면 한 차수에 사유가 둘 생긴다.
+ * **비고는 있다는 것만 「✓ 비고」로 보이고 누르면 행 아래 전폭 줄로 펼친다** (담당자 2026-09-22·09-30).
+ * 빈 줄에는 「+ 비고」를 남겨 어디를 눌러야 적을 수 있는지 보이게 한다.
+ * 이 비고는 **지급 전용**(transactions.payment_note)이다 — 지급 확인 요청·사유를 적는다.
+ * 정산 비교의 금액·계산금액 차이 사유와는 따로 둔다 (담당자 2026-09-30).
  */
 
 /** 표의 열 수 — 펼친 상세가 가로로 다 차지하려면 이 값을 쓴다. */
@@ -134,6 +134,8 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
   const router = useRouter()
   const [filter, setFilter] = useState<FilterKey>('all')
   const [open, setOpen] = useState<Set<string>>(new Set())
+  /** 비고를 펼친 차수 — 행 상세 펼침과는 따로 연다 */
+  const [noteOpen, setNoteOpen] = useState<Set<string>>(new Set())
   const [draft, setDraft] = useState<PaymentDraft | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -146,6 +148,15 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
   const balanceLabel = '미지급금'
   const paidLabel = '지급액'
 
+  function toggleNote(id: string) {
+    setNoteOpen((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   function toggle(id: string) {
     setOpen((prev) => {
       const next = new Set(prev)
@@ -155,17 +166,13 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
     })
   }
 
-  /**
-   * 메모는 중간정산 행에 적는다 — 정산 비교 화면과 같은 칸이라 어느 화면에서 적어도 같이 보인다.
-   * 정산이 아직 없는 차수에는 적을 곳이 없어 상세에서 그 사실을 말해 준다.
-   */
+  /** 지급 비고는 차수에 적는다 — 중간정산이 아직 없는 차수에도 적을 수 있다. */
   async function saveNote(row: PaymentRow, note: string | null) {
-    if (!row.interimSettlementId) throw new Error('중간정산 미등록 차수로 비고를 저장할 수 없습니다')
     const supabase = createClient()
     const { error } = await supabase
-      .from('interim_settlements')
-      .update({ notes: note })
-      .eq('id', row.interimSettlementId)
+      .from('transactions')
+      .update({ payment_note: note })
+      .eq('id', row.transactionId)
     if (error) throw new Error(error.message)
     router.refresh()
   }
@@ -220,7 +227,7 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
               <th className={cn(TH, NUM, 'w-[12%]')}>{balanceLabel}</th>
               <th className={cn(TH, CENTER, 'w-[10%]')}>기일</th>
               <th className={cn(TH, CENTER, 'w-[14%]')}>상태</th>
-              <th className={cn(TH, 'w-[14%]')}>비고 (금액 차이 사유)</th>
+              <th className={cn(TH, 'w-[14%]')}>지급 비고<span className="block text-xs font-normal text-muted-foreground">(사유 · 확인 요청)</span></th>
               <th className={cn(TH, 'w-[4%]')} />
             </tr>
           </thead>
@@ -229,6 +236,7 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
             const isOpen = open.has(r.transactionId)
             const issue = issueText(r)
             const zebra = i % 2 === 1 ? 'bg-slate-50/60' : ''
+            const isNoteOpen = !!r.note?.trim() && noteOpen.has(r.transactionId)
 
             return (
               <tbody key={r.transactionId} className="border-t">
@@ -274,7 +282,7 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
                     )}
                   </td>
                   <td className="px-3 py-2.5 align-middle">
-                    <NoteCell note={r.note} />
+                    <NoteCell note={r.note} expanded={isNoteOpen} onToggle={() => toggleNote(r.transactionId)} />
                   </td>
                   <td className={cn(TD, CENTER, 'px-1')}>
                     <button
@@ -288,6 +296,8 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
                     </button>
                   </td>
                 </tr>
+
+                {isNoteOpen && <NoteRow colSpan={COLS} label="지급 비고" note={r.note} />}
 
                 {issue && (
                   <tr className={cn('cursor-pointer', zebra)} onClick={() => toggle(r.transactionId)}>
@@ -489,17 +499,12 @@ function RoundDetail({
         </p>
       )}
 
-      {/* 금액 차이의 원인은 사람만 안다 — 최차장님께 설명할 문장을 여기 적어 둔다.
-          정산 비교 화면의 비고와 같은 칸이라 어느 쪽에서 적어도 둘 다에 뜬다. */}
+      {/* 지급 확인 요청·사유를 적는 자리. 정산 비교의 비고와는 다른 칸이다. */}
       <div className="max-w-2xl rounded-md border bg-white px-3 py-2">
-        <p className="mb-1 font-semibold">비고 (금액 차이 사유)</p>
-        {row.interimSettlementId ? (
-          <MemoField notes={row.note} onSave={(next) => onSaveNote(row, next)} />
-        ) : (
-          <p className="text-muted-foreground">
-            중간정산 미등록 차수로 비고를 입력할 수 없습니다.
-          </p>
-        )}
+        <p className="mb-1 font-semibold">
+          지급 비고 <span className="font-normal text-muted-foreground">(지급 사유 · 확인 요청)</span>
+        </p>
+        <MemoField notes={row.note} onSave={(next) => onSaveNote(row, next)} />
       </div>
 
       <p>
