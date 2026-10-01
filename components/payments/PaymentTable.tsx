@@ -101,12 +101,21 @@ function statusText(r: PaymentRow): string {
 /**
  * 지금 손대야 하는 줄인가.
  *
- * 담당자 2026-09-10 로 좁아졌다 — 35차까지의 남은 금액은 「지급금 차이」라 빨강이 아니고,
- * 이번 달 기일 건도 유예 7일 안에서는 지급이 도는 중이라 빨강이 아니다.
+ * 담당자 2026-09-10 로 좁아졌다 — 35차까지의 남은 금액은 「지급금 차이」라 연체가 아니고,
+ * 이번 달 기일 건도 유예 7일 안에서는 지급이 도는 중이라 손댈 줄이 아니다.
  */
 function needsAttention(r: PaymentRow): boolean {
   if (r.bucket === 'overdue') return true
   return r.bucket === 'in_progress' && (r.delayDays ?? 0) >= DUE_GRACE_DAYS
+}
+
+/**
+ * 미지급 칸을 빨강으로 칠하는가. 손댈 줄(`needsAttention`)에 더해 35차까지의 지급금 차이도
+ * 덜 나간 돈이라 빨강이다 — 회색이면 덜 낸 돈이 화면에서 안 보인다 (담당자 2026-10-01).
+ * 「연체」라 부르지 않는 것은 그대로다(상태 글자는 「지급금 차이」).
+ */
+function isUnderpaidShown(r: PaymentRow): boolean {
+  return needsAttention(r) || r.bucket === 'settled_gap'
 }
 
 function issueText(r: PaymentRow): string | null {
@@ -116,7 +125,7 @@ function issueText(r: PaymentRow): string | null {
       : null
   }
   if (r.bucket === 'settled_gap') {
-    return `잔액 ${krw(r.balanceKrw)}원 — 정산 완료 구간의 지급금 차이`
+    return `미지급 ${krw(r.balanceKrw)}원 — 정산 완료 구간의 지급금 차이`
   }
   if (needsAttention(r)) {
     const last = r.installments.at(-1)
@@ -266,9 +275,8 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
                       : krw(r.paidKrw)}
                   </td>
                   <td className={cn(TD, NUM, 'font-semibold tabular-nums',
-                    // 빨강은 「덜 나간 돈」에만. 초과 지급은 확인 대상이지 연체가 아니고,
-                    // 35차까지의 지급금 차이와 유예 안의 이번 달 건도 회색이다.
-                    needsAttention(r) ? 'text-red-700' : 'text-slate-600')}>
+                    // 빨강은 「덜 나간 돈」에만. 초과 지급과 유예 안의 이번 달 건은 회색이다.
+                    isUnderpaidShown(r) ? 'text-red-700' : 'text-slate-600')}>
                     {r.basisKrw == null ? '—'
                       : Math.abs(r.balanceKrw) < PAID_TOLERANCE_KRW ? '0'
                       : r.balanceKrw < 0 ? `+${krw(-r.balanceKrw)}`
