@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { StatCards, type Stat } from '@/components/ui/StatCards'
 import { CompareTable } from './CompareTable'
-import { PAID_TOLERANCE_KRW } from '@/lib/data/payments'
+import { PAID_TOLERANCE_KRW, SETTLED_THROUGH_ROUND } from '@/lib/data/payments'
 import { KIND_LABEL, type CompareRow, type CompareSummary, type SettlementKind } from '@/lib/data/settlementCompare'
 
 /**
@@ -101,6 +101,43 @@ export function CompareScreen({
     },
   ]
 
+  /**
+   * 정산이 끝난 구간(35차까지)의 차이 셋 — 담당자 2026-10-01.
+   * 36차부터는 담당자가 확인하며 맞춰 가므로 지난 구간만 합친다.
+   * 부호는 표의 같은 이름 열과 같다(계산 차이는 청구−계산, 지급 두 칸은 더 지급 +).
+   * 중간·최종정산에 띄운다. 지체상금은 계산값이 없어 띄우지 않는다.
+   */
+  const settled = summary.settled
+  // 청구액이 없는 차수는 차이를 낼 수 없다 — 최종정산은 청구액이 비어 있어 전부 0 이 나오므로
+  // 몇 개 차수로 낸 값인지 함께 적는다. 안 적으면 「차이 없음」으로 읽힌다.
+  const basisSub = settled.billedCount > 0
+    ? `청구액 입력된 ${settled.billedCount}개 차수 기준`
+    : '청구액 입력된 차수 없음 — 비교 전'
+  const excludedSub = [basisSub,
+    ...(settled.excludedCount > 0 ? [`구방식 등 비교 불가 ${settled.excludedCount}건 제외`] : [])]
+  const settledCards: Stat[] = [
+    {
+      label: `계산 차이 (청구−계산) · ${SETTLED_THROUGH_ROUND}차까지`,
+      value: signed(settled.billVsCalcKrw),
+      unit: '원',
+      sub: excludedSub,
+    },
+    {
+      label: `청구-지급 차이 (지급−청구) · ${SETTLED_THROUGH_ROUND}차까지`,
+      value: signed(-settled.balanceKrw),
+      unit: '원',
+      sub: [basisSub],
+      alert: settled.balanceKrw > PAID_TOLERANCE_KRW,
+    },
+    {
+      label: `계산-지급 차이 (지급−계산) · ${SETTLED_THROUGH_ROUND}차까지`,
+      value: signed(-settled.calcVsPaidKrw),
+      unit: '원',
+      sub: excludedSub,
+      alert: settled.calcVsPaidKrw > PAID_TOLERANCE_KRW,
+    },
+  ]
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -129,6 +166,8 @@ export function CompareScreen({
       </div>
 
       <StatCards items={cards} />
+
+      {kind !== 'penalty' && <StatCards items={settledCards} />}
 
       {error && (
         <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm">

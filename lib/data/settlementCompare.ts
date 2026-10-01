@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { calculateInterim, type CostItem, type RoundingPolicy, type VatMode } from '@/lib/calculations/interim'
-import { calculateClosing } from '@/lib/calculations/closing'
-import { computeSettlementSchedule } from '@/lib/calculations/schedule'
-import { PAID_TOLERANCE_KRW, isCalcPaidShown, type Installment } from '@/lib/data/payments'
+import { calculateInterim, type CostItem, type RoundingPolicy, type VatMode } from '../calculations/interim.ts'
+import { calculateClosing } from '../calculations/closing.ts'
+import { computeSettlementSchedule } from '../calculations/schedule.ts'
+import { PAID_TOLERANCE_KRW, SETTLED_THROUGH_ROUND, isCalcPaidShown, type Installment } from './payments.ts'
 
 /**
  * 청구값 · 계산값 · 지불값을 한 행에 세운다.
@@ -124,6 +124,8 @@ export interface CompareTotals {
   calcVsPaidKrw: number
   /** 계산 비교에서 뺀 행 수 (구방식이거나 재계산 불가) */
   excludedCount: number
+  /** 청구액이 있는 행 수 — 차이는 이 행들로만 낸다. 0 이면 「차이 0」이 아니라 「비교 전」이다 */
+  billedCount: number
 }
 
 export interface CompareSummary extends CompareTotals {
@@ -143,9 +145,10 @@ export interface CompareSummary extends CompareTotals {
   plannedCalcKrw: number
   /** 아직 청구하지 않은 차수 */
   unbilledCount: number
-  billedCount: number
   /** 구방식(inclusive) — 계산값과 직접 비교할 수 없는 건수 */
   legacyCount: number
+  /** 정산이 끝난 구간(35차까지)의 합계 — 차이 셋을 한눈에 본다 */
+  settled: CompareTotals
 }
 
 function num(v: number | string | null | undefined): number {
@@ -213,6 +216,7 @@ export function aggregate(rows: CompareRow[], today: string): CompareTotals {
     balanceKrw: billed.reduce((s, r) => s + (r.balanceKrw ?? 0), 0),
     calcVsPaidKrw: calcPaid.reduce((s, r) => s + (r.calcVsPaidKrw ?? 0), 0),
     excludedCount: billed.length - cmp.length,
+    billedCount: billed.length,
   }
 }
 
@@ -564,6 +568,17 @@ function build(args: {
   }
 }
 
+/**
+ * 정산이 끝난 구간(`SETTLED_THROUGH_ROUND`)만 더한 합계.
+ *
+ * 담당자 2026-10-01: 36차부터는 담당자가 확인하며 맞춰 가므로, 지난 구간의 차이
+ * (청구−계산 · 청구−지급 · 계산−지급)만 합쳐 위에 띄운다. 경계는 지급 현황의
+ * 「지급금 차이」와 같은 차수로 자른다 — 기간으로 자르면 두 화면의 35차가 갈라진다.
+ */
+export function settledTotals(rows: CompareRow[], today: string): CompareTotals {
+  return aggregate(rows.filter((r) => r.roundNo != null && r.roundNo <= SETTLED_THROUGH_ROUND), today)
+}
+
 function summarize(rows: CompareRow[], today: string): CompareSummary {
   const billed = rows.filter((r) => r.invoicedKrw != null)
 
@@ -587,5 +602,6 @@ function summarize(rows: CompareRow[], today: string): CompareSummary {
     unbilledCount: rows.length - billed.length,
     billedCount: billed.length,
     legacyCount: rows.filter((r) => r.legacyVatMode).length,
+    settled: settledTotals(rows, today),
   }
 }
