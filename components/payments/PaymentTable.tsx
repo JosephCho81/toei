@@ -10,6 +10,7 @@ import { MemoField } from '@/components/ui/MemoField'
 import { NoteCell, NoteRow } from '@/components/ui/NoteCell'
 import { TABLE, TABLE_WRAP, TH, TD, THEAD_ROW, CENTER, NUM } from '@/components/ui/table-style'
 import { createClient } from '@/lib/supabase/client'
+import { useCanEdit } from '@/components/auth/RoleProvider'
 import {
   DUE_GRACE_DAYS, PAID_TOLERANCE_KRW, roundName,
   type Installment, type PaymentRow,
@@ -147,6 +148,7 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
   const [noteOpen, setNoteOpen] = useState<Set<string>>(new Set())
   const [draft, setDraft] = useState<PaymentDraft | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const canEdit = useCanEdit()
 
   const counts = useMemo(
     () => Object.fromEntries(FILTERS.map((f) => [f.key, rows.filter(f.test).length])) as Record<FilterKey, number>,
@@ -293,7 +295,7 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
                     <NoteCell note={r.note} expanded={isNoteOpen} onToggle={() => toggleNote(r.transactionId)} />
                   </td>
                   <td className={cn(TD, CENTER, 'px-1')}>
-                    <button
+                    {canEdit && <button
                       type="button"
                       aria-label={`${roundName(r)} ${paidLabel.slice(0, 2)} 입력`}
                       title={`${paidLabel.slice(0, 2)} 입력`}
@@ -301,7 +303,7 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
                       className="rounded-sm border bg-white p-1 text-slate-500 opacity-0 transition-opacity hover:bg-slate-100 focus:opacity-100 group-hover:opacity-100"
                     >
                       <Plus className="h-3.5 w-3.5" />
-                    </button>
+                    </button>}
                   </td>
                 </tr>
 
@@ -326,6 +328,7 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
                       <RoundDetail
                         row={r}
                         onSaveNote={saveNote}
+                        canEdit={canEdit}
                         onAdd={() => setDraft({ mode: 'create', row: r })}
                         onEdit={(inst) => setDraft({ mode: 'edit', row: r, installment: inst })}
                         onDelete={remove}
@@ -369,8 +372,11 @@ function RoundDetail({
   onEdit,
   onDelete,
   busy,
+  canEdit,
 }: {
   row: PaymentRow
+  /** 토에이 계정은 지급 입력·수정·삭제를 보지 않는다 (비고는 적는다) */
+  canEdit: boolean
   onSaveNote: (row: PaymentRow, note: string | null) => Promise<void>
   onAdd: () => void
   onEdit: (inst: Installment) => void
@@ -388,13 +394,13 @@ function RoundDetail({
         <span className="font-semibold">
           {roundName(row)} 중간정산 지급 내역
         </span>
-        <button
+        {canEdit && <button
           type="button"
           onClick={onAdd}
           className="inline-flex items-center gap-1 rounded-md border bg-white px-2.5 py-1 hover:bg-slate-100"
         >
           <Plus className="h-3.5 w-3.5" /> 지급 입력
-        </button>
+        </button>}
       </div>
 
       {row.installments.length === 0 ? (
@@ -416,7 +422,7 @@ function RoundDetail({
                     {gap == null ? '' : gap === 0 ? '기일 당일' : gap > 0 ? `기일 +${gap}일` : `기일 ${gap}일`}
                   </td>
                   <td className="py-1.5 text-right">
-                    {inst.paymentId && (
+                    {canEdit && inst.paymentId && (
                       <span className="inline-flex gap-1">
                         <button
                           type="button"

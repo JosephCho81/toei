@@ -16,11 +16,13 @@ export function Row({ label, value }: { label: string; value: string }) {
 }
 
 export function SettlementCard({
-  label, href, amount, date, isLocked, settlementId, pdfType, txLocked, interimConfirmedKrw,
+  label, href, amount, date, isLocked, settlementId, pdfType, txLocked, interimConfirmedKrw, editable = true,
 }: {
   label: string; href: string; amount: number | null; date: string | null
   isLocked: boolean; settlementId: string | null; pdfType: 'interim' | 'closing'; txLocked: boolean
   interimConfirmedKrw?: number | null
+  /** 토에이 계정 — 정산을 시작·수정하지 않고 리포트로 읽기만 한다 */
+  editable?: boolean
 }) {
   const grandTotal = (interimConfirmedKrw != null && amount != null)
     ? interimConfirmedKrw + amount
@@ -74,9 +76,9 @@ export function SettlementCard({
         <div className="flex gap-2 pt-1">
           <SettlementPdfButton type={pdfType} settlementId={settlementId} isLocked={isLocked} />
           {/* 잠긴 거래도 정산 화면은 열어 준다 — 안에 잠금 해제 버튼이 있고, 링크를 숨기면 도달할 방법이 없다 */}
-          {(amount != null || !txLocked) && (
+          {(amount != null || (editable && !txLocked)) && (
             <Link href={href} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
-              {amount == null ? '정산 시작' : isLocked ? '상세보기' : '수정'}
+              {amount == null ? '정산 시작' : isLocked || !editable ? '상세보기' : '수정'}
             </Link>
           )}
         </div>

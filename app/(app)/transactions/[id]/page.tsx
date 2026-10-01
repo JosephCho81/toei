@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { getRole } from '@/lib/auth/server'
+import { canEdit } from '@/lib/auth/role'
 import { notFound } from 'next/navigation'
 import { fetchInterimSettlement, fetchClosingSettlement } from '@/lib/data/queries'
 import { buttonVariants } from '@/components/ui/button'
@@ -24,6 +26,7 @@ const STATUS_LABELS: Record<string, string> = {
 export default async function TransactionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
+  const editable = canEdit(await getRole(supabase))
 
   const { data: t } = await supabase
     .from('v_transaction_status')
@@ -37,6 +40,9 @@ export default async function TransactionDetailPage({ params }: { params: Promis
   ])
 
   if (!t) notFound()
+
+  // 토에이 계정에는 잠긴 거래처럼 보인다 — 입력칸 없이 읽기만 한다 (메모는 적는다)
+  const readOnly = t.is_locked || !editable
 
   const mfr = t.manufacturers as { name: string } | null
   // 한 차수에 LC가 여러 건인 경우가 있어(예: 37차) 컨테이너에 기록된 LC 번호를 우선 표시한다.
@@ -74,10 +80,10 @@ export default async function TransactionDetailPage({ params }: { params: Promis
           >
             정산 리포트
           </Link>
-          {!t.is_locked && (
+          {!readOnly && (
             <Link href={`/transactions/${id}/edit`} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>수정</Link>
           )}
-          <TransactionLockButton transactionId={id} isLocked={t.is_locked} />
+          {editable && <TransactionLockButton transactionId={id} isLocked={t.is_locked} />}
         </div>
       </div>
 
@@ -117,6 +123,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
             settlementId={interim?.id ?? null}
             pdfType="interim"
             txLocked={t.is_locked}
+            editable={editable}
           />
           <SettlementCard
             label="클로징정산"
@@ -127,16 +134,17 @@ export default async function TransactionDetailPage({ params }: { params: Promis
             settlementId={closing?.id ?? null}
             pdfType="closing"
             txLocked={t.is_locked}
+            editable={editable}
             interimConfirmedKrw={interim?.confirmed_amount_krw ?? null}
           />
         </div>
       </div>
 
-      <ItemsEditTable transactionId={id} isLocked={t.is_locked} />
+      <ItemsEditTable transactionId={id} isLocked={readOnly} />
 
-      <ContainerList transactionId={id} isLocked={t.is_locked} defaultLcNumber={t.lc_no} />
+      <ContainerList transactionId={id} isLocked={readOnly} defaultLcNumber={t.lc_no} />
 
-      <ForwardingQuoteSection transactionId={id} isLocked={t.is_locked} />
+      <ForwardingQuoteSection transactionId={id} isLocked={readOnly} />
 
       <TransactionNotesCard transactionId={id} initialNotes={t.notes ?? null} />
     </div>

@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { LayoutDashboard, FileText, Building2, LogOut, Wallet, Scale } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useRole, useCanEdit } from '@/components/auth/RoleProvider'
+import { ROLE_LABEL } from '@/lib/auth/role'
 
 /**
  * 사이드바는 「답하는 질문이 다른 화면」만 세운다.
@@ -21,13 +23,15 @@ const navItems = [
   { href: '/dashboard', label: '정산 현황', icon: LayoutDashboard, match: ['/dashboard'] },
   { href: '/transactions', label: '거래 목록', icon: FileText, match: ['/transactions'] },
   // 제조사·품목 마스터는 MasterTabs 가 가른다
-  { href: '/manufacturers', label: '기준정보', icon: Building2, match: ['/manufacturers', '/products'] },
+  { href: '/manufacturers', label: '기준정보', icon: Building2, match: ['/manufacturers', '/products'], editorsOnly: true },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const role = useRole()
+  const canEdit = useCanEdit()
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -42,7 +46,7 @@ export function Sidebar() {
         <p className="text-xs text-muted-foreground mt-0.5">토에이↔에이원</p>
       </div>
       <nav className="flex-1 px-2 py-3 space-y-1">
-        {navItems.map(({ href, label, icon: Icon, match }) => (
+        {navItems.filter((n) => canEdit || !n.editorsOnly).map(({ href, label, icon: Icon, match }) => (
           <Link
             key={href}
             href={href}
@@ -59,6 +63,7 @@ export function Sidebar() {
         ))}
       </nav>
       <div className="px-2 py-3 border-t">
+        {role && <p className="px-3 pb-2 text-sm text-muted-foreground">{ROLE_LABEL[role]}</p>}
         <Button
           variant="ghost"
           size="sm"

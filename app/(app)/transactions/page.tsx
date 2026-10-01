@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { getRole } from '@/lib/auth/server'
+import { canEdit } from '@/lib/auth/role'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
@@ -8,6 +10,7 @@ import type { TxFlag, TxAmountCheck } from '@/types/transaction'
 
 export default async function TransactionsPage() {
   const supabase = await createClient()
+  const editable = canEdit(await getRole(supabase))
 
   const { data } = await supabase
     .from('v_transaction_status')
@@ -55,9 +58,11 @@ export default async function TransactionsPage() {
           >
             <Download className="h-4 w-4 mr-1" />엑셀 다운로드
           </a>
-          <Link href="/transactions/new" className={cn(buttonVariants({ size: 'sm' }))}>
-            <Plus className="h-4 w-4 mr-1" />새 거래 등록
-          </Link>
+          {editable && (
+            <Link href="/transactions/new" className={cn(buttonVariants({ size: 'sm' }))}>
+              <Plus className="h-4 w-4 mr-1" />새 거래 등록
+            </Link>
+          )}
         </div>
       </div>
       <TransactionTable

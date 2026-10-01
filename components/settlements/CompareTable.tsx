@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MemoField } from '@/components/ui/MemoField'
+import { useCanEdit } from '@/components/auth/RoleProvider'
 import { NoteCell, NoteRow } from '@/components/ui/NoteCell'
 import { PAID_TOLERANCE_KRW, calcPaidPhase, type CalcPaidPhase } from '@/lib/data/payments'
 import { aggregate, type CompareRow, type CompareTotals, type NoteTarget, type SettlementKind } from '@/lib/data/settlementCompare'
@@ -659,6 +660,8 @@ function RowDetail({
 }) {
   const bill = row.billVsCalcKrw
   const confirm = row.confirmVsCalcKrw
+  // 청구액은 한국에이원이 서류를 받고 넣는다 — 토에이 계정은 비고만 적는다
+  const canEdit = useCanEdit()
 
   return (
     <div className="space-y-3 text-sm">
@@ -705,7 +708,7 @@ function RowDetail({
       )}
 
       {/* 계산서를 확인하고 나서 적어 넣는 자리. 검산이 끝난 값만 여기 들어온다. */}
-      {row.invoicedTarget && (
+      {canEdit && row.invoicedTarget && (
         <InvoicedField
           value={row.invoicedKrw}
           calcKrw={row.calcKrw}

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { useCanEdit } from '@/components/auth/RoleProvider'
 import { TABLE, TABLE_WRAP, TH, TD, THEAD_ROW, CENTER, NUM, zebra } from '@/components/ui/table-style'
 
 export type VerRow = {
@@ -43,6 +44,7 @@ function formatDiff(diff: number | null, roundLabel: string): string {
 export function VerificationIssueCard({ rows }: { rows: VerRow[] }) {
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const router = useRouter()
+  const canEdit = useCanEdit()
 
   const visible = rows.filter((r) => !hidden.has(r.id))
   if (visible.length === 0) return null
@@ -104,13 +106,13 @@ export function VerificationIssueCard({ rows }: { rows: VerRow[] }) {
                   {formatDiff(row.diff, row.round_label)}
                 </td>
                 <td className={cn(TD, CENTER)}>
-                  <button
+                  {canEdit && <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); void handleConfirm(row.id) }}
                     className="whitespace-nowrap rounded-md border bg-white px-2 py-1 hover:bg-slate-100"
                   >
                     확인했음
-                  </button>
+                  </button>}
                 </td>
               </tr>
             ))}

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
+import { useCanEdit } from '@/components/auth/RoleProvider'
 
 /**
  * 지체상금 입력.
@@ -14,6 +15,7 @@ import { Plus } from 'lucide-react'
  */
 export function PenaltyNote() {
   const router = useRouter()
+  const canEdit = useCanEdit()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -50,13 +52,13 @@ export function PenaltyNote() {
           지체상금은 <span className="font-semibold text-foreground">산식이 아직 정해지지 않아</span> 금액을 직접 넣습니다.
           넣은 금액은 중간·최종정산과 같은 방식으로 지급과 대사되어 미수금에 합산됩니다.
         </p>
-        <button
+        {canEdit && <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           className="inline-flex items-center gap-1 rounded-md border bg-white px-2.5 py-1 hover:bg-slate-100"
         >
           <Plus className="h-3.5 w-3.5" /> 지체상금 입력
-        </button>
+        </button>}
       </div>
 
       {open && (
