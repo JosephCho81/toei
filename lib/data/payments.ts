@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 // 회귀 테스트가 node 로 이 파일을 직접 부른다 — 별칭(@/) 은 node 가 풀지 못하므로 상대경로로 둔다.
 import { computeSettlementSchedule } from '../calculations/schedule.ts'
+import { noteStamp, type NoteMeta } from './noteMeta.ts'
 
 /**
  * 지급 현황 화면이 읽는 데이터.
@@ -164,10 +165,81 @@ export interface PaymentRow {
   closingBalanceKrw: number
   closingInstallments: Installment[]
   /**
+   * 최종정산을 계산서 한 장으로 여러 차수와 묶어 정산했으면 그 묶음 (042).
+   * 지급이 묶음에만 붙어 있어 이 차수의 closingBalanceKrw 는 0 으로 두고, 남은 금액은 묶음 단위로 말한다.
+   */
+  closingBundle: ClosingBundle | null
+  /**
    * 지급 비고 — 지급 확인 요청·사유 (transactions.payment_note).
    * 정산 비교의 비고(금액·계산금액 차이 사유)와 섞지 않는다 (담당자 2026-09-30).
    */
   note: string | null
+  /** 지급 비고를 마지막으로 저장한 계정·날짜 「토에이 · 10-02」 (043) */
+  noteStamp: string | null
+}
+
+export interface ClosingBundle {
+  label: string
+  rounds: number[]
+  /** 든 차수의 청구액 합. 하나라도 비면 null */
+  billedKrw: number | null
+  paidKrw: number
+  balanceKrw: number
+  installments: Installment[]
+}
+
+/** v_settlement_bundle_status 한 줄 */
+type BundleStatusRow = {
+  bundle_id: string
+  label: string
+  transaction_ids: string[]
+  paid_krw: number | string
+  installments: StatusRow['installments']
+}
+
+/** 정산 한 단위 — 차수 하나 또는 묶음 하나. billedKrw 가 null 이면 잔액을 내지 않는다 */
+export interface SettleUnit {
+  billedKrw: number | null
+  paidKrw: number
+}
+
+/** 단위들의 청구·지급·잔액 합과 남은 단위 수 */
+export function unitTotals(units: SettleUnit[]) {
+  let billedKrw = 0, paidKrw = 0, balanceKrw = 0, openCount = 0
+  for (const u of units) {
+    paidKrw += u.paidKrw
+    if (u.billedKrw == null) continue
+    const bal = u.billedKrw - u.paidKrw
+    billedKrw += u.billedKrw
+    balanceKrw += bal
+    if (Math.abs(bal) >= PAID_TOLERANCE_KRW) openCount += 1
+  }
+  return { billedKrw, paidKrw, balanceKrw, openCount }
+}
+
+/**
+ * 최종정산을 「정산 단위」로 센다 — 묶음에 든 차수는 빼고 묶음 하나로 넣는다.
+ * 차수별 지급액을 지어내지 않으려고 묶음 지급은 묶음에서만 뺀다 (1·3~8차, 직원 2026-10-02).
+ */
+export function closingUnits(
+  billedOf: ReadonlyMap<string, number>,
+  paidOf: (txId: string) => number,
+  bundles: { transactionIds: string[]; paidKrw: number }[],
+): SettleUnit[] {
+  const inBundle = new Set(bundles.flatMap((b) => b.transactionIds))
+  const units: SettleUnit[] = []
+  for (const [txId, billed] of billedOf) {
+    if (!inBundle.has(txId)) units.push({ billedKrw: billed, paidKrw: paidOf(txId) })
+  }
+  for (const b of bundles) {
+    // 청구액이 빠진 차수가 있으면 잔액을 낼 근거가 없다 — 지급만 세고 잔액은 만들지 않는다.
+    const billedKrw = b.transactionIds.every((id) => billedOf.has(id))
+      ? b.transactionIds.reduce((s, id) => s + billedOf.get(id)!, 0)
+      : null
+    const paid = b.paidKrw + b.transactionIds.reduce((s, id) => s + paidOf(id), 0)
+    units.push({ billedKrw, paidKrw: paid })
+  }
+  return units
 }
 
 export interface UnallocatedPayment {
@@ -412,7 +484,7 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
   const results = await Promise.all([
     supabase
       .from('transactions')
-      .select('id, round_no, round_label, import_amount_usd, lc_open_date, payment_due_date, payment_note')
+      .select('id, round_no, round_label, import_amount_usd, lc_open_date, payment_due_date, payment_note, note_meta')
       .order('round_no', { ascending: false }),
     supabase
       .from('interim_settlements')
@@ -428,6 +500,10 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
     supabase.from('holidays').select('date'),
     // 지체상금은 산식이 없어 적힌 금액이 곧 청구액이다 (037).
     supabase.from('settlement_penalties').select('transaction_id, amount_krw'),
+    supabase
+      .from('v_settlement_bundle_status')
+      .select('bundle_id, label, transaction_ids, paid_krw, installments')
+      .eq('kind', 'closing'),
   ])
   // 읽기 실패를 삼키면 화면이 「차수가 없다」고 조용히 거짓말한다 — 하나라도 실패하면 멈춘다.
   const failed = results.find((r) => r.error)
@@ -440,6 +516,7 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
     { data: unallocRows },
     { data: holidayRows },
     { data: penaltyRows },
+    { data: bundleRows },
   ] = results
 
   const holidays = new Set((holidayRows ?? []).map((h: { date: string }) => h.date))
@@ -469,6 +546,42 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
     else if (s.kind === 'penalty') penaltyStatus.set(s.transaction_id, s)
   }
 
+  const roundOf = new Map(((txRows ?? []) as { id: string; round_no: number | null }[])
+    .map((t) => [t.id, t.round_no ?? 0]))
+  const toInst = (list: StatusRow['installments'] | undefined): Installment[] => (list ?? []).map((i) => ({
+    paymentId: i.payment_id,
+    paidAt: i.paid_at,
+    amountKrw: num(i.amount),
+    direction: i.direction,
+    confirmed: i.confirmed,
+  }))
+  const closingPaidOf = (txId: string) => num(closingStatus.get(txId)?.paid_krw)
+  const bundles = ((bundleRows ?? []) as BundleStatusRow[]).map((b) => ({
+    transactionIds: b.transaction_ids,
+    paidKrw: num(b.paid_krw),
+    label: b.label,
+    installments: [
+      ...toInst(b.installments),
+      ...b.transaction_ids.flatMap((id) => toInst(closingStatus.get(id)?.installments)),
+    ].sort((x, y) => x.paidAt.localeCompare(y.paidAt)),
+  }))
+  const closingBundleOf = new Map<string, ClosingBundle>()
+  for (const b of bundles) {
+    const billedKrw = b.transactionIds.every((id) => closingBilledOf.has(id))
+      ? b.transactionIds.reduce((sum, id) => sum + closingBilledOf.get(id)!, 0)
+      : null
+    const paidKrw = b.paidKrw + b.transactionIds.reduce((sum, id) => sum + closingPaidOf(id), 0)
+    const info: ClosingBundle = {
+      label: b.label,
+      rounds: b.transactionIds.map((id) => roundOf.get(id) ?? 0).sort((x, y) => x - y),
+      billedKrw,
+      paidKrw,
+      balanceKrw: billedKrw == null ? 0 : billedKrw - paidKrw,
+      installments: b.installments,
+    }
+    for (const id of b.transactionIds) closingBundleOf.set(id, info)
+  }
+
   // 한 차수에 지체상금이 여러 건일 수 있어 차수 단위로 합친다.
   const penaltyOf = new Map<string, number>()
   for (const r of (penaltyRows ?? []) as { transaction_id: string; amount_krw: number | string }[]) {
@@ -480,6 +593,7 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
     import_amount_usd: number | string | null
     lc_open_date: string | null; payment_due_date: string | null
     payment_note: string | null
+    note_meta: NoteMeta | null
   }[]).map((t) => {
     const s = status.get(t.id)
     const billedKrw = invoicedOf.get(t.id) ?? null
@@ -558,9 +672,12 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
       stalled,
       closingBilledKrw,
       closingPaidKrw,
-      closingBalanceKrw: closingBilledKrw == null ? 0 : closingBilledKrw - closingPaidKrw,
+      // 묶음에 든 차수는 지급이 묶음에 있으므로 차수 단위 잔액을 만들지 않는다
+      closingBalanceKrw: closingBilledKrw == null || closingBundleOf.has(t.id) ? 0 : closingBilledKrw - closingPaidKrw,
       closingInstallments,
+      closingBundle: closingBundleOf.get(t.id) ?? null,
       note: t.payment_note,
+      noteStamp: noteStamp(t.note_meta, 'payment_note', today),
     }
   })
 
@@ -590,16 +707,12 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
     }
   }
 
-  let closingBalanceKrw = 0
-  let closingOpenCount = 0
-  for (const [txId, billed] of closingBilledOf) {
-    const paid = num(closingStatus.get(txId)?.paid_krw)
-    const bal = billed - paid
-    if (Math.abs(bal) >= PAID_TOLERANCE_KRW) {
-      closingBalanceKrw += bal
-      closingOpenCount += 1
-    }
-  }
+  // 묶음은 한 단위로 센다 — 「미정산 N개 차수」의 N 도 묶음 하나가 1이다.
+  const closingUnitList = closingUnits(closingBilledOf, closingPaidOf, bundles)
+  const closingTotals = unitTotals(closingUnitList.filter((u) =>
+    u.billedKrw != null && Math.abs(u.billedKrw - u.paidKrw) >= PAID_TOLERANCE_KRW))
+  const closingBalanceKrw = closingTotals.balanceKrw
+  const closingOpenCount = closingTotals.openCount
 
   const schedule = buildSchedule(rows, today)
 
@@ -608,28 +721,16 @@ export async function loadPaymentsData(supabase: SupabaseClient, today: string) 
 
   // ── 구분별 한 줄 요약 ──
   // 첫 화면은 「얼마 언제」만 답한다. 청구가 계산과 맞는지는 /settlements/* 가 답한다.
-  function totals(
-    kind: 'interim' | 'closing' | 'penalty',
-    label: string,
-    billedOf: Map<string, number>,
-    statusOf: Map<string, StatusRow>,
-  ): KindTotals {
-    let billedKrw = 0, paidKrw = 0, balanceKrw = 0, openCount = 0
-    for (const [txId, billed] of billedOf) {
-      const paid = num(statusOf.get(txId)?.paid_krw)
-      const bal = billed - paid
-      billedKrw += billed
-      paidKrw += paid
-      balanceKrw += bal
-      if (Math.abs(bal) >= PAID_TOLERANCE_KRW) openCount += 1
-    }
-    return { kind, label, href: `/settlements/${kind}`, billedKrw, paidKrw, balanceKrw, openCount }
+  function totals(kind: 'interim' | 'closing' | 'penalty', label: string, units: SettleUnit[]): KindTotals {
+    return { kind, label, href: `/settlements/${kind}`, ...unitTotals(units) }
   }
+  const byRound = (billedOf: Map<string, number>, statusOf: Map<string, StatusRow>): SettleUnit[] =>
+    [...billedOf].map(([txId, billed]) => ({ billedKrw: billed, paidKrw: num(statusOf.get(txId)?.paid_krw) }))
 
   const byKind: KindTotals[] = [
-    totals('interim', '중간정산', invoicedOf, status),
-    totals('closing', '최종정산', closingBilledOf, closingStatus),
-    totals('penalty', '지체상금', penaltyOf, penaltyStatus),
+    totals('interim', '중간정산', byRound(invoicedOf, status)),
+    totals('closing', '최종정산', closingUnitList),
+    totals('penalty', '지체상금', byRound(penaltyOf, penaltyStatus)),
   ]
 
   const summary: PaymentSummary = {

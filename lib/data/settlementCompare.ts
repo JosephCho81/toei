@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { calculateInterim, type CostItem, type RoundingPolicy, type VatMode } from '../calculations/interim.ts'
 import { calculateClosing } from '../calculations/closing.ts'
 import { computeSettlementSchedule } from '../calculations/schedule.ts'
+import type { NoteMeta } from './noteMeta.ts'
 import { PAID_TOLERANCE_KRW, SETTLED_THROUGH_ROUND, isCalcPaidShown, type Installment } from './payments.ts'
 
 /**
@@ -38,7 +39,7 @@ export const KIND_LABEL: Record<SettlementKind, string> = {
 
 /** 메모를 어디에 쓰는가. 구분마다 테이블도 컬럼명도 다르다. */
 export interface NoteTarget {
-  table: 'interim_settlements' | 'closing_settlements' | 'settlement_penalties'
+  table: 'interim_settlements' | 'closing_settlements' | 'settlement_penalties' | 'settlement_bundles'
   column: 'notes' | 'note' | 'calc_diff_note'
   id: string
 }
@@ -95,6 +96,8 @@ export interface CompareRow {
    */
   calcNote: string | null
   calcNoteTarget: NoteTarget | null
+  /** 메모를 마지막으로 저장한 계정·시각 (043). 칸 이름은 noteTarget·calcNoteTarget 의 column */
+  noteMeta: NoteMeta | null
   /**
    * 청구액을 적어 넣을 자리. 담당자 2026-09-10:
    * 「기본적으로 계산하여 검산 후 청구하나 계산서 발행에서 10단위 자리가 달라질 수 있음.
@@ -102,9 +105,27 @@ export interface CompareRow {
    * 지체상금은 적힌 금액이 곧 청구액이라(037) 따로 넣을 자리가 없다.
    */
   invoicedTarget: { table: 'interim_settlements' | 'closing_settlements'; id: string } | null
+  /**
+   * 묶음에 든 차수면 그 묶음. 지급은 차수가 아니라 묶음에 붙어 있으므로
+   * 이 행의 지급·잔액·계산-지급은 비우고, 합계는 묶음 줄이 대신 센다 (`applyBundles`).
+   */
+  inBundle: { id: string; label: string } | null
+  /** 묶음 줄이면 든 차수와 청구액이 들어온 차수 수. 차수 줄이면 null */
+  bundle: { rounds: number[]; billedCount: number } | null
   /** 지체상금만: 무엇 때문에 물렸나 */
   reason?: string
   incurredOn?: string
+}
+
+/** v_settlement_bundle_status 한 줄 */
+export interface BundleStatus {
+  bundle_id: string
+  label: string
+  note: string | null
+  transaction_ids: string[]
+  paid_krw: number | string
+  installments: StatusRow['installments']
+  note_meta: NoteMeta | null
 }
 
 /**
@@ -180,7 +201,7 @@ type StatusRow = {
   }[]
 }
 
-function toInstallments(s: StatusRow | undefined): Installment[] {
+function toInstallments(s: Pick<StatusRow, 'installments'> | undefined): Installment[] {
   return (s?.installments ?? []).map((i) => ({
     paymentId: i.payment_id,
     paidAt: i.paid_at,
@@ -200,7 +221,9 @@ function isComparable(r: CompareRow): boolean {
   return !r.legacyVatMode && r.calcKrw != null
 }
 
-export function aggregate(rows: CompareRow[], today: string): CompareTotals {
+export function aggregate(all: CompareRow[], today: string): CompareTotals {
+  // 묶음에 든 차수는 묶음 줄이 대신 센다 — 둘 다 세면 청구·계산이 두 번 잡힌다.
+  const rows = all.filter((r) => r.inBundle == null)
   const billed = rows.filter((r) => r.invoicedKrw != null)
   // 계산 비교는 **청구된 차수만** 센다. 청구 전 차수를 넣으면 「아직 청구도 안 한 돈」이
   // 미지급으로 잡혀 40·41·43차만으로 5억이 얹힌다.
@@ -261,11 +284,21 @@ export async function loadSettlementCompare(
       kind === 'interim' ? await interimRows(supabase, txById, status, holidays)
       : kind === 'closing' ? await closingRows(supabase, txById, status, holidays)
       : await penaltyRows(supabase, txById, status, holidays)
+    if (kind === 'closing') {
+      const res = await supabase
+        .from('v_settlement_bundle_status')
+        .select('bundle_id, label, note, transaction_ids, paid_krw, installments, note_meta')
+        .eq('kind', kind)
+      rows = applyBundles(rows, orThrow(res, '묶음 정산') as BundleStatus[])
+    }
   } catch (e) {
     error = e instanceof Error ? e.message : String(e)
   }
 
-  rows.sort((a, b) => (b.roundNo ?? 0) - (a.roundNo ?? 0) || (a.incurredOn ?? '').localeCompare(b.incurredOn ?? ''))
+  // 같은 차수 번호면 묶음 줄이 위 — 묶음 줄 바로 아래로 그 차수들이 이어진다.
+  rows.sort((a, b) => (b.roundNo ?? 0) - (a.roundNo ?? 0)
+    || Number(b.bundle != null) - Number(a.bundle != null)
+    || (a.incurredOn ?? '').localeCompare(b.incurredOn ?? ''))
   markMergedPayments(rows)
 
   return { rows, summary: summarize(rows, today), error }
@@ -300,6 +333,105 @@ function markMergedPayments(rows: CompareRow[]) {
   }
 }
 
+/**
+ * 묶음 정산 — 계산서 한 장으로 여러 차수를 정산한 건 (042, 1·3~8차 최종정산).
+ *
+ * 지급은 묶음에만 붙어 있다. 차수별 지급액을 지어내지 않고, 청구·계산은 차수 값을 더해
+ * 묶음 한 줄에서 비교한다. 차수 줄은 청구·계산을 그대로 보여 주되 지급 쪽 셋은 비운다.
+ *
+ * 청구 합은 **모든 차수에 청구액이 들어온 뒤에만** 낸다. 일부만 더하면 덜 넣은 만큼이
+ * 「덜 지급」이 아니라 「더 지급」으로 둔갑한다.
+ */
+export function applyBundles(rows: CompareRow[], bundles: BundleStatus[]): CompareRow[] {
+  if (bundles.length === 0) return rows
+  const byTx = new Map(rows.map((r) => [r.transactionId, r]))
+  const added: CompareRow[] = []
+  const memberOf = new Map<string, { id: string; label: string }>()
+
+  for (const b of bundles) {
+    const members = b.transaction_ids.map((id) => byTx.get(id)).filter((r): r is CompareRow => r != null)
+    if (members.length === 0) continue
+    for (const m of members) memberOf.set(m.transactionId, { id: b.bundle_id, label: b.label })
+
+    const sumAll = (pick: (r: CompareRow) => number | null) =>
+      members.every((m) => pick(m) != null) ? members.reduce((s, m) => s + pick(m)!, 0) : null
+
+    const invoicedKrw = sumAll((m) => m.invoicedKrw)
+    const confirmedKrw = sumAll((m) => m.confirmedKrw)
+    const calcKrw = sumAll((m) => m.calcKrw)
+    const legacyVatMode = members.some((m) => m.legacyVatMode)
+    // 혹시 차수에 직접 붙은 지급이 있어도 버리지 않는다 — 묶음 줄로 모아 센다.
+    const installments = [
+      ...toInstallments(b),
+      ...members.flatMap((m) => m.installments),
+    ].sort((x, y) => x.paidAt.localeCompare(y.paidAt))
+    const paidKrw = num(b.paid_krw) + members.reduce((s, m) => s + m.paidKrw, 0)
+    const dueDate = members.reduce<string | null>(
+      (last, m) => (m.dueDate != null && (last == null || m.dueDate > last) ? m.dueDate : last), null)
+    const usd = sumAll((m) => m.importAmountUsd)
+
+    added.push({
+      transactionId: `bundle:${b.bundle_id}`,
+      roundNo: Math.max(...members.map((m) => m.roundNo ?? 0)),
+      roundLabel: b.label,
+      orderNo: null,
+      importAmountUsd: usd,
+      kind: members[0].kind,
+      invoicedKrw,
+      confirmedKrw,
+      calcKrw,
+      billVsCalcKrw: invoicedKrw != null && calcKrw != null ? invoicedKrw - calcKrw : null,
+      confirmVsCalcKrw: confirmedKrw != null && calcKrw != null ? confirmedKrw - calcKrw : null,
+      calcVsPaidKrw: !legacyVatMode && calcKrw != null ? calcKrw - paidKrw : null,
+      paidKrw,
+      installments,
+      balanceKrw: invoicedKrw == null ? null : invoicedKrw - paidKrw,
+      dueDate,
+      dueYear: dueDate ? Number(dueDate.slice(0, 4)) : null,
+      lastPaidAt: installments.at(-1)?.paidAt ?? null,
+      mergedWithRounds: [],
+      legacyVatMode,
+      note: b.note,
+      noteTarget: { table: 'settlement_bundles', column: 'note', id: b.bundle_id },
+      noteMeta: b.note_meta,
+      calcNote: null,
+      calcNoteTarget: null,
+      invoicedTarget: null,
+      inBundle: null,
+      bundle: {
+        rounds: members.map((m) => m.roundNo ?? 0).sort((x, y) => x - y),
+        billedCount: members.filter((m) => m.invoicedKrw != null).length,
+      },
+    })
+  }
+
+  return [
+    ...rows.map((r) => {
+      const inBundle = memberOf.get(r.transactionId)
+      if (!inBundle) return r
+      return {
+        ...r, inBundle,
+        paidKrw: 0, installments: [], balanceKrw: null, calcVsPaidKrw: null,
+        lastPaidAt: null, mergedWithRounds: [],
+      }
+    }),
+    ...added,
+  ]
+}
+
+/** 묶음에 든 차수 번호를 「1, 3~8」처럼 줄여 쓴다 */
+export function roundRange(rounds: number[]): string {
+  const parts: string[] = []
+  let start = rounds[0]
+  for (let i = 1; i <= rounds.length; i++) {
+    if (rounds[i] === rounds[i - 1] + 1) continue
+    const end = rounds[i - 1]
+    parts.push(start === end ? `${start}` : `${start}~${end}`)
+    start = rounds[i]
+  }
+  return parts.join(', ')
+}
+
 /** PostgREST 오류를 그대로 던진다 — 컬럼이 없으면 그 사실이 화면까지 올라가야 한다. */
 function orThrow<T>(res: { data: T | null; error: { message: string } | null }, what: string): T {
   if (res.error) throw new Error(`${what}을(를) 읽지 못했습니다 — ${res.error.message}`)
@@ -326,7 +458,7 @@ async function interimRows(
     .from('interim_settlements')
     .select(
       'id, transaction_id, invoiced_amount_krw, confirmed_amount_krw, customs_exchange_rate,'
-      + ' rounding_policy, vat_mode, notes, calc_diff_note,'
+      + ' rounding_policy, vat_mode, notes, calc_diff_note, note_meta,'
       + ' interim_cost_items(amount_krw, is_import_vat, is_duty, is_vat_taxable, vat_amount_krw)',
     )
   const data = orThrow(res, '중간정산')
@@ -341,6 +473,7 @@ async function interimRows(
     vat_mode: string | null
     notes: string | null
     calc_diff_note: string | null
+    note_meta: NoteMeta | null
     interim_cost_items: {
       amount_krw: number | string | null; is_import_vat: boolean | null
       is_duty: boolean | null; is_vat_taxable: boolean | null; vat_amount_krw: number | string | null
@@ -382,6 +515,7 @@ async function interimRows(
       noteTarget: { table: 'interim_settlements', column: 'notes', id: r.id },
       calcNote: r.calc_diff_note,
       calcNoteTarget: { table: 'interim_settlements', column: 'calc_diff_note', id: r.id },
+      noteMeta: r.note_meta,
     })]
   })
 }
@@ -396,7 +530,7 @@ async function closingRows(
     .from('closing_settlements')
     .select(
       'id, transaction_id, invoiced_amount_krw, confirmed_amount_krw, lc_payment_total_krw,'
-      + ' fx_burden_a1_pct, rounding_policy, vat_mode, notes, calc_diff_note,'
+      + ' fx_burden_a1_pct, rounding_policy, vat_mode, notes, calc_diff_note, note_meta,'
       + ' lc_fee_items(amount_krw), closing_cost_items(amount_krw)',
     )
   const data = orThrow(res, '최종정산')
@@ -412,6 +546,7 @@ async function closingRows(
     vat_mode: string | null
     notes: string | null
     calc_diff_note: string | null
+    note_meta: NoteMeta | null
     lc_fee_items: { amount_krw: number | string | null }[] | null
     closing_cost_items: { amount_krw: number | string | null }[] | null
   }
@@ -461,6 +596,7 @@ async function closingRows(
       noteTarget: { table: 'closing_settlements', column: 'notes', id: r.id },
       calcNote: r.calc_diff_note,
       calcNoteTarget: { table: 'closing_settlements', column: 'calc_diff_note', id: r.id },
+      noteMeta: r.note_meta,
     })]
   })
 }
@@ -473,13 +609,14 @@ async function penaltyRows(
 ): Promise<CompareRow[]> {
   const res = await supabase
     .from('settlement_penalties')
-    .select('id, transaction_id, incurred_on, reason, amount_krw, due_date, note')
+    .select('id, transaction_id, incurred_on, reason, amount_krw, due_date, note, note_meta')
     .order('incurred_on', { ascending: false })
   const data = orThrow(res, '지체상금')
 
   type Row = {
     id: string; transaction_id: string; incurred_on: string
     reason: string; amount_krw: number | string; due_date: string | null; note: string | null
+    note_meta: NoteMeta | null
   }
 
   // 지급 배분은 차수 단위라 한 차수에 지체상금이 여러 건이면 첫 행에만 붙인다.
@@ -507,6 +644,7 @@ async function penaltyRows(
         noteTarget: { table: 'settlement_penalties', column: 'note', id: r.id },
         calcNote: null,
         calcNoteTarget: null,
+        noteMeta: r.note_meta,
       }),
       reason: r.reason,
       incurredOn: r.incurred_on,
@@ -527,6 +665,7 @@ function build(args: {
   noteTarget: NoteTarget | null
   calcNote: string | null
   calcNoteTarget: NoteTarget | null
+  noteMeta: NoteMeta | null
 }): CompareRow {
   const nt = args.noteTarget
   const invoicedTarget =
@@ -564,7 +703,10 @@ function build(args: {
     noteTarget: args.noteTarget,
     calcNote: args.calcNote,
     calcNoteTarget: args.calcNoteTarget,
+    noteMeta: args.noteMeta,
     invoicedTarget,
+    inBundle: null,
+    bundle: null,
   }
 }
 
@@ -579,7 +721,9 @@ export function settledTotals(rows: CompareRow[], today: string): CompareTotals 
   return aggregate(rows.filter((r) => r.roundNo != null && r.roundNo <= SETTLED_THROUGH_ROUND), today)
 }
 
-function summarize(rows: CompareRow[], today: string): CompareSummary {
+function summarize(all: CompareRow[], today: string): CompareSummary {
+  // 묶음에 든 차수는 묶음 줄이 대신 센다 (aggregate 와 같은 규칙)
+  const rows = all.filter((r) => r.inBundle == null)
   const billed = rows.filter((r) => r.invoicedKrw != null)
 
   // 기일이 없는 행은 「지났다」고 말할 근거가 없다 — 경과로 세지 않는다.

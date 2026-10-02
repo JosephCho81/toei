@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { NoteMeta } from '@/lib/data/noteMeta'
 import { aggregateForwardingQuotes } from '@/lib/utils/forwarding'
 import { fetchTransactionBase, fetchInterimSettlement, fetchForwardingQuotes } from '@/lib/data/queries'
 import { krwToUsd } from '@/lib/calculations/helpers'
@@ -44,6 +45,8 @@ export interface StoredClosing {
   vatMode: 'inclusive' | 'exclusive'
   confirmedAmountKrw: number | null
   notes: string | null
+  /** 메모를 마지막으로 저장한 계정·시각 (043) */
+  noteMeta: NoteMeta | null
   /** 달러 없이 원화만 저장된 과거 정산 — 계산 기준을 저장값으로 고정한다 */
   legacyLcPaymentKrw: number | null
   feeRows: FeeRow[] | null
@@ -135,6 +138,7 @@ async function toStoredClosing(
     vatMode: closing.vat_mode === 'inclusive' ? 'inclusive' : 'exclusive',
     confirmedAmountKrw: closing.confirmed_amount_krw != null ? Number(closing.confirmed_amount_krw) : null,
     notes: (closing.notes as string | null) ?? null,
+    noteMeta: (closing.note_meta as NoteMeta | null) ?? null,
     legacyLcPaymentKrw: legacy,
     feeRows: fees?.length
       ? fees.map((f) => ({

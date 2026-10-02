@@ -9,6 +9,7 @@ import { useClosingForm } from '@/lib/settlements/useClosingForm'
 import { saveClosingSettlement, validateClosingInput } from '@/lib/settlements/closingSave'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { noteStamp } from '@/lib/data/noteMeta'
 import { MemoField } from '@/components/ui/MemoField'
 import { ClosingFxCard } from '@/components/settlements/ClosingFxCard'
 import { ClosingLcFeeCard } from '@/components/settlements/ClosingLcFeeCard'
@@ -179,6 +180,7 @@ export default function ClosingSettlementPage() {
           <CardContent>
             <MemoField
               notes={f.notes}
+              stamp={noteStamp(f.noteMeta, 'notes', new Date().toISOString().slice(0, 10))}
               disabled={isLocked}
               onSave={async (newNotes) => {
                 const { error } = await supabase

@@ -12,6 +12,7 @@ import { ContainerList } from '@/components/containers/ContainerList'
 import { SettlementCard, Row } from '@/components/transactions/SettlementCard'
 import { ItemsEditTable } from '@/components/transactions/ItemsEditTable'
 import { ForwardingQuoteSection } from '@/components/transactions/ForwardingQuoteSection'
+import { noteStamp } from '@/lib/data/noteMeta'
 import { TransactionNotesCard } from '@/components/transactions/TransactionNotesCard'
 import { TransactionLockButton } from '@/components/transactions/TransactionLockButton'
 
@@ -146,7 +147,11 @@ export default async function TransactionDetailPage({ params }: { params: Promis
 
       <ForwardingQuoteSection transactionId={id} isLocked={readOnly} />
 
-      <TransactionNotesCard transactionId={id} initialNotes={t.notes ?? null} />
+      <TransactionNotesCard
+        transactionId={id}
+        initialNotes={t.notes ?? null}
+        stamp={noteStamp(t.note_meta ?? null, 'notes', new Date().toISOString().slice(0, 10))}
+      />
     </div>
   )
 }

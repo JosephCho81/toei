@@ -12,8 +12,9 @@ import { Input } from '@/components/ui/input'
 import { MemoField } from '@/components/ui/MemoField'
 import { useCanEdit } from '@/components/auth/RoleProvider'
 import { NoteCell, NoteRow } from '@/components/ui/NoteCell'
+import { noteStamp } from '@/lib/data/noteMeta'
 import { PAID_TOLERANCE_KRW, calcPaidPhase, type CalcPaidPhase } from '@/lib/data/payments'
-import { aggregate, type CompareRow, type CompareTotals, type NoteTarget, type SettlementKind } from '@/lib/data/settlementCompare'
+import { aggregate, roundRange, type CompareRow, type CompareTotals, type NoteTarget, type SettlementKind } from '@/lib/data/settlementCompare'
 
 /**
  * 청구값 · 계산값 · 지불값을 한 줄에 세운 표. 세 화면이 같은 것을 쓴다.
@@ -69,6 +70,14 @@ function Sub({ children, strong = false }: { children: React.ReactNode; strong?:
       {children}
     </span>
   )
+}
+
+/** 비고 칸 — 좁은 칸에서 「✓ 비고 2건」이 두 줄로 꺾이지 않게 한 줄로 자른다 */
+const NOTE_TD = 'overflow-hidden whitespace-nowrap px-1.5 py-2.5 align-middle'
+
+/** 그 메모 칸을 마지막으로 저장한 계정·날짜 */
+function stampOf(r: CompareRow, target: NoteTarget | null, today: string): string | null {
+  return target ? noteStamp(r.noteMeta, target.column, today) : null
 }
 
 function rowKey(r: CompareRow): string {
@@ -343,16 +352,16 @@ export function CompareTable({
                 />
               </th>
               <th className={cn(TH, CENTER, 'w-[10%]')}>차수 · P/O No.</th>
-              <th className={cn(TH, NUM, 'w-[7%]')}>수입금액 ($)</th>
+              <th className={cn(TH, CENTER, 'w-[7%]')}>수입금액 ($)</th>
               <th className={cn(TH, CENTER, 'w-[7%]')}>기일</th>
-              <th className={cn(TH, NUM, 'w-[10%]')}>청구금액<Sub>(토에이 계산금액)</Sub></th>
-              <th className={cn(TH, NUM, 'w-[10%]')}>계산금액<Sub strong>(시스템 계산금액)</Sub></th>
-              <th className={cn(TH, NUM, 'w-[10%]')}>실지급액 (원)<Sub>(계산서를 확인한 금액)</Sub></th>
-              <th className={cn(TH, NUM, 'w-[9%]')}>계산 차이<Sub>(청구−계산)</Sub></th>
-              <th className={cn(TH, NUM, 'w-[9%]')}>청구-지급 차이<Sub>(지급−청구)</Sub></th>
-              <th className={cn(TH, NUM, 'w-[9%]')}>계산-지급 차이<Sub strong>(지급−계산)</Sub></th>
-              <th className={cn(TH, 'w-[8%]')}>비고<Sub>(금액 차이 사유)</Sub></th>
-              <th className={cn(TH, 'w-[8%]')}>비고<Sub>(계산금액 차이 사유)</Sub></th>
+              <th className={cn(TH, CENTER, 'w-[10%]')}>청구금액<Sub>(토에이 계산금액)</Sub></th>
+              <th className={cn(TH, CENTER, 'w-[10%]')}>계산금액<Sub strong>(시스템 계산금액)</Sub></th>
+              <th className={cn(TH, CENTER, 'w-[10%]')}>실지급액 (원)<Sub>(계산서를 확인한 금액)</Sub></th>
+              <th className={cn(TH, CENTER, 'w-[9%]')}>계산 차이<Sub>(청구−계산)</Sub></th>
+              <th className={cn(TH, CENTER, 'w-[9%]')}>청구-지급 차이<Sub>(지급−청구)</Sub></th>
+              <th className={cn(TH, CENTER, 'w-[9%]')}>계산-지급 차이<Sub strong>(지급−계산)</Sub></th>
+              <th className={cn(TH, CENTER, 'w-[8%]')}>비고<Sub>(금액 차이 사유)</Sub></th>
+              <th className={cn(TH, CENTER, 'w-[8%]')}>비고<Sub>(계산금액 차이 사유)</Sub></th>
             </tr>
           </thead>
 
@@ -462,13 +471,13 @@ function GroupBody({
         return (
           <tbody key={id} className="border-t">
             <tr
-              className={cn('group cursor-pointer hover:bg-slate-100/70', zebra)}
+              className={cn('group cursor-pointer hover:bg-slate-100/70', r.bundle ? 'bg-slate-100' : zebra)}
               onClick={() => onToggle(id)}
             >
               <td className={cn(TD, CENTER, 'px-1')} onClick={(e) => e.stopPropagation()}>
                 <input
                   type="checkbox"
-                  aria-label={`${r.roundNo ?? r.roundLabel}차 합계에 넣기`}
+                  aria-label={`${r.bundle ? r.roundLabel : `${r.roundNo ?? r.roundLabel}차`} 합계에 넣기`}
                   checked={picked.has(id)}
                   onChange={() => onPick(id)}
                   className="h-3.5 w-3.5 align-middle accent-slate-700"
@@ -480,8 +489,15 @@ function GroupBody({
                   {isOpen
                     ? <ChevronDown className="h-4 w-4 text-slate-400" />
                     : <ChevronRight className="h-4 w-4 text-slate-400" />}
-                  {r.roundNo != null ? `${r.roundNo}차` : r.roundLabel}
+                  {r.bundle ? `${roundRange(r.bundle.rounds)}차 묶음`
+                    : r.roundNo != null ? `${r.roundNo}차` : r.roundLabel}
                 </span>
+                {r.bundle && (
+                  <span className="block font-normal text-muted-foreground">계산서 1장으로 정산</span>
+                )}
+                {r.inBundle && (
+                  <span className="block font-normal text-muted-foreground">{r.inBundle.label}에 포함</span>
+                )}
                 {r.orderNo && (
                   <span className="block font-normal text-muted-foreground">{r.orderNo}</span>
                 )}
@@ -504,7 +520,9 @@ function GroupBody({
 
               <td className={cn(TD, NUM, 'tabular-nums')}>
                 {r.invoicedKrw != null ? krw(r.invoicedKrw)
-                  : <span className="text-muted-foreground">청구 전</span>}
+                  : r.bundle
+                    ? <span className="text-muted-foreground">청구 입력 {r.bundle.billedCount}/{r.bundle.rounds.length}</span>
+                    : <span className="text-muted-foreground">청구 전</span>}
               </td>
 
               <td className={cn(TD, NUM, 'tabular-nums text-slate-600')}>
@@ -513,9 +531,10 @@ function GroupBody({
               </td>
 
               <td className={cn(TD, NUM, 'tabular-nums')}>
-                {r.installments.length === 0
-                  ? <span className="text-muted-foreground">—</span>
-                  : krw(r.paidKrw)}
+                {r.inBundle ? <span className="text-muted-foreground">묶음 지급</span>
+                  : r.installments.length === 0
+                    ? <span className="text-muted-foreground">—</span>
+                    : krw(r.paidKrw)}
               </td>
 
               {/* 청구가 계산과 다른 것은 미지급이 아니라 청구 오류다. 빨강은 덜 청구한 쪽에만. */}
@@ -528,13 +547,15 @@ function GroupBody({
 
               <td className={cn(TD, NUM, 'tabular-nums font-semibold',
                 unpaid ? 'text-red-700' : 'text-slate-600')}>
-                <Gap value={r.balanceKrw == null ? null : -r.balanceKrw} />
+                {r.inBundle ? <span className="font-normal text-muted-foreground">묶음 줄</span>
+                  : <Gap value={r.balanceKrw == null ? null : -r.balanceKrw} />}
               </td>
 
               {/* 청구가 맞았다면 더/덜 나간 금액. 기일이 이번 달 이후면 숫자 대신 상태만 (담당자 2026-09-22) */}
               <td className={cn(TD, NUM, 'tabular-nums font-semibold', PHASE_BG[phase],
                 calcUnpaid ? 'text-red-700' : 'text-slate-600')}>
-                {r.legacyVatMode
+                {r.inBundle ? <span className="font-normal text-muted-foreground">묶음 줄</span>
+                  : r.legacyVatMode
                   ? <span className="text-muted-foreground">구방식</span>
                   : phase === 'shown'
                     ? <Gap value={r.calcVsPaidKrw == null ? null : -r.calcVsPaidKrw} />
@@ -542,23 +563,29 @@ function GroupBody({
               </td>
 
               {/* 메모가 있는 칸은 노랑 — 펼쳐 볼 차수가 표에서 먼저 보이게 (담당자 2026-09-22) */}
-              <td className={cn('px-2.5 py-2.5 align-middle', hasNote && 'bg-yellow-100')}>
+              <td className={cn(NOTE_TD, hasNote && 'bg-yellow-100')}>
                 <NoteCell note={r.note} expanded={amountNoteOpen} onToggle={() => onToggleNote(`${id}:amount`)} />
               </td>
-              <td className={cn('px-2.5 py-2.5 align-middle', hasCalcNote && 'bg-yellow-100')}>
+              <td className={cn(NOTE_TD, hasCalcNote && 'bg-yellow-100')}>
                 {r.calcNoteTarget
                   ? <NoteCell note={r.calcNote} expanded={calcNoteOpen} onToggle={() => onToggleNote(`${id}:calc`)} />
                   : <span className="text-muted-foreground">—</span>}
               </td>
             </tr>
 
-            {amountNoteOpen && <NoteRow colSpan={COLS} label="금액 차이 사유" note={r.note} />}
-            {calcNoteOpen && <NoteRow colSpan={COLS} label="계산금액 차이 사유" note={r.calcNote} />}
+            {amountNoteOpen && (
+              <NoteRow colSpan={COLS} label="금액 차이 사유" note={r.note}
+                stamp={stampOf(r, r.noteTarget, today)} />
+            )}
+            {calcNoteOpen && (
+              <NoteRow colSpan={COLS} label="계산금액 차이 사유" note={r.calcNote}
+                stamp={stampOf(r, r.calcNoteTarget, today)} />
+            )}
 
             {isOpen && (
               <tr>
                 <td colSpan={COLS} className="border-l-4 border-slate-300 bg-slate-100/70 px-6 py-3">
-                  <RowDetail row={r} onSaveNote={onSaveNote} onSaveInvoiced={onSaveInvoiced} />
+                  <RowDetail row={r} today={today} onSaveNote={onSaveNote} onSaveInvoiced={onSaveInvoiced} />
                 </td>
               </tr>
             )}
@@ -651,10 +678,12 @@ function TotalsRow({
  */
 function RowDetail({
   row,
+  today,
   onSaveNote,
   onSaveInvoiced,
 }: {
   row: CompareRow
+  today: string
   onSaveNote: (target: NoteTarget | null, note: string | null) => Promise<void>
   onSaveInvoiced: (row: CompareRow, amount: number | null) => Promise<void>
 }) {
@@ -707,6 +736,19 @@ function RowDetail({
         </>
       )}
 
+      {row.bundle && (
+        <p className="text-slate-700">
+          {roundRange(row.bundle.rounds)}차를 계산서 한 장으로 정산한 묶음입니다. 지급은 차수에 나누지 않고 이 줄에만 붙습니다.
+          청구액은 차수 줄을 펼쳐 차수별로 넣습니다 — 모든 차수에 들어와야 묶음 청구 합과 청구-지급 차이가 나옵니다
+          (지금 {row.bundle.billedCount}/{row.bundle.rounds.length}).
+        </p>
+      )}
+      {row.inBundle && (
+        <p className="text-slate-700">
+          이 차수는 「{row.inBundle.label}」로 정산했습니다. 지급과 청구-지급·계산-지급 차이는 묶음 줄에서 봅니다.
+        </p>
+      )}
+
       {/* 계산서를 확인하고 나서 적어 넣는 자리. 검산이 끝난 값만 여기 들어온다. */}
       {canEdit && row.invoicedTarget && (
         <InvoicedField
@@ -741,7 +783,7 @@ function RowDetail({
             ))}
           </tbody>
         </table>
-      ) : (
+      ) : row.inBundle ? null : (
         <p className="text-muted-foreground">아직 지급 기록이 없습니다.</p>
       )}
 
@@ -759,6 +801,7 @@ function RowDetail({
         {row.noteTarget ? (
           <MemoField
             notes={row.note}
+            stamp={stampOf(row, row.noteTarget, today)}
             onSave={(next) => onSaveNote(row.noteTarget, next)}
           />
         ) : (
@@ -773,16 +816,21 @@ function RowDetail({
           </p>
           <MemoField
             notes={row.calcNote}
+            stamp={stampOf(row, row.calcNoteTarget, today)}
             onSave={(next) => onSaveNote(row.calcNoteTarget, next)}
           />
         </div>
       )}
 
       <p>
-        <Link href={`/transactions/${row.transactionId}`} className="underline underline-offset-2">
-          거래 상세 보기
-        </Link>
-        {' · '}
+        {!row.bundle && (
+          <>
+            <Link href={`/transactions/${row.transactionId}`} className="underline underline-offset-2">
+              거래 상세 보기
+            </Link>
+            {' · '}
+          </>
+        )}
         <Link href="/payments" className="underline underline-offset-2">
           지급 입력은 지급 현황에서
         </Link>

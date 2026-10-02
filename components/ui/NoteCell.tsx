@@ -19,28 +19,36 @@ export function NoteCell({
 }) {
   const lines = noteLines(note)
   if (lines.length === 0) {
-    return <span className="text-muted-foreground">+ 비고</span>
+    return <span className="whitespace-nowrap text-muted-foreground">+ 비고</span>
   }
   return (
     <button
       type="button"
       aria-expanded={expanded}
       onClick={(e) => { e.stopPropagation(); onToggle() }}
-      className="inline-flex items-center gap-1 font-semibold text-slate-800 hover:underline"
+      className="inline-flex items-center whitespace-nowrap font-semibold text-slate-800 hover:underline"
     >
-      {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-      ✓ 비고 {lines.length > 1 && <span className="font-normal text-muted-foreground">{lines.length}건</span>}
+      {/* 열 폭이 표의 8%라 「✓ 비고 4건」이 두 줄로 꺾였다 (담당자 2026-10-02). 아이콘·간격을 줄이고 한 줄로 묶는다 */}
+      {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+      <span>✓ 비고{lines.length > 1 && <span className="ml-0.5 font-normal text-muted-foreground">{lines.length}</span>}</span>
     </button>
   )
 }
 
 /** NoteCell 을 펼쳤을 때 행 바로 아래 붙는 전폭 줄 */
-export function NoteRow({ colSpan, label, note }: { colSpan: number; label: string; note: string | null }) {
+export function NoteRow({ colSpan, label, note, stamp = null }: {
+  colSpan: number
+  label: string
+  note: string | null
+  /** 마지막 저장 「토에이 · 10-02」 — 글 뒤에 작게만 붙인다 (043) */
+  stamp?: string | null
+}) {
   return (
     <tr>
       <td colSpan={colSpan} className="border-l-4 border-yellow-300 bg-yellow-50 px-6 py-2 text-sm">
         <span className="mr-2 font-semibold text-slate-800">{label}</span>
         <span className="whitespace-pre-wrap break-words text-slate-700">{noteLines(note).join('\n')}</span>
+        {stamp && <span className="ml-3 whitespace-nowrap text-xs text-muted-foreground">{stamp}</span>}
       </td>
     </tr>
   )

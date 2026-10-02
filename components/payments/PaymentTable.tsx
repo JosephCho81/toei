@@ -307,7 +307,7 @@ export function PaymentTable({ rows }: { rows: PaymentRow[] }) {
                   </td>
                 </tr>
 
-                {isNoteOpen && <NoteRow colSpan={COLS} label="지급 비고" note={r.note} />}
+                {isNoteOpen && <NoteRow colSpan={COLS} label="지급 비고" note={r.note} stamp={r.noteStamp} />}
 
                 {issue && (
                   <tr className={cn('cursor-pointer', zebra)} onClick={() => toggle(r.transactionId)}>
@@ -482,7 +482,30 @@ function RoundDetail({
       )}
 
       {/* 청구액 양수 = 에이원이 토에이에 낼 돈, 음수 = 토에이가 에이원에 돌려줄 환급이다. */}
-      {row.closingBilledKrw != null && (
+      {/* 묶음 정산 차수 — 지급이 묶음에만 붙어 있어 차수별 지급액이 없다. 묶음 전체로 말한다 (042). */}
+      {row.closingBundle && (
+        <div className="text-slate-700">
+          <p className="font-semibold">최종정산 — {row.closingBundle.label} (계산서 1장)</p>
+          <p>
+            묶음 청구금액{' '}
+            <b className="tabular-nums">
+              {row.closingBundle.billedKrw == null ? '청구액 미입력 차수 있음' : `${krw(row.closingBundle.billedKrw)}원`}
+            </b>
+            {' · '}묶음 지급액 <b className="tabular-nums">{krw(row.closingBundle.paidKrw)}원</b>
+          </p>
+          <p>
+            {row.closingBundle.billedKrw == null
+              ? '정산 결과: 청구액이 모두 들어와야 냅니다'
+              : Math.abs(row.closingBundle.balanceKrw) < PAID_TOLERANCE_KRW
+                ? '정산 결과: 정산 완료'
+                : row.closingBundle.balanceKrw > 0
+                  ? `정산 결과: 묶음 ${krw(row.closingBundle.balanceKrw)}원 미지급 (청구-지급 차이)`
+                  : `정산 결과: 묶음 ${krw(-row.closingBundle.balanceKrw)}원 더 지급 (청구-지급 차이)`}
+          </p>
+        </div>
+      )}
+
+      {row.closingBilledKrw != null && !row.closingBundle && (
         <div className="text-slate-700">
           <p className="font-semibold">최종정산</p>
           <p>
@@ -518,7 +541,7 @@ function RoundDetail({
         <p className="mb-1 font-semibold">
           지급 비고 <span className="font-normal text-muted-foreground">(지급 사유 · 확인 요청)</span>
         </p>
-        <MemoField notes={row.note} onSave={(next) => onSaveNote(row, next)} />
+        <MemoField notes={row.note} stamp={row.noteStamp} onSave={(next) => onSaveNote(row, next)} />
       </div>
 
       <p>

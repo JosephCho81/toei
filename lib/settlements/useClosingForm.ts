@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import type { NoteMeta } from '@/lib/data/noteMeta'
 import { createClient } from '@/lib/supabase/client'
 import type { RoundingPolicy, VatMode } from '@/lib/calculations/closing'
 import { loadClosingForm, type ClosingCostRow, type ClosingFormData } from './closingLoad'
@@ -43,6 +44,7 @@ export function useClosingForm(transactionId: string) {
   // null이면 시스템 계산값을 따라간다. 담당자가 직접 입력했거나 DB에 확정금액이 있을 때만 문자열.
   const [confirmedOverride, setConfirmedOverride] = useState<string | null>(null)
   const [notes, setNotes] = useState<string | null>(null)
+  const [noteMeta, setNoteMeta] = useState<NoteMeta | null>(null)
 
   useEffect(() => {
     loadClosingForm(supabase, transactionId).then((data) => {
@@ -62,6 +64,7 @@ export function useClosingForm(transactionId: string) {
       setVatMode(c.vatMode)
       setConfirmedOverride(c.confirmedAmountKrw != null ? String(c.confirmedAmountKrw) : null)
       setNotes(c.notes)
+      setNoteMeta(c.noteMeta)
       if (c.feeRows) setLcFeeRows(c.feeRows)
       if (c.costRows) setClosingCostRows(c.costRows)
     })
@@ -76,7 +79,7 @@ export function useClosingForm(transactionId: string) {
     advanceUsd, setAdvanceUsd, advanceRate, setAdvanceRate,
     fxBurdenA1Pct, setFxBurdenA1Pct, roundingPolicy, setRoundingPolicy, vatMode,
     lcFeeRows, setLcFeeRows, closingCostRows, setClosingCostRows,
-    confirmedOverride, setConfirmedOverride, notes, setNotes,
+    confirmedOverride, setConfirmedOverride, notes, setNotes, noteMeta,
     bokRateNum: parseFloat(bokRate) || 0,
     lcPaymentUsdNum: num(lcPaymentUsd),
     advanceUsdNum: num(advanceUsd),

@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchTransactionBase, fetchInterimSettlement, fetchInterimCostItems } from '@/lib/data/queries'
 import { toCostRow } from '@/lib/utils/costRows'
 import type { VatMode } from '@/lib/calculations/interim'
+import type { NoteMeta } from '@/lib/data/noteMeta'
 import type { CostRow } from '@/types/settlement'
 import { saveSettlementInOrder, toError } from './saveInOrder'
 
@@ -21,6 +22,8 @@ export interface InterimFormData {
   /** 확정 대상은 공급가다 — 부가세·합계는 여기서 파생시켜야 세금계산서가 항상 맞는다. */
   storedSupply: string | null
   notes: string | null
+  /** 메모를 마지막으로 저장한 계정·시각 (043) */
+  noteMeta: NoteMeta | null
   shippingRows: CostRow[] | null
   customsRows: CostRow[] | null
   /** 포워딩 실청구액에서 운송비를 자동으로 채웠는가 */
@@ -55,6 +58,7 @@ export async function loadInterimForm(
     vatMode: 'exclusive',
     storedSupply: null,
     notes: null,
+    noteMeta: null,
     shippingRows: null,
     customsRows: null,
     prefilled: false,
@@ -85,6 +89,7 @@ export async function loadInterimForm(
       vatMode: mode,
       storedSupply: supply != null ? String(supply) : null,
       notes: interim.notes ?? null,
+      noteMeta: (interim as { note_meta?: NoteMeta | null }).note_meta ?? null,
     }
   }
 

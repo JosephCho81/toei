@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ShippingCostItems, type CostRow, DEFAULT_SHIPPING } from '@/components/settlements/ShippingCostItems'
 import { CustomsCostItems, DEFAULT_CUSTOMS } from '@/components/settlements/CustomsCostItems'
 import { InterimResultsCard } from '@/components/settlements/InterimResultsCard'
+import { noteStamp, type NoteMeta } from '@/lib/data/noteMeta'
 import { MemoField } from '@/components/ui/MemoField'
 import { UnlockButton } from '@/components/settlements/UnlockButton'
 import { DeleteSettlementButton } from '@/components/settlements/DeleteSettlementButton'
@@ -40,6 +41,7 @@ export default function InterimSettlementPage() {
   const [supplyOverride, setSupplyOverride] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [notes, setNotes] = useState<string | null>(null)
+  const [noteMeta, setNoteMeta] = useState<NoteMeta | null>(null)
 
   useEffect(() => {
     loadInterimForm(supabase, id).then((d) => {
@@ -51,6 +53,7 @@ export default function InterimSettlementPage() {
       setVatMode(d.vatMode)
       setSupplyOverride(d.storedSupply)
       setNotes(d.notes)
+      setNoteMeta(d.noteMeta)
       setPrefilled(d.prefilled)
       if (d.shippingRows) setShippingRows(d.shippingRows)
       if (d.customsRows) setCustomsRows(d.customsRows)
@@ -159,6 +162,7 @@ export default function InterimSettlementPage() {
           <CardContent>
             <MemoField
               notes={notes}
+              stamp={noteStamp(noteMeta, 'notes', new Date().toISOString().slice(0, 10))}
               disabled={isLocked}
               onSave={async (newNotes) => {
                 const { error } = await supabase.from('interim_settlements').update({ notes: newNotes }).eq('id', sid)

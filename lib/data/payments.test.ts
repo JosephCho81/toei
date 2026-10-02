@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { bucketOf, calcPaidPhase, isCalcPaidShown, isPastGrace, SETTLED_THROUGH_ROUND, PAID_TOLERANCE_KRW } from './payments.ts'
+import { bucketOf, calcPaidPhase, closingUnits, unitTotals, isCalcPaidShown, isPastGrace, SETTLED_THROUGH_ROUND, PAID_TOLERANCE_KRW } from './payments.ts'
 
 /**
  * 남은 금액이 어느 칸에 들어가는가 — 담당자 2026-09-10 규약.
@@ -93,4 +93,30 @@ test('숨긴 칸의 상태 — 38차 연빨강, 37·39차 연녹색', () => {
   assert.equal(calcPaidPhase('2026-10-16', T, true), 'upcoming')
   assert.equal(calcPaidPhase('2026-10-18', T, false), 'upcoming')
   assert.equal(calcPaidPhase(null, T, true), 'undated')
+})
+
+/**
+ * 1, 3~8차 최종정산은 계산서 한 장으로 끝났다 (직원 2026-10-02).
+ * 묶음 지급을 차수에 나누지 않고, 묶음 한 단위로 청구 합 − 지급을 낸다.
+ */
+test('최종정산 묶음은 한 단위로 센다 — 든 차수의 청구 합에서 묶음 지급을 뺀다', () => {
+  const billed = new Map([['t1', -500], ['t3', 1500], ['t4', 1000], ['t9', 700]])
+  const paid = new Map([['t9', 700]])
+  const units = closingUnits(billed, (id) => paid.get(id) ?? 0,
+    [{ transactionIds: ['t1', 't3', 't4'], paidKrw: 1850 }])
+  assert.equal(units.length, 2)
+  const t = unitTotals(units)
+  assert.equal(t.billedKrw, 2700)
+  assert.equal(t.paidKrw, 2550)
+  assert.equal(t.balanceKrw, 150)
+  assert.equal(t.openCount, 0) // 150원은 절사 폭 안
+})
+
+test('묶음 차수 중 청구액이 빠지면 지급만 세고 잔액은 만들지 않는다', () => {
+  const billed = new Map([['t1', 1000]])
+  const units = closingUnits(billed, () => 0, [{ transactionIds: ['t1', 't3'], paidKrw: 17_242_417 }])
+  assert.deepEqual(units, [{ billedKrw: null, paidKrw: 17_242_417 }])
+  const t = unitTotals(units)
+  assert.equal(t.balanceKrw, 0)
+  assert.equal(t.paidKrw, 17_242_417)
 })
