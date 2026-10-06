@@ -80,16 +80,16 @@ export function ForwardingDetailCard({ rows }: { rows: ForwardingRow[] }) {
           <TableHeader>
             <TableRow>
               <TableHead>항목</TableHead>
-              <TableHead className="text-right">견적금액</TableHead>
-              <TableHead className="text-right">실청구액</TableHead>
+              <TableHead className="text-right">청구금액 (VAT 미포함)</TableHead>
+              <TableHead className="text-right">청구금액 (VAT 포함)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length > 0 ? rows.map((r, i) => (
               <TableRow key={i}>
                 <TableCell className="text-sm">{r.forwarder_name}</TableCell>
-                <TableCell className="text-right tabular-nums text-sm">{krw(r.quote_amount_krw)}</TableCell>
-                <TableCell className="text-right tabular-nums text-sm">{krw(r.actual_amount_krw)}</TableCell>
+                <TableCell className="text-right tabular-nums text-sm">{krw(r.actual_supply_krw)}</TableCell>
+                <TableCell className="text-right tabular-nums text-sm">{krw(r.actual_with_vat_krw)}</TableCell>
               </TableRow>
             )) : (
               <TableRow>

@@ -57,8 +57,8 @@ export function CostSection({ data }: { data: ClosingPdfData }) {
             <View style={[s.itemsTable, { marginBottom: 4 }]}>
               <View style={s.itemsHeaderRow}>
                 <Text style={[s.itemsHeaderCell, { width: '40%' }]}>항목</Text>
-                <Text style={[s.itemsHeaderCell, { width: '30%', borderLeftWidth: 1, borderLeftColor: BORDER, textAlign: 'right' }]}>견적금액</Text>
-                <Text style={[s.itemsHeaderCell, { width: '30%', borderLeftWidth: 1, borderLeftColor: BORDER, textAlign: 'right' }]}>실청구액</Text>
+                <Text style={[s.itemsHeaderCell, { width: '30%', borderLeftWidth: 1, borderLeftColor: BORDER, textAlign: 'right' }]}>청구 (VAT 미포함)</Text>
+                <Text style={[s.itemsHeaderCell, { width: '30%', borderLeftWidth: 1, borderLeftColor: BORDER, textAlign: 'right' }]}>청구 (VAT 포함)</Text>
               </View>
               {data.forwardingQuotes.map((r, i) => {
                 const isLast = i === data.forwardingQuotes.length - 1
@@ -70,10 +70,10 @@ export function CostSection({ data }: { data: ClosingPdfData }) {
                   <View key={i} style={rowStyle}>
                     <Text style={[s.itemsCell, { width: '40%' }]}>{r.itemName}</Text>
                     <Text style={[s.itemsCell, { width: '30%', textAlign: 'right' }]}>
-                      {r.quoteAmountKrw != null ? r.quoteAmountKrw.toLocaleString('ko-KR') + '원' : '-'}
+                      {r.actualSupplyKrw != null ? r.actualSupplyKrw.toLocaleString('ko-KR') + '원' : '-'}
                     </Text>
                     <Text style={[s.itemsCellLast, { width: '30%', textAlign: 'right' }]}>
-                      {r.actualAmountKrw != null ? r.actualAmountKrw.toLocaleString('ko-KR') + '원' : '-'}
+                      {r.actualWithVatKrw != null ? r.actualWithVatKrw.toLocaleString('ko-KR') + '원' : '-'}
                     </Text>
                   </View>
                 )

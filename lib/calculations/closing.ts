@@ -178,3 +178,16 @@ export function calcLcPaymentKrw(p: LcPaymentInput, bokRate: number): number {
   const advanceUsd = p.advanceUsd ?? 0
   return usdToKrw(advanceUsd, p.advanceRate) + usdToKrw(total - advanceUsd, bokRate)
 }
+
+/**
+ * 확정된 종합정산액 = 중간 확정 + 클로징 확정. 확정 전이면 null.
+ * 리포트·PDF 는 두 확정값을 나란히 보이고 그 아래 합을 적으므로, 합도 확정값끼리 더해야 덧셈이 맞는다
+ * (사용자 2026-10-06). grandTotalKrw 는 클로징 계산값을 더한 값이라 입력 화면에서만 쓴다.
+ */
+export function confirmedGrandTotalKrw(
+  interimConfirmedKrw: number | null,
+  closingConfirmedKrw: number | string | null | undefined,
+): number | null {
+  if (interimConfirmedKrw == null || closingConfirmedKrw == null || closingConfirmedKrw === '') return null
+  return interimConfirmedKrw + Number(closingConfirmedKrw)
+}

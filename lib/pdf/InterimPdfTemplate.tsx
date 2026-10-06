@@ -24,7 +24,7 @@ export interface InterimPdfData {
   isPaid: boolean
   issuedAt: string
   costItems: InterimPdfCostItem[]
-  forwardingQuotes: { itemName: string; quoteAmountKrw: number | null; actualAmountKrw: number | null }[]
+  forwardingQuotes: { itemName: string; actualSupplyKrw: number | null; actualWithVatKrw: number | null }[]
 }
 
 const s = pdfStyles
@@ -124,8 +124,8 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
             <View style={[triCol.table, { marginBottom: 4 }]}>
               <View style={triCol.headerRow}>
                 <Text style={[triCol.headerCell, { width: '40%' }]}>항목</Text>
-                <Text style={[triCol.headerCell, { width: '30%', borderLeftWidth: 1, borderLeftColor: '#A5D6A7', textAlign: 'right' }]}>견적금액</Text>
-                <Text style={[triCol.headerCell, { width: '30%', borderLeftWidth: 1, borderLeftColor: '#A5D6A7', textAlign: 'right' }]}>실청구액</Text>
+                <Text style={[triCol.headerCell, { width: '30%', borderLeftWidth: 1, borderLeftColor: '#A5D6A7', textAlign: 'right' }]}>청구 (VAT 미포함)</Text>
+                <Text style={[triCol.headerCell, { width: '30%', borderLeftWidth: 1, borderLeftColor: '#A5D6A7', textAlign: 'right' }]}>청구 (VAT 포함)</Text>
               </View>
               {data.forwardingQuotes.map((r, i) => {
                 const isLast = i === data.forwardingQuotes.length - 1
@@ -135,10 +135,10 @@ export function InterimPdfDocument({ data }: { data: InterimPdfData }) {
                   <View key={i} style={rowStyle}>
                     <Text style={[triCol.cellItem, { width: '40%' }]}>{r.itemName}</Text>
                     <Text style={[triCol.cellAmount, { width: '30%' }]}>
-                      {r.quoteAmountKrw != null ? r.quoteAmountKrw.toLocaleString('ko-KR') + '원' : '-'}
+                      {r.actualSupplyKrw != null ? r.actualSupplyKrw.toLocaleString('ko-KR') + '원' : '-'}
                     </Text>
                     <Text style={[triCol.cellAmount, { width: '30%' }]}>
-                      {r.actualAmountKrw != null ? r.actualAmountKrw.toLocaleString('ko-KR') + '원' : '-'}
+                      {r.actualWithVatKrw != null ? r.actualWithVatKrw.toLocaleString('ko-KR') + '원' : '-'}
                     </Text>
                   </View>
                 )

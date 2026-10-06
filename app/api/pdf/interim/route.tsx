@@ -128,8 +128,8 @@ export async function GET(req: NextRequest) {
     }),
     forwardingQuotes: aggregateForwardingQuotes(fwdRows).map(q => ({
       itemName: q.forwarderName,
-      quoteAmountKrw: q.quoteAmountKrw || null,
-      actualAmountKrw: q.actualAmountKrw || null,
+      actualSupplyKrw: q.actualSupplyKrw || null,
+      actualWithVatKrw: q.actualWithVatKrw || null,
     })),
   }
 

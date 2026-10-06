@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ClosingPdfData } from '@/lib/pdf/ClosingPdfTemplate'
-import { calculateClosing, type RoundingPolicy } from '@/lib/calculations/closing'
+import { calculateClosing, confirmedGrandTotalKrw, type RoundingPolicy } from '@/lib/calculations/closing'
 import { normalizeOne } from '@/lib/utils/normalize'
 import { aggregateForwardingQuotes } from '@/lib/utils/forwarding'
 import { fetchInterimSettlement, fetchInterimCostItems, fetchForwardingQuotes } from '@/lib/data/queries'
@@ -170,9 +170,10 @@ export async function buildClosingPdfData(
     interimConfirmedKrw: interimSettlement?.confirmed_amount_krw
       ? Number(interimSettlement.confirmed_amount_krw)
       : null,
-    grandTotalKrw: interimSettlement?.confirmed_amount_krw != null
-      ? calc.grandTotalKrw
-      : null,
+    grandTotalKrw: confirmedGrandTotalKrw(
+      interimSettlement?.confirmed_amount_krw != null ? Number(interimSettlement.confirmed_amount_krw) : null,
+      closing.confirmed_amount_krw,
+    ),
     shippingItems: interimCostItems
       .filter((c) => c.group_type === 'shipping')
       .map((c) => ({ itemName: c.item_name, amountKrw: c.amount_krw })),
@@ -184,8 +185,8 @@ export async function buildClosingPdfData(
       .map((c) => ({ itemName: c.item_name, amountKrw: c.amount_krw })),
     forwardingQuotes: aggregateForwardingQuotes(fwdRows).map(q => ({
       itemName: q.forwarderName,
-      quoteAmountKrw: q.quoteAmountKrw || null,
-      actualAmountKrw: q.actualAmountKrw || null,
+      actualSupplyKrw: q.actualSupplyKrw || null,
+      actualWithVatKrw: q.actualWithVatKrw || null,
     })),
   }
 

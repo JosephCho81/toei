@@ -101,8 +101,8 @@ export async function loadReportData(supabase: SupabaseClient, id: string) {
       forwarder_name: q.forwarderName || null,
       quote_date: fwdRows[i]?.quote_date ?? null,
       notes: fwdRows[i]?.notes ?? null,
-      quote_amount_krw: q.quoteAmountKrw || null,
-      actual_amount_krw: q.actualAmountKrw || null,
+      actual_supply_krw: q.actualSupplyKrw || null,
+      actual_with_vat_krw: q.actualWithVatKrw || null,
     })),
   }
 }

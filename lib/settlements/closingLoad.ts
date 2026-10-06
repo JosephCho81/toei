@@ -27,8 +27,8 @@ export interface InterimSummary {
 
 export interface ForwardingRow {
   forwarder_name: string
-  quote_amount_krw: number | null
-  actual_amount_krw: number | null
+  actual_supply_krw: number | null
+  actual_with_vat_krw: number | null
 }
 
 /** 저장된 클로징정산. 없으면 null — 새 정산 화면이 된다. */
@@ -101,8 +101,8 @@ export async function loadClosingForm(
     })),
     forwardingQuotes: aggregateForwardingQuotes(fwdRows).map((q) => ({
       forwarder_name: q.forwarderName,
-      quote_amount_krw: q.quoteAmountKrw || null,
-      actual_amount_krw: q.actualAmountKrw || null,
+      actual_supply_krw: q.actualSupplyKrw || null,
+      actual_with_vat_krw: q.actualWithVatKrw || null,
     })),
     closing: closing ? await toStoredClosing(supabase, closing) : null,
   }

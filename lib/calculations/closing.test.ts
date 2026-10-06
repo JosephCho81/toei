@@ -1,7 +1,7 @@
 // 실행: node --test lib/calculations/closing.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { calculateClosing } from './closing.ts'
+import { calculateClosing, confirmedGrandTotalKrw } from './closing.ts'
 import { applyRounding } from './interim.ts'
 
 // ── 클로징 정산 ────────────────────────────────────────────
@@ -113,4 +113,11 @@ test('중간정산 확정금액과 합쳐 최종 합계를 낸다', () => {
     roundingPolicy: 'floor_100', vatMode: 'exclusive',
   })
   assert.equal(c.grandTotalKrw, 55313164 + c.roundedFinalKrw)
+})
+
+test('종합정산 확정액은 확정값끼리 더한다 — 클로징 계산값이 확정과 달라도 화면 덧셈이 맞는다', () => {
+  assert.equal(confirmedGrandTotalKrw(88_235_767, '-1200300'), 87_035_467)
+  assert.equal(confirmedGrandTotalKrw(88_235_767, 0), 88_235_767)
+  assert.equal(confirmedGrandTotalKrw(null, 5), null)
+  assert.equal(confirmedGrandTotalKrw(5, null), null)
 })

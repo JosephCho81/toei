@@ -7,8 +7,8 @@ import { formatDate } from '@/lib/utils/format'
 interface QuoteRow {
   forwarder_name: string | null
   quote_date: string | null
-  quote_amount_krw: number | null
-  actual_amount_krw: number | null
+  actual_supply_krw: number | null
+  actual_with_vat_krw: number | null
   notes: string | null
 }
 
@@ -16,55 +16,40 @@ function krw(v: number | null): string {
   return v != null ? `${v.toLocaleString('ko-KR')}원` : '-'
 }
 
-function diffLabel(diff: number): string {
-  return `${diff > 0 ? '+' : ''}${diff.toLocaleString('ko-KR')}원 (${diff > 0 ? '초과' : '절감'})`
-}
-
+/** 포워딩 청구는 물건을 받은 뒤에 온다 — 견적·견적 대비 차이는 뺐다 (담당자 2026-10-06) */
 export function ReportForwardingSection({ rows }: { rows: QuoteRow[] }) {
   if (!rows.length) return null
 
-  const totalQuote = rows.reduce((s, r) => s + (r.quote_amount_krw ?? 0), 0)
-  const totalActual = rows.reduce((s, r) => s + (r.actual_amount_krw ?? 0), 0)
-  const totalDiff = totalActual - totalQuote
+  const totalSupply = rows.reduce((s, r) => s + (r.actual_supply_krw ?? 0), 0)
+  const totalWithVat = rows.reduce((s, r) => s + (r.actual_with_vat_krw ?? 0), 0)
 
   return (
-    <ReportSection title="IV. 포워딩 견적">
+    <ReportSection title="IV. 포워딩 청구">
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>포워더</TableHead>
               <TableHead>견적일</TableHead>
-              <TableHead className="text-right">견적금액(KRW)</TableHead>
-              <TableHead className="text-right">실청구금액(KRW)</TableHead>
-              <TableHead className="text-right">차이</TableHead>
+              <TableHead className="text-right">청구금액 (VAT 미포함)</TableHead>
+              <TableHead className="text-right">청구금액 (VAT 포함)</TableHead>
               <TableHead>메모</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((r, i) => {
-              const hasBoth = r.quote_amount_krw != null && r.actual_amount_krw != null
-              const diff = hasBoth ? (r.actual_amount_krw! - r.quote_amount_krw!) : null
-              return (
-                <TableRow key={i}>
-                  <TableCell className="text-sm">{r.forwarder_name ?? '-'}</TableCell>
-                  <TableCell className="text-sm">{formatDate(r.quote_date)}</TableCell>
-                  <TableCell className="text-right text-sm tabular-nums">{krw(r.quote_amount_krw)}</TableCell>
-                  <TableCell className="text-right text-sm tabular-nums">{krw(r.actual_amount_krw)}</TableCell>
-                  <TableCell className={`text-right text-sm tabular-nums ${diff == null ? '' : diff > 0 ? 'text-red-600' : 'text-slate-600'}`}>
-                    {diff == null ? '-' : diffLabel(diff)}
-                  </TableCell>
-                  <TableCell className="text-sm">{r.notes ?? '-'}</TableCell>
-                </TableRow>
-              )
-            })}
+            {rows.map((r, i) => (
+              <TableRow key={i}>
+                <TableCell className="text-sm">{r.forwarder_name ?? '-'}</TableCell>
+                <TableCell className="text-sm">{formatDate(r.quote_date)}</TableCell>
+                <TableCell className="text-right text-sm tabular-nums">{krw(r.actual_supply_krw)}</TableCell>
+                <TableCell className="text-right text-sm tabular-nums">{krw(r.actual_with_vat_krw)}</TableCell>
+                <TableCell className="text-sm">{r.notes ?? '-'}</TableCell>
+              </TableRow>
+            ))}
             <TableRow className="bg-muted/50 font-semibold">
               <TableCell colSpan={2} className="text-sm">합계</TableCell>
-              <TableCell className="text-right text-sm tabular-nums">{krw(totalQuote)}</TableCell>
-              <TableCell className="text-right text-sm tabular-nums">{krw(totalActual)}</TableCell>
-              <TableCell className={`text-right text-sm tabular-nums ${totalDiff > 0 ? 'text-red-600' : totalDiff < 0 ? 'text-slate-600' : ''}`}>
-                {totalDiff !== 0 ? diffLabel(totalDiff) : '0원'}
-              </TableCell>
+              <TableCell className="text-right text-sm tabular-nums">{krw(totalSupply)}</TableCell>
+              <TableCell className="text-right text-sm tabular-nums">{krw(totalWithVat)}</TableCell>
               <TableCell />
             </TableRow>
           </TableBody>

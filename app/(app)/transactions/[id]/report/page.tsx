@@ -13,6 +13,7 @@ import { ReportTimeline } from '@/components/report/ReportTimeline'
 import { ReportFlowDiagram } from '@/components/report/ReportFlowDiagram'
 import { ReportFooter } from '@/components/report/ReportFooter'
 import { Separator } from '@/components/ui/separator'
+import { confirmedGrandTotalKrw } from '@/lib/calculations/closing'
 
 export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -24,8 +25,11 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
     shippingItems, customsItems, vatAmountKrw, interimVatMode, marginRatePct,
     interimImportKrw, interimConfirmedKrw, interimDirection,
     lcFeesParsed, closingCostsParsed, fxBurdenA1Pct, importAmountKrw, closingCalc,
-    customsDate, nonVatCostsTotal, sectionIRows, forwardingQuotes,
+    customsDate, sectionIRows, forwardingQuotes,
   } = data
+
+  const closingConfirmedKrw = closing?.confirmed_amount_krw != null ? Number(closing.confirmed_amount_krw) : null
+  const grandTotalKrw = confirmedGrandTotalKrw(interimConfirmedKrw, closingConfirmedKrw)
 
   const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
 
@@ -54,8 +58,9 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       <ReportKpiCards
         importUsd={importUsd}
         marginRatePct={marginRatePct}
-        fxGainLossKrw={closingCalc?.fxGainLossKrw ?? null}
-        grandTotalKrw={interimConfirmedKrw != null && closingCalc ? closingCalc.grandTotalKrw : null}
+        interimKrw={interimConfirmedKrw}
+        closingKrw={closingConfirmedKrw}
+        grandTotalKrw={grandTotalKrw}
       />
 
       {/* I. 거래 개요 */}
@@ -118,11 +123,9 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       )}
 
       {/* 계산 플로우 다이어그램 (중간정산~클로징 사이) */}
-      {closingCalc && interimConfirmedKrw != null && closing?.confirmed_amount_krw && (
+      {closingCalc && interimConfirmedKrw != null && closingConfirmedKrw != null && grandTotalKrw != null && (
         <ReportFlowDiagram
           importAmountKrw={interimImportKrw}
-          nonVatCostsTotal={nonVatCostsTotal}
-          vatAmountKrw={vatAmountKrw}
           interimConfirmedKrw={interimConfirmedKrw}
           fxGainLossKrw={closingCalc.fxGainLossKrw}
           lcFeeTotalKrw={closingCalc.lcFeeTotalKrw}
@@ -131,8 +134,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           a1BurdenWithVatKrw={closingCalc.a1BurdenWithVatKrw}
           closingCostsTotalKrw={closingCalc.closingCostsTotalKrw}
           a1ClosingCostsKrw={closingCalc.a1ClosingCostsKrw}
-          closingConfirmedKrw={Number(closing.confirmed_amount_krw)}
-          grandTotalKrw={closingCalc.grandTotalKrw}
+          closingConfirmedKrw={closingConfirmedKrw}
+          grandTotalKrw={grandTotalKrw}
         />
       )}
 
@@ -166,9 +169,9 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             closingCostItems: closingCostsParsed,
             closingCostsTotalKrw: closingCalc.closingCostsTotalKrw,
             a1ClosingCostsKrw: closingCalc.a1ClosingCostsKrw,
-            confirmed_amount_krw: closing.confirmed_amount_krw ? Number(closing.confirmed_amount_krw) : null,
+            confirmed_amount_krw: closingConfirmedKrw,
             interimConfirmedKrw,
-            grandTotalKrw: interimConfirmedKrw != null ? closingCalc.grandTotalKrw : null,
+            grandTotalKrw,
           }} />
 
         </>

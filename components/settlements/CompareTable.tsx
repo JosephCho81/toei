@@ -814,11 +814,14 @@ function RowDetail({
           <p className="mb-1 font-semibold">
             비고 — 계산금액 차이 사유 <span className="font-normal text-muted-foreground">(청구금액이 시스템 계산과 어긋난 이유)</span>
           </p>
+          {/* 시스템 계산과 맞춰 본 쪽(에이원)이 적는 칸이라 토에이는 읽기만 한다 (담당자 2026-10-06, DB 는 044) */}
           <MemoField
             notes={row.calcNote}
             stamp={stampOf(row, row.calcNoteTarget, today)}
             onSave={(next) => onSaveNote(row.calcNoteTarget, next)}
+            disabled={!canEdit}
           />
+          {!canEdit && !row.calcNote && <p className="text-muted-foreground">적힌 사유가 없습니다.</p>}
         </div>
       )}
 

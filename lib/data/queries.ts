@@ -59,6 +59,7 @@ export interface ForwardingQuoteWithItems {
   forwarding_quote_items: Array<{
     item_type: string
     amount_krw: number | string | null
+    vat_amount_krw: number | string | null
   }>
 }
 
@@ -126,11 +127,12 @@ export async function fetchForwardingQuotes(
   supabase: SupabaseClient,
   transactionId: string
 ): Promise<ForwardingQuoteWithItems[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('forwarding_quotes')
-    .select('forwarder_name,quote_date,notes,forwarding_quote_items(item_type,amount_krw)')
+    .select('forwarder_name,quote_date,notes,forwarding_quote_items(item_type,amount_krw,vat_amount_krw)')
     .eq('transaction_id', transactionId)
     .order('sort_order')
+  if (error) throw new Error(`포워딩 청구 조회 실패: ${error.message}`)
   return (data ?? []) as unknown as ForwardingQuoteWithItems[]
 }
 

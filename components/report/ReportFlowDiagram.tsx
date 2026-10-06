@@ -1,7 +1,5 @@
 interface Props {
   importAmountKrw: number
-  nonVatCostsTotal: number
-  vatAmountKrw: number
   interimConfirmedKrw: number
   fxGainLossKrw: number
   lcFeeTotalKrw: number
@@ -48,7 +46,7 @@ function Arrow() {
 
 export function ReportFlowDiagram(props: Props) {
   const {
-    importAmountKrw, nonVatCostsTotal, vatAmountKrw, interimConfirmedKrw,
+    importAmountKrw, interimConfirmedKrw,
     fxGainLossKrw, lcFeeTotalKrw, fxBurdenPct, a1BurdenKrw,
     a1BurdenWithVatKrw, closingCostsTotalKrw, a1ClosingCostsKrw, closingConfirmedKrw, grandTotalKrw,
   } = props
@@ -60,13 +58,11 @@ export function ReportFlowDiagram(props: Props) {
     <div className="mb-4 break-inside-avoid">
       <p className="text-sm font-semibold text-muted-foreground mb-2">계산 플로우</p>
       <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-0.5">
-        {/* 중간정산 계산 */}
-        <FlowRow label="수입원가 (USD × 통관환율)" value={`${fmt(importAmountKrw)}원`} />
-        <FlowRow label={`+ 통관/운송비`} value={`+${fmt(nonVatCostsTotal)}원`} indent />
-        <FlowRow label="+ 부가세" value={`+${fmt(vatAmountKrw)}원`} indent />
-        <div className="border-t border-gray-300 my-1" />
+        {/* 중간정산 — 관세·과세 항목 부가세가 빠져 「수입원가 + 통관/운송비 + 부가세」가 확정금액과
+            맞지 않았다(담당자 2026-10-06). 덧셈처럼 보이지 않게 두 금액만 세운다. 내역은 III 절에 있다 */}
+        <FlowRow label="수입금액 (USD × 통관환율)" value={`${fmt(importAmountKrw)}원`} />
         <FlowTotal
-          label="= 중간정산 확정금액"
+          label="중간정산 확정금액"
           value={`${fmt(interimConfirmedKrw)}원`}
           colorClass="bg-slate-100 text-slate-700"
         />

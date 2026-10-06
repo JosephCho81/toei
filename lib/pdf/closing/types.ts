@@ -40,5 +40,5 @@ export interface ClosingPdfData {
   shippingItems: { itemName: string; amountKrw: number }[]
   customsItems: { itemName: string; amountKrw: number }[]
   customsDetailItems: { itemName: string; amountKrw: number }[]
-  forwardingQuotes: { itemName: string; quoteAmountKrw: number | null; actualAmountKrw: number | null }[]
+  forwardingQuotes: { itemName: string; actualSupplyKrw: number | null; actualWithVatKrw: number | null }[]
 }

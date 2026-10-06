@@ -46,9 +46,14 @@ export function NoteRow({ colSpan, label, note, stamp = null }: {
   return (
     <tr>
       <td colSpan={colSpan} className="border-l-4 border-yellow-300 bg-yellow-50 px-6 py-2 text-sm">
-        <span className="mr-2 font-semibold text-slate-800">{label}</span>
-        <span className="whitespace-pre-wrap break-words text-slate-700">{noteLines(note).join('\n')}</span>
-        {stamp && <span className="ml-3 whitespace-nowrap text-xs text-muted-foreground">{stamp}</span>}
+        {/* 둘째 줄부터 칸 왼쪽 끝으로 돌아가 라벨 밑에 붙었다 — 줄마다 첫 줄 글머리에 맞춘다 (담당자 2026-10-06) */}
+        <div className="flex items-start gap-2">
+          <span className="shrink-0 font-semibold text-slate-800">{label}</span>
+          <div className="min-w-0 text-slate-700">
+            {noteLines(note).map((line, i) => <p key={i} className="break-words">{line}</p>)}
+            {stamp && <p className="text-xs text-muted-foreground">{stamp}</p>}
+          </div>
+        </div>
       </td>
     </tr>
   )
