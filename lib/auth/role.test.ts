@@ -4,7 +4,7 @@ import { canEdit, canEditNotes, loginEmail, roleOf, toeiRedirect } from './role.
 
 test('ID 만 넣으면 내부 도메인을 붙이고, 이메일은 그대로 둔다', () => {
   assert.equal(loginEmail(' Toei '), 'toei@toei.local')
-  assert.equal(loginEmail('alkorea'), 'alkorea@toei.local')
+  assert.equal(loginEmail('a1korea'), 'a1korea@toei.local')
   assert.equal(loginEmail('a@b.com'), 'a@b.com')
 })
 
